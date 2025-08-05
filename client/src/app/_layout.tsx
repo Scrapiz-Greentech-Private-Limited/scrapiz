@@ -1,7 +1,28 @@
-import { Stack } from "expo-router";
-import '../../global.css'
+import { Stack, Tabs } from "expo-router";
+import { useFonts } from 'expo-font';
+import * as SplashScreen from 'expo-splash-screen';
+import { useEffect } from "react";
+import '@/global.css';
+import React from "react";
+
+// Keep splash screen visible while loading resources
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    // Add your custom fonts here
+  });
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) {
+    return null;
+  }
+
   return (
     <Stack>
       <Stack.Screen name="index" options={{ headerShown: false }} />
