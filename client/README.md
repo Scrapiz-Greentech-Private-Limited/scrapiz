@@ -1,50 +1,171 @@
-# Welcome to your Expo app 👋
+# Scrapiz App - Authentication Flow
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+## Overview
 
-## Get started
+This React Native app with Expo Router implements a complete authentication system with the following features:
 
-1. Install dependencies
+- **Splash Screen**: 2-second loading screen with app branding
+- **Login Screen**: Email/password authentication with social login options
+- **Register Screen**: User registration with OTP verification
+- **Forgot Password**: Password reset with email OTP verification
+- **Home Screen**: Welcome screen with logout functionality
 
+## Authentication Flow
+
+### 1. Splash Screen (`/index.tsx`)
+- Shows for 2 seconds with app branding
+- Automatically redirects to login screen
+
+### 2. Login Screen (`/auth/login.tsx`)
+- Email and password input fields
+- "Forgot Password?" link
+- Social login buttons (Google, Facebook)
+- "Sign Up" link to registration
+- API integration with proper error handling
+
+### 3. Register Screen (`/auth/register.tsx`)
+- **Step 1**: Registration form (name, email, password, confirm password)
+- **Step 2**: OTP verification
+- Form validation and API integration
+- Resend OTP functionality
+
+### 4. Forgot Password Screen (`/auth/forgot-password.tsx`)
+- **Step 1**: Email input for password reset
+- **Step 2**: OTP verification
+- **Step 3**: New password setup
+- Complete password reset flow
+
+### 5. Home Screen (`/(tabs)/home.tsx`)
+- Welcome message and app features
+- Logout functionality
+- Beautiful UI with gradient background
+
+## API Integration
+
+### Configuration (`/api/config.ts`)
+- Base URL: `http://localhost:8000/api`
+- All authentication endpoints defined
+- TypeScript interfaces for type safety
+
+### API Service (`/api/apiService.ts`)
+- Complete authentication service class
+- Axios interceptors for token management
+- Error handling and AsyncStorage integration
+- All endpoints from the backend API
+
+### Endpoints Implemented
+- `POST /api/register` - User registration
+- `PUT /api/register` - OTP verification
+- `POST /api/resendotp` - Resend OTP
+- `POST /api/login` - User login
+- `POST /api/logout` - User logout
+- `POST /api/password-reset-request` - Password reset request
+- `POST /api/password-reset` - Password reset
+- `POST /api/oauth-login` - OAuth login
+
+## Features
+
+### UI/UX
+- Beautiful gradient backgrounds
+- Consistent design language
+- Loading states and error handling
+- Toast notifications for user feedback
+- Responsive design with proper spacing
+
+### Security
+- JWT token management
+- Secure password handling
+- OTP verification for registration and password reset
+- Input validation and sanitization
+
+### State Management
+- React Context for authentication state
+- AsyncStorage for persistent login
+- Proper navigation flow
+
+## Setup Instructions
+
+1. **Install Dependencies**
    ```bash
+   cd client
    npm install
    ```
 
-2. Start the app
-
+2. **Start the Backend Server**
    ```bash
-    npx expo start
+   cd ../server
+   python manage.py runserver
    ```
 
-In the output, you'll find options to open the app in a
+3. **Start the React Native App**
+   ```bash
+   cd ../client
+   npm start
+   ```
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+4. **Run on Device/Simulator**
+   - Press `a` for Android
+   - Press `i` for iOS
+   - Press `w` for web
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## File Structure
 
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+client/src/
+├── api/
+│   ├── config.ts          # API configuration and types
+│   └── apiService.ts      # Authentication API service
+├── app/
+│   ├── _layout.tsx        # Root layout with AuthProvider
+│   ├── index.tsx          # Splash screen
+│   ├── (auth)/
+│   │   ├── _layout.tsx    # Auth navigation layout
+│   │   ├── index.tsx      # Auth redirect
+│   │   ├── login.tsx      # Login screen
+│   │   ├── register.tsx   # Register screen
+│   │   └── forgot-password.tsx # Forgot password screen
+│   └── (tabs)/
+│       ├── _layout.tsx    # Tabs navigation layout
+│       └── home.tsx       # Home screen
+└── context/
+    └── AuthContext.tsx    # Authentication context
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Dependencies
 
-## Learn more
+- `expo-router` - Navigation
+- `axios` - HTTP client
+- `@react-native-async-storage/async-storage` - Local storage
+- `expo-linear-gradient` - Gradient backgrounds
+- `react-native-toast-message` - Toast notifications
+- `nativewind` - Tailwind CSS for React Native
 
-To learn more about developing your project with Expo, look at the following resources:
+## Backend Integration
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+The app is designed to work with the Django backend API documented in `server/EndPoints.md`. Make sure the backend server is running on `http://localhost:8000` before testing the authentication flow.
 
-## Join the community
+## Testing the Flow
 
-Join our community of developers creating universal apps.
+1. **Registration Flow**:
+   - Navigate to Register screen
+   - Fill in all fields
+   - Submit registration
+   - Enter OTP received via email
+   - Verify and redirect to home
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+2. **Login Flow**:
+   - Enter email and password
+   - Submit login
+   - Redirect to home screen
+
+3. **Password Reset Flow**:
+   - Navigate to Forgot Password
+   - Enter email
+   - Enter OTP
+   - Set new password
+   - Redirect to login
+
+4. **Logout Flow**:
+   - Press logout button on home screen
+   - Clear authentication state
+   - Redirect to login screen

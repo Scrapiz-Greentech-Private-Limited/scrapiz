@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "SafarSaathi",
-    "slug": "SafarSaathi",
+    "name": "Scrapiz",
+    "slug": "Scrapiz",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "medicationApp",
+    "scheme": "Scrapiz",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -29,7 +29,7 @@
         "android.permission.READ_MEDIA_AUDIO",
         "android.permission.READ_MEDIA_VIDEO"
       ],
-      "package": "com.anonymous.SafarSaathi"
+      "package": "com.anonymous.Scrapiz"
     },
     "web": {
       "bundler": "metro",
@@ -63,7 +63,7 @@
       "typedRoutes": true
     },
     "extra": {
-      "EXPO_PUBLIC_API_URL": "http://your-api-url"
+      "EXPO_PUBLIC_API_URL": "http://192.168.1.103:3000"
     }
   }
 }
