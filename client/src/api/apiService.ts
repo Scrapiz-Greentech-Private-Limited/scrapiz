@@ -45,6 +45,22 @@ export interface AddressSummary {
   user: number;
 }
 
+export interface CreateAddressRequest {
+  name: string;
+  phone_number: string;
+  room_number: string;
+  street: string;
+  area: string;
+  city: string;
+  state: string;
+  country: string;
+  pincode: number;
+  delivery_suggestion?: string;
+  user?: number;
+}
+
+export type UpdateAddressRequest = Partial<CreateAddressRequest>;
+
 export interface UserProfile {
   id: number;
   name: string;
@@ -222,6 +238,58 @@ export class AuthService {
       return response.data as ApiResponse;
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Failed to delete user');
+    }
+  }
+
+  // Address APIs
+  static async getAddresses(): Promise<AddressSummary[]> {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.USER_ADDRESSES);
+      return response.data as AddressSummary[];
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch addresses');
+    }
+  }
+
+  static async createAddress(payload: CreateAddressRequest): Promise<AddressSummary> {
+    try {
+      // Some backends require 'user' in payload; include it proactively
+      let body: CreateAddressRequest = { ...payload };
+      if (!body.user) {
+        try {
+          const user = await AuthService.getUser();
+          body.user = user.id;
+        } catch {}
+      }
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.USER_ADDRESSES, body);
+      return response.data as AddressSummary;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to create address');
+    }
+  }
+
+  static async updateAddress(id: number, payload: UpdateAddressRequest): Promise<AddressSummary> {
+    try {
+      let body: any = { ...payload };
+      if (!('user' in body)) {
+        try {
+          const user = await AuthService.getUser();
+          body.user = user.id;
+        } catch {}
+      }
+      const response = await apiClient.put(`${API_CONFIG.ENDPOINTS.USER_ADDRESSES}${id}/`, body);
+      return response.data as AddressSummary;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to update address');
+    }
+  }
+
+  static async deleteAddress(id: number): Promise<ApiResponse> {
+    try {
+      const response = await apiClient.delete(`${API_CONFIG.ENDPOINTS.USER_ADDRESSES}${id}/`);
+      return response.data as ApiResponse;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to delete address');
     }
   }
 }

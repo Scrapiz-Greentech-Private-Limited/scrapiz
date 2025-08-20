@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -28,6 +28,7 @@ import {
   Zap,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { AuthService, AddressSummary } from '../../api/apiService';
 
 const { width } = Dimensions.get('window');
 
@@ -98,7 +99,6 @@ const timeSlots = [
 
 const stepTitles = [
   'Select Materials',
-  'Schedule Pickup',
   'Pickup Details',
   'Confirmation'
 ];
@@ -109,14 +109,54 @@ export default function SellScreen() {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
-  const [addressForm, setAddressForm] = useState({
-    title: '',
-    addressLine: '',
-    landmark: '',
-    city: '',
-    pinCode: ''
-  });
   const [useNewAddress, setUseNewAddress] = useState(true);
+  const [addresses, setAddresses] = useState<AddressSummary[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
+  const [loadingAddresses, setLoadingAddresses] = useState<boolean>(false);
+  const [creatingAddress, setCreatingAddress] = useState<boolean>(false);
+  const [editingAddressId, setEditingAddressId] = useState<number | null>(null);
+  const [newAddressForm, setNewAddressForm] = useState({
+    name: '',
+    phone_number: '',
+    room_number: '',
+    street: '',
+    area: '',
+    city: '',
+    state: '',
+    country: 'India',
+    pincode: '',
+    delivery_suggestion: ''
+  });
+  const [editAddressForm, setEditAddressForm] = useState({
+    name: '',
+    phone_number: '',
+    room_number: '',
+    street: '',
+    area: '',
+    city: '',
+    state: '',
+    country: 'India',
+    pincode: '',
+    delivery_suggestion: ''
+  });
+
+  useEffect(() => {
+    const load = async () => {
+      setLoadingAddresses(true);
+      try {
+        const list = await AuthService.getAddresses();
+        setAddresses(list);
+        if (list.length > 0) {
+          setSelectedAddressId(list[0].id);
+        }
+      } catch (e: any) {
+        // ignore silently here; user may not be logged in on this screen yet
+      } finally {
+        setLoadingAddresses(false);
+      }
+    };
+    load();
+  }, []);
 
   const addItem = (category: any) => {
     const existingItem = selectedItems.find(item => item.id === category.id);
@@ -154,18 +194,21 @@ export default function SellScreen() {
       Alert.alert('Error', 'Please select at least one item to sell');
       return;
     }
-    if (currentStep === 2 && (!selectedDate || !selectedTime)) {
-      Alert.alert('Error', 'Please select date and time for pickup');
-      return;
-    }
-    if (currentStep === 3) {
-      if (useNewAddress && (!addressForm.addressLine.trim() || !addressForm.city.trim() || !addressForm.pinCode.trim())) {
-        Alert.alert('Error', 'Please fill in all required address fields');
-        return;
+    if (currentStep === 2) {
+      if (useNewAddress) {
+        if (!newAddressForm.street.trim() || !newAddressForm.city.trim() || !newAddressForm.pincode.trim()) {
+          Alert.alert('Error', 'Please fill in street, city and pincode');
+          return;
+        }
+      } else {
+        if (!selectedAddressId) {
+          Alert.alert('Error', 'Please select a saved address');
+          return;
+        }
       }
     }
     
-    if (currentStep < 4) {
+    if (currentStep < 3) {
       setCurrentStep(currentStep + 1);
     } else {
       handleOrderSubmission();
@@ -205,20 +248,104 @@ export default function SellScreen() {
     setSelectedItems([]);
     setSelectedDate('');
     setSelectedTime('');
-    setAddressForm({
-      title: '',
-      addressLine: '',
-      landmark: '',
+    setNewAddressForm({
+      name: '',
+      phone_number: '',
+      room_number: '',
+      street: '',
+      area: '',
       city: '',
-      pinCode: ''
+      state: '',
+      country: 'India',
+      pincode: '',
+      delivery_suggestion: ''
     });
+  };
+
+  const handleCreateAddress = async () => {
+    if (!newAddressForm.name.trim()) {
+      Alert.alert('Error', 'Please enter address name');
+      return;
+    }
+    setCreatingAddress(true);
+    try {
+      const payload = {
+        name: newAddressForm.name.trim(),
+        phone_number: newAddressForm.phone_number.trim(),
+        room_number: newAddressForm.room_number.trim(),
+        street: newAddressForm.street.trim(),
+        area: newAddressForm.area.trim(),
+        city: newAddressForm.city.trim(),
+        state: newAddressForm.state.trim(),
+        country: newAddressForm.country.trim() || 'India',
+        pincode: parseInt(newAddressForm.pincode, 10) || 0,
+        delivery_suggestion: newAddressForm.delivery_suggestion.trim(),
+      };
+      const created = await AuthService.createAddress(payload);
+      const list = await AuthService.getAddresses();
+      setAddresses(list);
+      setUseNewAddress(false);
+      setSelectedAddressId(created.id);
+      Alert.alert('Success', 'Address saved');
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to save address');
+    } finally {
+      setCreatingAddress(false);
+    }
+  };
+
+  const beginEditAddress = (addr: AddressSummary) => {
+    setEditingAddressId(addr.id);
+    setEditAddressForm({
+      name: addr.name || '',
+      phone_number: addr.phone_number || '',
+      room_number: addr.room_number || '',
+      street: addr.street || '',
+      area: addr.area || '',
+      city: addr.city || '',
+      state: addr.state || '',
+      country: addr.country || 'India',
+      pincode: String(addr.pincode || ''),
+      delivery_suggestion: addr.delivery_suggestion || '',
+    });
+  };
+
+  const saveEditAddress = async () => {
+    if (!editingAddressId) return;
+    try {
+      const payload: any = { ...editAddressForm };
+      if (typeof payload.pincode === 'string') payload.pincode = parseInt(payload.pincode, 10) || 0;
+      const updated = await AuthService.updateAddress(editingAddressId, payload);
+      const list = await AuthService.getAddresses();
+      setAddresses(list);
+      setEditingAddressId(null);
+      Alert.alert('Success', 'Address updated');
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to update address');
+    }
+  };
+
+  const deleteAddress = async (id: number) => {
+    Alert.alert('Delete Address', 'Are you sure you want to delete this address?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        try {
+          await AuthService.deleteAddress(id);
+          const list = await AuthService.getAddresses();
+          setAddresses(list);
+          if (selectedAddressId === id) setSelectedAddressId(list[0]?.id ?? null);
+        } catch (e: any) {
+          Alert.alert('Error', e.message || 'Failed to delete address');
+        }
+      }}
+    ]);
   };
 
   const renderStepIndicator = () => (
     <View style={styles.stepIndicatorContainer}>
       <LinearGradient colors={['#667eea', '#764ba2']} style={styles.stepIndicatorGradient}>
         <View style={styles.stepIndicator}>
-          {[1, 2, 3, 4].map((step) => (
+          {[1, 2, 3].map((step) => (
             <React.Fragment key={step}>
               <View style={[
                 styles.stepCircle,
@@ -236,7 +363,7 @@ export default function SellScreen() {
                   </Text>
                 )}
               </View>
-              {step < 4 && (
+              {step < 3 && (
                 <View style={[
                   styles.stepLine,
                   currentStep > step && styles.stepLineActive
@@ -366,39 +493,7 @@ export default function SellScreen() {
         </ScrollView>
       </View>
 
-      <View style={styles.scheduleSection}>
-        <Text style={styles.sectionLabel}>Select Time Slot</Text>
-        <View style={styles.timeSlotsContainer}>
-          {timeSlots.map((slot) => (
-            <TouchableOpacity
-              key={slot.id}
-              style={[
-                styles.timeSlot,
-                selectedTime === slot.time && styles.timeSlotSelected,
-                !slot.available && styles.timeSlotDisabled
-              ]}
-              onPress={() => slot.available && setSelectedTime(slot.time)}
-              disabled={!slot.available}
-            >
-              <LinearGradient 
-                colors={selectedTime === slot.time ? ['#667eea', '#764ba2'] : ['#ffffff', '#f8fafc']}
-                style={styles.timeSlotGradient}
-              >
-                <Text style={[
-                  styles.timeSlotText,
-                  selectedTime === slot.time && styles.timeSlotTextSelected,
-                  !slot.available && styles.timeSlotTextDisabled
-                ]}>
-                  {slot.time}
-                </Text>
-                {!slot.available && (
-                  <Text style={styles.unavailableText}>Unavailable</Text>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
+      {/* Removed time slot step to keep 3-step flow */}
     </View>
   );
 
@@ -433,84 +528,190 @@ export default function SellScreen() {
         {useNewAddress ? (
           <View style={styles.addressForm}>
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Address Title</Text>
+              <Text style={styles.formLabel}>Name</Text>
               <TextInput
                 style={styles.formInput}
-                placeholder="e.g., Home, Office"
-                value={addressForm.title}
-                onChangeText={(text) => setAddressForm(prev => ({ ...prev, title: text }))}
+                placeholder="Home / Office"
+                value={newAddressForm.name}
+                onChangeText={(text) => setNewAddressForm(prev => ({ ...prev, name: text }))}
               />
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Address Line <Text style={styles.required}>*</Text></Text>
+              <Text style={styles.formLabel}>Phone Number</Text>
               <TextInput
                 style={styles.formInput}
-                placeholder="House/Flat no, Street name"
-                value={addressForm.addressLine}
-                onChangeText={(text) => setAddressForm(prev => ({ ...prev, addressLine: text }))}
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Landmark</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="Nearby landmark"
-                value={addressForm.landmark}
-                onChangeText={(text) => setAddressForm(prev => ({ ...prev, landmark: text }))}
+                placeholder="9876543210"
+                keyboardType="phone-pad"
+                value={newAddressForm.phone_number}
+                onChangeText={(text) => setNewAddressForm(prev => ({ ...prev, phone_number: text }))}
               />
             </View>
 
             <View style={styles.formRow}>
-              <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+              <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}> 
+                <Text style={styles.formLabel}>Room/Flat</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="101"
+                  value={newAddressForm.room_number}
+                  onChangeText={(text) => setNewAddressForm(prev => ({ ...prev, room_number: text }))}
+                />
+              </View>
+              <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}> 
+                <Text style={styles.formLabel}>Street <Text style={styles.required}>*</Text></Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="Street"
+                  value={newAddressForm.street}
+                  onChangeText={(text) => setNewAddressForm(prev => ({ ...prev, street: text }))}
+                />
+              </View>
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Area</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="Area"
+                value={newAddressForm.area}
+                onChangeText={(text) => setNewAddressForm(prev => ({ ...prev, area: text }))}
+              />
+            </View>
+
+            <View style={styles.formRow}>
+              <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}> 
                 <Text style={styles.formLabel}>City <Text style={styles.required}>*</Text></Text>
                 <TextInput
                   style={styles.formInput}
                   placeholder="City"
-                  value={addressForm.city}
-                  onChangeText={(text) => setAddressForm(prev => ({ ...prev, city: text }))}
+                  value={newAddressForm.city}
+                  onChangeText={(text) => setNewAddressForm(prev => ({ ...prev, city: text }))}
                 />
               </View>
-              <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
+              <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}> 
                 <Text style={styles.formLabel}>PIN Code <Text style={styles.required}>*</Text></Text>
                 <TextInput
                   style={styles.formInput}
                   placeholder="123456"
                   keyboardType="numeric"
                   maxLength={6}
-                  value={addressForm.pinCode}
-                  onChangeText={(text) => setAddressForm(prev => ({ ...prev, pinCode: text }))}
+                  value={newAddressForm.pincode}
+                  onChangeText={(text) => setNewAddressForm(prev => ({ ...prev, pincode: text }))}
                 />
               </View>
             </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Delivery Suggestion</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="Any delivery notes"
+                value={newAddressForm.delivery_suggestion}
+                onChangeText={(text) => setNewAddressForm(prev => ({ ...prev, delivery_suggestion: text }))}
+              />
+            </View>
+
+            <TouchableOpacity onPress={handleCreateAddress} disabled={creatingAddress} style={{ marginTop: 8, alignSelf: 'flex-end' }}>
+              <LinearGradient colors={['#667eea', '#764ba2']} style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 }}>
+                <Text style={{ color: 'white', fontWeight: '700' }}>{creatingAddress ? 'Saving...' : 'Save Address'}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.savedAddresses}>
-            <TouchableOpacity style={styles.savedAddressCard}>
-              <LinearGradient colors={['#f0fdf4', '#dcfce7']} style={styles.savedAddressGradient}>
-                <View style={styles.savedAddressContent}>
-                  <Text style={styles.savedAddressTitle}>Home</Text>
-                  <Text style={styles.savedAddressText}>
-                    123, Green Valley Apartment, Sector 21, Pune - 411001
-                  </Text>
-                </View>
-                <View style={styles.radioButton}>
-                  <View style={styles.radioSelected} />
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
+            {loadingAddresses ? (
+              <Text>Loading addresses...</Text>
+            ) : addresses.length ? (
+              addresses.map((addr) => (
+                <TouchableOpacity key={addr.id} style={styles.savedAddressCard} onPress={() => setSelectedAddressId(addr.id)}>
+                  <LinearGradient colors={['#f0fdf4', '#dcfce7']} style={styles.savedAddressGradient}>
+                    <View style={styles.savedAddressContent}>
+                      <Text style={styles.savedAddressTitle}>{addr.name} • {addr.phone_number}</Text>
+                      <Text style={styles.savedAddressText}>
+                        {addr.room_number}, {addr.street}, {addr.area}, {addr.city}, {addr.state}, {addr.country} - {addr.pincode}
+                      </Text>
+                    </View>
+                    <View style={styles.radioButton}>
+                      {selectedAddressId === addr.id ? <View style={styles.radioSelected} /> : null}
+                    </View>
+                  </LinearGradient>
+                  <View style={{ flexDirection: 'row', gap: 12, marginTop: 8, justifyContent: 'flex-end' }}>
+                    <TouchableOpacity onPress={() => beginEditAddress(addr)} style={{ paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#eef2ff', borderRadius: 8 }}>
+                      <Text style={{ color: '#4338ca', fontWeight: '600' }}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => deleteAddress(addr.id)} style={{ paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#fee2e2', borderRadius: 8 }}>
+                      <Text style={{ color: '#b91c1c', fontWeight: '600' }}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <Text>No saved addresses. Create a new one.</Text>
+            )}
+
+            {editingAddressId && (
+              <View style={{ marginTop: 16 }}>
+                <LinearGradient colors={['#ffffff', '#f8fafc']} style={{ borderRadius: 16, padding: 16 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '700', marginBottom: 12 }}>Edit Address</Text>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>Name</Text>
+                    <TextInput style={styles.formInput} value={editAddressForm.name} onChangeText={(t) => setEditAddressForm(prev => ({ ...prev, name: t }))} />
+                  </View>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>Phone Number</Text>
+                    <TextInput style={styles.formInput} value={editAddressForm.phone_number} onChangeText={(t) => setEditAddressForm(prev => ({ ...prev, phone_number: t }))} />
+                  </View>
+                  <View style={styles.formRow}>
+                    <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}> 
+                      <Text style={styles.formLabel}>Room/Flat</Text>
+                      <TextInput style={styles.formInput} value={editAddressForm.room_number} onChangeText={(t) => setEditAddressForm(prev => ({ ...prev, room_number: t }))} />
+                    </View>
+                    <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}> 
+                      <Text style={styles.formLabel}>Street</Text>
+                      <TextInput style={styles.formInput} value={editAddressForm.street} onChangeText={(t) => setEditAddressForm(prev => ({ ...prev, street: t }))} />
+                    </View>
+                  </View>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>Area</Text>
+                    <TextInput style={styles.formInput} value={editAddressForm.area} onChangeText={(t) => setEditAddressForm(prev => ({ ...prev, area: t }))} />
+                  </View>
+                  <View style={styles.formRow}>
+                    <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}> 
+                      <Text style={styles.formLabel}>City</Text>
+                      <TextInput style={styles.formInput} value={editAddressForm.city} onChangeText={(t) => setEditAddressForm(prev => ({ ...prev, city: t }))} />
+                    </View>
+                    <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}> 
+                      <Text style={styles.formLabel}>PIN Code</Text>
+                      <TextInput style={styles.formInput} value={editAddressForm.pincode} onChangeText={(t) => setEditAddressForm(prev => ({ ...prev, pincode: t }))} keyboardType="numeric" maxLength={6} />
+                    </View>
+                  </View>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>Delivery Suggestion</Text>
+                    <TextInput style={styles.formInput} value={editAddressForm.delivery_suggestion} onChangeText={(t) => setEditAddressForm(prev => ({ ...prev, delivery_suggestion: t }))} />
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12 }}>
+                    <TouchableOpacity onPress={() => setEditingAddressId(null)} style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
+                      <Text style={{ color: '#6b7280', fontWeight: '600' }}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={saveEditAddress} style={{ backgroundColor: '#667eea', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 }}>
+                      <Text style={{ color: 'white', fontWeight: '700' }}>Save</Text>
+                    </TouchableOpacity>
+                  </View>
+                </LinearGradient>
+              </View>
+            )}
           </View>
         )}
       </LinearGradient>
 
-      <TouchableOpacity style={styles.photoUploadCard}>
+      {/* <TouchableOpacity style={styles.photoUploadCard}>
         <LinearGradient colors={['#f8fafc', '#e2e8f0']} style={styles.photoUploadGradient}>
           <Camera size={32} color="#667eea" />
           <Text style={styles.photoUploadTitle}>Add Photos (Optional)</Text>
           <Text style={styles.photoUploadSubtitle}>Help us identify your materials better</Text>
         </LinearGradient>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
     </View>
   );
 
@@ -543,16 +744,19 @@ export default function SellScreen() {
 
       <LinearGradient colors={['#ffffff', '#f8fafc']} style={styles.summaryCard}>
         <Text style={styles.summaryTitle}>Pickup Information</Text>
-        <View style={styles.summaryDetail}>
+        {/* <View style={styles.summaryDetail}>
           <Calendar size={16} color="#6b7280" />
           <Text style={styles.summaryDetailText}>{selectedDate} • {selectedTime}</Text>
-        </View>
+        </View> */}
         <View style={styles.summaryDetail}>
           <MapPin size={16} color="#6b7280" />
           <Text style={styles.summaryDetailText}>
             {useNewAddress 
-              ? `${addressForm.addressLine}, ${addressForm.city} - ${addressForm.pinCode}`
-              : '123, Green Valley Apartment, Sector 21, Pune - 411001'
+              ? `${newAddressForm.street}, ${newAddressForm.city} - ${newAddressForm.pincode}`
+              : (addresses.find(a => a.id === selectedAddressId)
+                  ? `${addresses.find(a => a.id === selectedAddressId)!.street}, ${addresses.find(a => a.id === selectedAddressId)!.city} - ${addresses.find(a => a.id === selectedAddressId)!.pincode}`
+                  : 'Select an address'
+                )
             }
           </Text>
         </View>
@@ -568,9 +772,8 @@ export default function SellScreen() {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {currentStep === 1 && renderStep1()}
-        {currentStep === 2 && renderStep2()}
-        {currentStep === 3 && renderStep3()}
-        {currentStep === 4 && renderStep4()}
+        {currentStep === 2 && renderStep3()}
+        {currentStep === 3 && renderStep4()}
       </ScrollView>
 
       {selectedItems.length > 0 && (
@@ -594,9 +797,9 @@ export default function SellScreen() {
               <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
                 <LinearGradient colors={['#667eea', '#764ba2']} style={styles.nextButtonGradient}>
                   <Text style={styles.nextButtonText}>
-                    {currentStep === 4 ? 'Confirm Pickup' : 'Continue'}
+                    {currentStep === 3 ? 'Confirm Pickup' : 'Continue'}
                   </Text>
-                  {currentStep === 4 ? (
+                  {currentStep === 3 ? (
                     <Zap size={20} color="white" />
                   ) : (
                     <ArrowRight size={20} color="white" />

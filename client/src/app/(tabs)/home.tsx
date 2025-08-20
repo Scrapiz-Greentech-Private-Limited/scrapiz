@@ -6,25 +6,52 @@ import {
   ScrollView,
   StyleSheet,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import {
-  Bell,
   Package,
   TrendingUp,
-  IndianRupee,
-  Award,
   ArrowRight,
-  Recycle,
   Truck,
 } from 'lucide-react-native';
+import { AuthService, UserProfile } from '../../api/apiService';
 
 const { width } = Dimensions.get('window');
 
+function formatAMPM(date: Date) {
+  let hours = date.getHours();
+  const minutes = date.getMinutes();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12; // the hour '0' should be '12'
+  const minutesString = minutes < 10 ? '0' + minutes : minutes;
+  const strTime = hours + ':' + minutesString + ' ' + ampm;
+  return strTime;
+}
+
 export default function HomeScreen() {
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [user, setUser] = useState<UserProfile | undefined>(undefined);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data = await AuthService.getUser();
+        setUser(data);
+      } catch (e: any) {
+        Alert.alert('Error', e.message || 'Failed to load user');
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const profileName = user?.name || 'User'; 
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -40,12 +67,10 @@ export default function HomeScreen() {
     return 'Good Evening';
   };
 
-  const stats = [
-    { id: 1, title: 'Total Earnings', value: '₹8,420', icon: IndianRupee, color: '#16a34a' },
-    { id: 2, title: 'Orders Completed', value: '24', icon: Package, color: '#3b82f6' },
-    { id: 3, title: 'Recycled Weight', value: '186kg', icon: Recycle, color: '#f59e0b' },
-    { id: 4, title: 'Eco Score', value: '4.8★', icon: Award, color: '#8b5cf6' },
-  ];
+  // const stats = [
+  //   { id: 1, title: 'Total Earnings', value: '₹8,420', icon: IndianRupee, color: '#16a34a' },
+  //   { id: 2, title: 'Orders Completed', value: '2', icon: Package, color: '#3b82f6' },
+  // ];
 
   const quickActions = [
     {
@@ -74,6 +99,12 @@ export default function HomeScreen() {
     },
   ];
 
+  const ads = [
+    { id: 1, title: 'Get ₹100 Bonus', subtitle: 'Refer a friend and earn rewards', colors: ['#fde68a', '#fbbf24'] },
+    { id: 2, title: 'Higher Rates Today', subtitle: 'Best prices for Iron & Copper', colors: ['#bfdbfe', '#93c5fd'] },
+    { id: 3, title: 'Eco Challenge', subtitle: 'Recycle 10kg this week and win', colors: ['#c7d2fe', '#a5b4fc'] },
+  ];
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
@@ -84,34 +115,27 @@ export default function HomeScreen() {
           <View style={styles.headerTop}>
             <View>
               <Text style={styles.greeting}>{getGreeting()}</Text>
-              <Text style={styles.userName}>Rajesh Kumar</Text>
+              <Text style={styles.userName}>{profileName}</Text>
             </View>
-            <TouchableOpacity style={styles.notificationButton}>
-              <Bell size={24} color="white" />
-              <View style={styles.notificationBadge} />
-            </TouchableOpacity>
           </View>
 
-          {/* Stats Cards */}
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            style={styles.statsContainer}
-          >
-            {stats.map((stat) => (
-              <View key={stat.id} style={styles.statCard}>
-                <View style={[styles.statIcon, { backgroundColor: `${stat.color}20` }]}>
-                  <stat.icon size={20} color={stat.color} />
-                </View>
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statTitle}>{stat.title}</Text>
-              </View>
-            ))}
-          </ScrollView>
         </View>
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Ads Carousel */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Ad's</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -8 }}>
+            {ads.map((ad) => (
+              <LinearGradient key={ad.id} colors={ad.colors as any} style={styles.adCard}>
+                <Text style={styles.adTitle}>{ad.title}</Text>
+                <Text style={styles.adSubtitle}>{ad.subtitle}</Text>
+              </LinearGradient>
+            ))}
+          </ScrollView>
+        </View>
+
         {/* Quick Actions */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
@@ -126,83 +150,12 @@ export default function HomeScreen() {
                   <action.icon size={24} color="white" />
                 </View>
                 <Text style={styles.actionTitle}>{action.title}</Text>
-                <Text style={styles.actionSubtitle}>{action.subtitle}</Text>
-                <ArrowRight size={16} color="#6b7280" style={styles.actionArrow} />
+                {/* <Text style={styles.actionSubtitle}>{action.subtitle}</Text> */}
+                <ArrowRight size={26} color="#6b7280" style={styles.actionArrow} />
               </TouchableOpacity>
             ))}
           </View>
-            </View>
-
-        {/* Recent Activity */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Activity</Text>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/orders')}>
-              <Text style={styles.seeAllText}>See All</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.activityCard}>
-            <View style={styles.activityItem}>
-              <View style={[styles.activityIcon, { backgroundColor: '#dcfce7' }]}>
-                <Package size={20} color="#16a34a" />
-              </View>
-              <View style={styles.activityContent}>
-                <Text style={styles.activityTitle}>Pickup Completed</Text>
-                <Text style={styles.activitySubtitle}>Order #ORD-2024-002 • ₹650</Text>
-                <Text style={styles.activityTime}>Yesterday, 4:45 PM</Text>
-              </View>
-            </View>
-            
-            <View style={styles.activityDivider} />
-            
-            <View style={styles.activityItem}>
-              <View style={[styles.activityIcon, { backgroundColor: '#dbeafe' }]}>
-                <Truck size={20} color="#3b82f6" />
-              </View>
-              <View style={styles.activityContent}>
-                <Text style={styles.activityTitle}>Agent En Route</Text>
-                <Text style={styles.activitySubtitle}>Order #ORD-2024-001 • ETA 30 mins</Text>
-                <Text style={styles.activityTime}>Today, 2:30 PM</Text>
-              </View>
-            </View>
-          </View>
-              </View>
-
-        {/* Environmental Impact */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Your Environmental Impact</Text>
-          <LinearGradient
-            colors={['#f0fdf4', '#dcfce7']}
-            style={styles.impactCard}
-          >
-            <View style={styles.impactHeader}>
-              <Text style={styles.impactEmoji}>🌱</Text>
-              <View style={styles.impactContent}>
-                <Text style={styles.impactTitle}>Great Job!</Text>
-                <Text style={styles.impactDescription}>
-                  You've recycled 186kg of waste this month
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.impactStats}>
-              <View style={styles.impactStat}>
-                <Text style={styles.impactStatValue}>124</Text>
-                <Text style={styles.impactStatLabel}>Trees Saved</Text>
-              </View>
-              <View style={styles.impactStat}>
-                <Text style={styles.impactStatValue}>340kg</Text>
-                <Text style={styles.impactStatLabel}>CO₂ Reduced</Text>
-              </View>
-              <View style={styles.impactStat}>
-                <Text style={styles.impactStatValue}>89%</Text>
-                <Text style={styles.impactStatLabel}>Efficiency</Text>
-              </View>
-            </View>
-          </LinearGradient>
-        </View>
-
+            </View>      
         {/* Tips Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Tips for Better Recycling</Text>
@@ -331,6 +284,29 @@ const styles = StyleSheet.create({
   },
   actionsGrid: {
     gap: 12,
+  },
+  adCard: {
+    marginHorizontal: 8,
+    borderRadius: 16,
+    padding: 16,
+    minWidth: 240,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  adTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 6,
+  },
+  adSubtitle: {
+    fontSize: 14,
+    color: '#374151',
+    fontFamily: 'Inter-Regular',
   },
   actionCard: {
     backgroundColor: 'white',

@@ -19,6 +19,7 @@ export const API_CONFIG = {
     PASSWORD_RESET_REQUEST: '/authentication/password-reset-request',
     PASSWORD_RESET: '/authentication/password-reset',
     USER: '/authentication/user',
+    USER_ADDRESSES: '/user/address/',
   },
   HEADERS: {
     'Content-Type': 'application/json',
