@@ -11,6 +11,12 @@ const apiClient = axios.create({
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
   async (config) => {
+    const frontendKey = API_CONFIG.HEADERS['x-auth-app'] as string | undefined;
+    if (frontendKey) {
+      if (!config.headers) config.headers = {} as any;
+      (config.headers as any)['x-auth-app'] = frontendKey;
+    }
+
     const token = await AsyncStorage.getItem('authToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -106,19 +112,6 @@ export class AuthService {
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Password reset failed');
-    }
-  }
-
-  // OAuth login
-  static async oauthLogin(email: string, name: string): Promise<ApiResponse> {
-    try {
-      const response = await apiClient.post(API_CONFIG.ENDPOINTS.OAUTH_LOGIN, { email, name });
-      if (response.data.jwt) {
-        await AsyncStorage.setItem('authToken', response.data.jwt);
-      }
-      return response.data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'OAuth login failed');
     }
   }
 

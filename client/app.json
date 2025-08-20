@@ -63,7 +63,10 @@
       "typedRoutes": true
     },
     "extra": {
-      "EXPO_PUBLIC_API_URL": "http://192.168.1.103:3000"
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://192.168.1.104:8000/api",
+        "EXPO_PUBLIC_FRONTEND_SECRET": "Scrapiz#0nn$(tab!z"
+      }
     }
   }
 }

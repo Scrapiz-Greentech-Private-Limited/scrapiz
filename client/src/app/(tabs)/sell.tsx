@@ -9,6 +9,7 @@ import {
   Alert,
   Dimensions,
   StatusBar,
+  ColorValue,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -264,7 +265,7 @@ export default function SellScreen() {
             style={styles.categoryCard}
             onPress={() => addItem(category)}
           >
-            <LinearGradient colors={category.gradient} style={styles.categoryGradient}>
+            <LinearGradient colors={category.gradient as [ColorValue, ColorValue, ...ColorValue[]]} style={styles.categoryGradient}>
               <View style={styles.categoryContent}>
                 <Text style={styles.categoryIcon}>{category.icon}</Text>
                 <Text style={styles.categoryName}>{category.name}</Text>
