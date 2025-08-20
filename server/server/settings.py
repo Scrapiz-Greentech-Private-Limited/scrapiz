@@ -18,14 +18,15 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
     'localhost',
     '0.0.0.0', 
-    '192.168.0.101',
     ]
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
+    'http://192.168.0.107:8081'
 ]
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
+    'http://92.168.0.107:8081'
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -36,7 +37,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'api',
+    'authentication',
+    'inventory',
+    'user'
 ]
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -58,7 +61,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'api.middleware.ExpiredUserCleanupMiddleware', 
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
 ]
@@ -67,7 +69,7 @@ ROOT_URLCONF = 'server.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        "DIRS": [BASE_DIR / "api" / "templates"],
+        "DIRS": [BASE_DIR / "authentication" / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -123,7 +125,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Kolkata'
 
 USE_I18N = True
 
@@ -151,7 +153,7 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 #  Authentication
-AUTH_USER_MODEL = 'api.User'
+AUTH_USER_MODEL = 'authentication.User'
 
 
 # Email configuration
