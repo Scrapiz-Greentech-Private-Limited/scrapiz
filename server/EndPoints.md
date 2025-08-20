@@ -8,7 +8,7 @@ The documentation is divided into three main sections:
 
 1. **Authentication**  
    Handles user registration, login, OTP verification, JWT generation, and secure access management.  
-   🔗 [Authentication API Documentation](/authentication/Readme.md)
+   🔗 [Authentication API Documentation](/authentication/README.md)
 
 2. **Inventory Management**  
    Provides endpoints to manage inventory items, categories, stock levels, and related operations.  
