@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -105,6 +105,21 @@ export default function HomeScreen() {
     { id: 3, title: 'Eco Challenge', subtitle: 'Recycle 10kg this week and win', colors: ['#c7d2fe', '#a5b4fc'] },
   ];
 
+  const adScrollRef = useRef<ScrollView | null>(null);
+  const [adIndex, setAdIndex] = useState(0);
+  const adCardWidth = width - 40; // full-bleed minus horizontal padding
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const next = (adIndex + 1) % ads.length;
+      setAdIndex(next);
+      try {
+        adScrollRef.current?.scrollTo({ x: next * (adCardWidth + 16), animated: true });
+      } catch {}
+    }, 3500);
+    return () => clearInterval(interval);
+  }, [adIndex, ads.length, adCardWidth]);
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
@@ -126,14 +141,34 @@ export default function HomeScreen() {
         {/* Ads Carousel */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Ad's</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -8 }}>
+          <ScrollView
+            ref={adScrollRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            decelerationRate="fast"
+            snapToInterval={adCardWidth + 16}
+            snapToAlignment="start"
+            contentContainerStyle={{ paddingHorizontal: 8 }}
+            onScroll={(e) => {
+              const x = e.nativeEvent.contentOffset.x;
+              const idx = Math.round(x / (adCardWidth + 16));
+              if (idx !== adIndex) setAdIndex(idx);
+            }}
+            scrollEventThrottle={16}
+            style={{ marginHorizontal: -8 }}
+          >
             {ads.map((ad) => (
-              <LinearGradient key={ad.id} colors={ad.colors as any} style={styles.adCard}>
+              <LinearGradient key={ad.id} colors={ad.colors as any} style={[styles.adCard, { width: adCardWidth, marginHorizontal: 8 }] }>
                 <Text style={styles.adTitle}>{ad.title}</Text>
                 <Text style={styles.adSubtitle}>{ad.subtitle}</Text>
               </LinearGradient>
             ))}
           </ScrollView>
+          <View style={styles.adDots}>
+            {ads.map((ad, idx) => (
+              <View key={ad.id} style={[styles.adDot, idx === adIndex && styles.adDotActive]} />
+            ))}
+          </View>
         </View>
 
         {/* Quick Actions */}
@@ -307,6 +342,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#374151',
     fontFamily: 'Inter-Regular',
+  },
+  adDots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+  adDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#e5e7eb',
+  },
+  adDotActive: {
+    backgroundColor: '#6b7280',
   },
   actionCard: {
     backgroundColor: 'white',

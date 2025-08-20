@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -22,137 +22,105 @@ import {
   Share
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { AuthService, CategorySummary, ProductSummary } from '../../api/apiService';
 
 const { width } = Dimensions.get('window');
 
-const scrapRates = {
-  metal: [
-    { name: 'Iron', rate: '₹30-35', trend: 'down', change: '-2.5%', icon: '⚙️', description: 'Scrap iron, steel parts', baseRate: 32.5 },
-    { name: 'Tin', rate: '₹25-30', trend: 'up', change: '+1.8%', icon: '🥫', description: 'Tin cans, containers', baseRate: 27.5 },
-    { name: 'Steel', rate: '₹45-50', trend: 'stable', change: '0.0%', icon: '🔧', description: 'Steel utensils, parts', baseRate: 47.5 },
-    { name: 'Aluminum', rate: '₹150-180', trend: 'up', change: '+3.2%', icon: '🪜', description: 'Aluminum sheets, cans', baseRate: 165 },
-    { name: 'Brass', rate: '₹600-680', trend: 'up', change: '+5.1%', icon: '🔔', description: 'Brass fittings, decorative items', baseRate: 640 },
-    { name: 'Copper', rate: '₹600-680', trend: 'down', change: '-1.2%', icon: '🔌', description: 'Copper wires, pipes', baseRate: 640 },
-  ],
-  paper: [
-    { name: 'Books', rate: '₹10-12', trend: 'stable', change: '0.0%', icon: '📚', description: 'Old books, notebooks', baseRate: 11 },
-    { name: 'Cardboard', rate: '₹10-12', trend: 'up', change: '+0.8%', icon: '📦', description: 'Corrugated boxes', baseRate: 11 },
-    { name: 'Office Paper', rate: '₹10-14', trend: 'up', change: '+1.5%', icon: '📄', description: 'White office paper', baseRate: 12 },
-    { name: 'Newspaper', rate: '₹12-15', trend: 'down', change: '-0.5%', icon: '📰', description: 'Daily newspapers', baseRate: 13.5 },
-    { name: 'Magazines', rate: '₹8-10', trend: 'stable', change: '0.0%', icon: '📖', description: 'Glossy magazines', baseRate: 9 },
-    { name: 'Mixed Paper', rate: '₹6-8', trend: 'up', change: '+0.3%', icon: '📋', description: 'Mixed paper waste', baseRate: 7 },
-  ],
-  plastic: [
-    { name: 'Blue Drum', rate: '₹40-50', trend: 'up', change: '+2.1%', icon: '🛢️', description: 'Large plastic drums', baseRate: 45 },
-    { name: 'PVC Pipe', rate: '₹10-15', trend: 'stable', change: '0.0%', icon: '🔧', description: 'PVC pipes, fittings', baseRate: 12.5 },
-    { name: 'PET Bottles', rate: '₹20-25', trend: 'up', change: '+1.2%', icon: '🧴', description: 'PET bottles', baseRate: 22.5 },
-    { name: 'Plastic Crates', rate: '₹25-30', trend: 'down', change: '-0.8%', icon: '📦', description: 'Storage crates', baseRate: 27.5 },
-    { name: 'Polythene Bags', rate: '₹15-18', trend: 'up', change: '+0.5%', icon: '🛍️', description: 'Polythene bags', baseRate: 16.5 },
-    { name: 'Containers', rate: '₹15-20', trend: 'stable', change: '0.0%', icon: '🥡', description: 'Food containers', baseRate: 17.5 },
-  ],
-  electronics: [
-    { name: 'Mobile Phones', rate: '₹100-500', trend: 'up', change: '+4.2%', icon: '📱', description: 'Old smartphones', baseRate: 300 },
-    { name: 'Laptops', rate: '₹500-2000', trend: 'up', change: '+2.8%', icon: '💻', description: 'Old laptops, computers', baseRate: 1250 },
-    { name: 'TV/Monitor', rate: '₹200-800', trend: 'down', change: '-1.5%', icon: '📺', description: 'CRT/LCD screens', baseRate: 500 },
-    { name: 'Cables & Wires', rate: '₹50-150', trend: 'up', change: '+1.8%', icon: '🔌', description: 'Electronic cables', baseRate: 100 },
-    { name: 'Circuit Boards', rate: '₹300-1000', trend: 'up', change: '+3.5%', icon: '🔧', description: 'PCBs, motherboards', baseRate: 650 },
-    { name: 'Batteries', rate: '₹80-200', trend: 'stable', change: '0.0%', icon: '🔋', description: 'Lead acid, lithium', baseRate: 140 },
-  ],
-};
-
-const categoryConfig = {
-  metal: { title: 'Metal Scrap', color: '#f59e0b', bgColor: '#fef3c7', gradient: ['#fef3c7', '#fde68a'] },
-  paper: { title: 'Paper Scrap', color: '#10b981', bgColor: '#d1fae5', gradient: ['#d1fae5', '#a7f3d0'] },
-  plastic: { title: 'Plastic Scrap', color: '#3b82f6', bgColor: '#dbeafe', gradient: ['#dbeafe', '#bfdbfe'] },
-  electronics: { title: 'Electronic Scrap', color: '#8b5cf6', bgColor: '#ede9fe', gradient: ['#ede9fe', '#ddd6fe'] },
-};
-
 export default function RatesScreen() {
   const router = useRouter();
-  const [selectedCategory, setSelectedCategory] = useState<keyof typeof scrapRates>('metal');
+  const [categories, setCategories] = useState<CategorySummary[]>([]);
+  const [products, setProducts] = useState<ProductSummary[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
 
-  const getTrendIcon = (trend: string) => {
-    switch (trend) {
-      case 'up':
-        return <ArrowUp size={12} color="#10b981" />;
-      case 'down':
-        return <ArrowDown size={12} color="#ef4444" />;
-      default:
-        return <View style={{ width: 12, height: 12, backgroundColor: '#6b7280', borderRadius: 6 }} />;
-    }
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [cats, prods] = await Promise.all([
+          AuthService.getCategories(),
+          AuthService.getProducts(),
+        ]);
+        setCategories(cats);
+        setProducts(prods);
+        if (cats.length > 0) setSelectedCategoryId(cats[0].id);
+      } catch (e) {}
+    };
+    load();
+  }, []);
+
+  const filteredProducts = useMemo(() => {
+    if (!selectedCategoryId) return products;
+    return products.filter(p => p.category === selectedCategoryId);
+  }, [products, selectedCategoryId]);
+
+  const getTrendIcon = (minRate: number, maxRate: number) => {
+    // Placeholder trend based on spread
+    const spread = maxRate - minRate;
+    if (spread > 20) return <ArrowUp size={12} color="#10b981" />;
+    if (spread < 5) return <View style={{ width: 12, height: 12, backgroundColor: '#6b7280', borderRadius: 6 }} />;
+    return <ArrowDown size={12} color="#ef4444" />;
   };
 
-  const getTrendColor = (trend: string) => {
-    switch (trend) {
-      case 'up':
-        return '#10b981';
-      case 'down':
-        return '#ef4444';
-      default:
-        return '#6b7280';
-    }
+  const getTrendColor = (minRate: number, maxRate: number) => {
+    const spread = maxRate - minRate;
+    if (spread > 20) return '#10b981';
+    if (spread < 5) return '#6b7280';
+    return '#ef4444';
   };
 
   const renderCategoryTabs = () => (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesContainer}>
-      {Object.entries(categoryConfig).map(([key, config]) => (
+      {categories.map((cat) => (
         <TouchableOpacity
-          key={key}
+          key={cat.id}
           style={[
             styles.categoryTab,
-            selectedCategory === key && { backgroundColor: config.color }
+            selectedCategoryId === cat.id && { backgroundColor: '#3b82f6' }
           ]}
-          onPress={() => setSelectedCategory(key as keyof typeof scrapRates)}
+          onPress={() => setSelectedCategoryId(cat.id)}
         >
           <Text style={[
             styles.categoryTabText,
-            selectedCategory === key && styles.categoryTabTextActive
+            selectedCategoryId === cat.id && styles.categoryTabTextActive
           ]}>
-            {config.title}
+            {cat.name}
           </Text>
         </TouchableOpacity>
       ))}
     </ScrollView>
   );
 
-  const renderRateCard = (item: any, config: any) => (
-    <View key={item.name} style={styles.rateCard}>
-      <LinearGradient colors={config.gradient} style={styles.rateCardGradient}>
+  const renderRateCard = (item: ProductSummary) => (
+    <View key={item.id} style={styles.rateCard}>
+      <LinearGradient colors={['#eef2ff', '#e0e7ff']} style={styles.rateCardGradient}>
         <View style={styles.rateCardHeader}>
           <View style={styles.rateCardLeft}>
-            <Text style={styles.rateCardIcon}>{item.icon}</Text>
+            <Text style={styles.rateCardIcon}>♻️</Text>
             <View style={styles.rateCardInfo}>
               <Text style={styles.rateCardName}>{item.name}</Text>
               <Text style={styles.rateCardDescription}>{item.description}</Text>
             </View>
           </View>
-          
           <TouchableOpacity style={styles.bookmarkButton}>
-            <Bookmark size={16} color={config.color} />
+            <Bookmark size={16} color="#3b82f6" />
           </TouchableOpacity>
         </View>
-        
         <View style={styles.rateCardContent}>
           <View style={styles.priceContainer}>
-            <Text style={[styles.ratePrice, { color: config.color }]}>{item.rate}</Text>
+            <Text style={[styles.ratePrice, { color: '#3b82f6' }]}>₹{item.min_rate}-{item.max_rate}</Text>
             <Text style={styles.rateUnit}>per kg</Text>
           </View>
-          
           <View style={styles.trendContainer}>
-            {getTrendIcon(item.trend)}
-            <Text style={[styles.trendText, { color: getTrendColor(item.trend) }]}>
-              {item.change}
-            </Text>
+            {getTrendIcon(item.min_rate, item.max_rate)}
+            <Text style={[styles.trendText, { color: getTrendColor(item.min_rate, item.max_rate) }]}>range</Text>
           </View>
         </View>
-        
         <View style={styles.rateCardFooter}>
-          <TouchableOpacity style={[styles.actionButton, { backgroundColor: config.color }]}>
+          {/* <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#3b82f6' }]}> 
             <Text style={styles.actionButtonText}>Get Quote</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.shareButton}>
-            <Share size={16} color={config.color} />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
+          {/* <TouchableOpacity style={styles.shareButton}>
+            <Share size={16} color="#3b82f6" />
+          </TouchableOpacity> */}
         </View>
       </LinearGradient>
     </View>
@@ -170,7 +138,17 @@ export default function RatesScreen() {
               <ArrowLeft size={24} color="white" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Market Rates</Text>
-            <TouchableOpacity style={styles.refreshButton}>
+            <TouchableOpacity style={styles.refreshButton} onPress={async () => {
+              try {
+                const [cats, prods] = await Promise.all([
+                  AuthService.getCategories(),
+                  AuthService.getProducts(),
+                ]);
+                setCategories(cats);
+                setProducts(prods);
+                if (cats.length > 0 && !cats.find(c => c.id === selectedCategoryId)) setSelectedCategoryId(cats[0].id);
+              } catch {}
+            }}>
               <RefreshCw size={24} color="white" />
             </TouchableOpacity>
           </View>
@@ -184,7 +162,7 @@ export default function RatesScreen() {
               </View>
               <View>
                 <Text style={styles.summaryLabel}>Market Status</Text>
-                <Text style={styles.summaryValue}>Bullish</Text>
+                <Text style={styles.summaryValue}>Active</Text>
               </View>
             </View>
             
@@ -193,8 +171,8 @@ export default function RatesScreen() {
                 <BarChart3 size={20} color="#3b82f6" />
               </View>
               <View>
-                <Text style={styles.summaryLabel}>Avg. Growth</Text>
-                <Text style={styles.summaryValue}>+2.1%</Text>
+                <Text style={styles.summaryLabel}>Avg. Spread</Text>
+                <Text style={styles.summaryValue}>~₹{Math.max(0, Math.round((products.reduce((s, p) => s + (p.max_rate - p.min_rate), 0) / Math.max(1, products.length))))}</Text>
               </View>
             </View>
             
@@ -234,38 +212,14 @@ export default function RatesScreen() {
         {/* Rates Grid */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>
-              {categoryConfig[selectedCategory].title} Rates
-            </Text>
+            <Text style={styles.sectionTitle}>Products</Text>
             <TouchableOpacity style={styles.filterButton}>
               <BarChart3 size={16} color="#6b7280" />
               <Text style={styles.filterText}>Filter</Text>
             </TouchableOpacity>
           </View>
-          
           <View style={styles.ratesGrid}>
-            {scrapRates[selectedCategory].map((item) => 
-              renderRateCard(item, categoryConfig[selectedCategory])
-            )}
-          </View>
-        </View>
-
-        {/* Market Trends */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Market Insights</Text>
-          <View style={styles.trendsCard}>
-            <View style={styles.trendInsight}>
-              <View style={[styles.trendIndicator, { backgroundColor: '#10b981' }]} />
-              <Text style={styles.trendInsightText}>Metal prices showing upward trend this week</Text>
-            </View>
-            <View style={styles.trendInsight}>
-              <View style={[styles.trendIndicator, { backgroundColor: '#3b82f6' }]} />
-              <Text style={styles.trendInsightText}>Electronics demand increasing due to festive season</Text>
-            </View>
-            <View style={styles.trendInsight}>
-              <View style={[styles.trendIndicator, { backgroundColor: '#f59e0b' }]} />
-              <Text style={styles.trendInsightText}>Paper rates stable with slight seasonal variation</Text>
-            </View>
+            {filteredProducts.map((item) => renderRateCard(item))}
           </View>
         </View>
 
@@ -556,33 +510,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  trendsCard: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 20,
-    gap: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  trendInsight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  trendIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  trendInsightText: {
-    fontSize: 14,
-    color: '#374151',
-    fontFamily: 'Inter-Regular',
-    flex: 1,
   },
   ctaCard: {
     borderRadius: 24,

@@ -20,6 +20,11 @@ export const API_CONFIG = {
     PASSWORD_RESET: '/authentication/password-reset',
     USER: '/authentication/user',
     USER_ADDRESSES: '/user/address/',
+    // Inventory
+    INVENTORY_CATEGORIES: '/inventory/categories/',
+    INVENTORY_PRODUCTS: '/inventory/products/',
+    INVENTORY_ORDERNOS: '/inventory/ordernos/',
+    INVENTORY_CREATE_ORDER: '/inventory/create-order/',
   },
   HEADERS: {
     'Content-Type': 'application/json',

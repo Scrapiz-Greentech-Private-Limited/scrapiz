@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,70 +8,13 @@ import {
   Dimensions,
   StatusBar,
 } from 'react-native';
-import {
-  Clock,
-  CheckCircle,
-  Truck,
-  Package,
-  MapPin,
-  Calendar,
-  IndianRupee,
-  Phone,
-  MessageCircle,
-  Search,
-  Filter,
-  Eye,
-} from 'lucide-react-native';
+import { Clock, CheckCircle, Truck, Package, MapPin, Calendar, IndianRupee, Phone, MessageCircle, Search, Filter, Eye } from 'lucide-react-native';
+import { AuthService, OrderSummary } from '../../api/apiService';
+import { useFocusEffect } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 
-const orders = [
-  {
-    id: 'ORD-2024-001',
-    status: 'in_transit',
-    statusText: 'Agent En Route',
-    date: 'Today, 2:30 PM',
-    expectedTime: '3:00 PM - 5:00 PM',
-    amount: 480,
-    items: [
-      { name: 'Paper & Cardboard', quantity: 15, rate: 12 },
-      { name: 'Plastic Bottles', quantity: 8, rate: 18 },
-      { name: 'Metal Scrap', quantity: 5, rate: 45 }
-    ],
-    agent: {
-      name: 'Ravi Kumar',
-      phone: '+91 98765 43210',
-      vehicle: 'MH 12 AB 1234'
-    },
-    address: '123, Green Valley Apartment, Sector 21, Pune - 411001'
-  },
-  {
-    id: 'ORD-2024-002',
-    status: 'completed',
-    statusText: 'Pickup Completed',
-    date: 'Yesterday, 4:15 PM',
-    completedTime: 'Completed at 4:45 PM',
-    amount: 650,
-    items: [
-      { name: 'Electronics', quantity: 6, rate: 85 },
-      { name: 'Metal Parts', quantity: 4, rate: 45 }
-    ],
-    address: '456, Sunrise Heights, Baner, Pune - 411045'
-  },
-  {
-    id: 'ORD-2024-003',
-    status: 'scheduled',
-    statusText: 'Pickup Scheduled',
-    date: 'Tomorrow, 10:00 AM',
-    expectedTime: '10:00 AM - 12:00 PM',
-    amount: 320,
-    items: [
-      { name: 'Paper Documents', quantity: 20, rate: 12 },
-      { name: 'Glass Bottles', quantity: 10, rate: 8 }
-    ],
-    address: '789, City Center Mall, FC Road, Pune - 411005'
-  },
-];
+const orders: any[] = [];
 
 const getStatusConfig = (status: string) => {
   switch (status) {
@@ -109,17 +52,35 @@ const getStatusConfig = (status: string) => {
 export default function OrdersScreen() {
   const [selectedTab, setSelectedTab] = useState('all');
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+  const [serverOrders, setServerOrders] = useState<OrderSummary[]>([]);
+
+  const loadOrders = async () => {
+    try {
+      const data = await AuthService.getOrderNos();
+      setServerOrders(data);
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    loadOrders();
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadOrders();
+    }, [])
+  );
 
   const filterOrders = (status?: string) => {
-    if (status === 'all' || !status) return orders;
-    return orders.filter(order => order.status === status);
+    if (status === 'all' || !status) return serverOrders;
+    return serverOrders.filter(order => (order.status?.name || '').toLowerCase().replace(' ', '_') === status);
   };
 
   const tabs = [
-    { id: 'all', label: 'All', count: orders.length },
-    { id: 'scheduled', label: 'Scheduled', count: orders.filter(o => o.status === 'scheduled').length },
-    { id: 'in_transit', label: 'In Transit', count: orders.filter(o => o.status === 'in_transit').length },
-    { id: 'completed', label: 'Completed', count: orders.filter(o => o.status === 'completed').length }
+    { id: 'all', label: 'All', count: serverOrders.length },
+    { id: 'scheduled', label: 'Scheduled', count: serverOrders.filter(o => (o.status?.name || '').toLowerCase() === 'scheduled').length },
+    { id: 'in_transit', label: 'In Transit', count: serverOrders.filter(o => (o.status?.name || '').toLowerCase() === 'in transit').length },
+    { id: 'completed', label: 'Completed', count: serverOrders.filter(o => (o.status?.name || '').toLowerCase() === 'completed').length }
   ];
 
   const toggleOrderDetails = (orderId: string) => {
@@ -187,7 +148,8 @@ export default function OrdersScreen() {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {filterOrders(selectedTab).map((order) => {
-          const statusConfig = getStatusConfig(order.status);
+          const statusName = (order.status?.name || 'unknown').toLowerCase().replace(' ', '_');
+          const statusConfig = getStatusConfig(statusName);
           const StatusIcon = statusConfig.icon;
           
           return (
@@ -196,13 +158,13 @@ export default function OrdersScreen() {
               <View style={styles.orderHeader}>
                 <View style={[styles.statusPill, { backgroundColor: statusConfig.bgColor }]}>
                   <StatusIcon size={16} color={statusConfig.darkColor} />
-                  <Text style={[styles.statusText, { color: statusConfig.darkColor }]}>
-                    {order.statusText}
+                  <Text style={[styles.statusText, { color: statusConfig.darkColor }]}> 
+                    {order.status?.name || 'Status'}
                   </Text>
                 </View>
                 <TouchableOpacity 
                   style={styles.viewButton}
-                  onPress={() => toggleOrderDetails(order.id)}
+                  onPress={() => toggleOrderDetails(String(order.id))}
                 >
                   <Eye size={16} color="#6b7280" />
                 </TouchableOpacity>
@@ -210,15 +172,15 @@ export default function OrdersScreen() {
               
               {/* Order Info */}
               <View style={styles.orderInfo}>
-                <Text style={styles.orderId}>{order.id}</Text>
+                <Text style={styles.orderId}>#{order.order_number}</Text>
                 <View style={styles.orderMeta}>
                   <View style={styles.metaItem}>
                     <Calendar size={14} color="#6b7280" />
-                    <Text style={styles.metaText}>{order.date}</Text>
+                    <Text style={styles.metaText}>{new Date(order.created_at).toLocaleString()}</Text>
                   </View>
                   <View style={styles.amountContainer}>
                     <IndianRupee size={16} color="#10b981" />
-                    <Text style={styles.orderAmount}>{order.amount}</Text>
+                    <Text style={styles.orderAmount}>{order.orders.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0)}</Text>
                   </View>
                 </View>
               </View>
@@ -226,10 +188,10 @@ export default function OrdersScreen() {
               {/* Items Preview */}
               <View style={styles.itemsPreview}>
                 <Text style={styles.itemsCount}>
-                  {order.items.length} item{order.items.length > 1 ? 's' : ''}
+                  {order.orders.length} item{order.orders.length > 1 ? 's' : ''}
                 </Text>
                 <Text style={styles.itemsList}>
-                  {order.items.map(item => item.name).join(', ')}
+                  {order.orders.map(item => item.product.name).join(', ')}
                 </Text>
               </View>
               
@@ -254,20 +216,20 @@ export default function OrdersScreen() {
               </View>
 
               {/* Expanded Details */}
-              {expandedOrder === order.id && (
+              {expandedOrder === String(order.id) && (
                 <View style={styles.expandedContent}>
                   <View style={styles.divider} />
                   
                   {/* Items Detail */}
                   <View style={styles.detailSection}>
                     <Text style={styles.detailTitle}>Items Breakdown</Text>
-                    {order.items.map((item, index) => (
+                    {order.orders.map((item, index) => (
                       <View key={index} style={styles.itemDetail}>
                         <View style={styles.itemInfo}>
-                          <Text style={styles.itemName}>{item.name}</Text>
-                          <Text style={styles.itemQuantity}>{item.quantity}kg @ ₹{item.rate}/kg</Text>
+                          <Text style={styles.itemName}>{item.product.name}</Text>
+                          <Text style={styles.itemQuantity}>{item.quantity}kg</Text>
                         </View>
-                        <Text style={styles.itemTotal}>₹{item.rate * item.quantity}</Text>
+                        <Text style={styles.itemTotal}>₹{item.quantity}</Text>
                       </View>
                     ))}
                   </View>
@@ -277,30 +239,11 @@ export default function OrdersScreen() {
                     <Text style={styles.detailTitle}>Pickup Address</Text>
                     <View style={styles.addressRow}>
                       <MapPin size={16} color="#6b7280" />
-                      <Text style={styles.addressText}>{order.address}</Text>
+                      <Text style={styles.addressText}>Address ID: {order.address || 'NA'}</Text>
                     </View>
                   </View>
                   
-                  {/* Agent Details */}
-                  {order.agent && (
-                    <View style={styles.detailSection}>
-                      <Text style={styles.detailTitle}>Pickup Agent</Text>
-                      <View style={styles.agentCard}>
-                        <View style={styles.agentInfo}>
-                          <Text style={styles.agentName}>{order.agent.name}</Text>
-                          <Text style={styles.agentVehicle}>Vehicle: {order.agent.vehicle}</Text>
-                        </View>
-                        <View style={styles.agentActions}>
-                          <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#dbeafe' }]}>
-                            <Phone size={18} color="#3b82f6" />
-                          </TouchableOpacity>
-                          <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#d1fae5' }]}>
-                            <MessageCircle size={18} color="#10b981" />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    </View>
-                  )}
+                  {/* Agent Details (not available in current API) */}
                   
                   {/* Action Button */}
                   {order.status === 'in_transit' && (

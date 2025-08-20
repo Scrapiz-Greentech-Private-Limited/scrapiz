@@ -13,6 +13,11 @@ export interface ProductSummary {
   category: number;
 }
 
+export interface CategorySummary {
+  id: number;
+  name: string;
+}
+
 export interface OrderItemSummary {
   id: number;
   order_no: number;
@@ -25,7 +30,7 @@ export interface OrderSummary {
   order_number: string;
   user: string;
   created_at: string;
-  status: string | null;
+  status: any;
   address: number;
   orders: OrderItemSummary[];
 }
@@ -290,6 +295,46 @@ export class AuthService {
       return response.data as ApiResponse;
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Failed to delete address');
+    }
+  }
+
+  // Inventory APIs
+  static async getCategories(): Promise<CategorySummary[]> {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.INVENTORY_CATEGORIES);
+      return response.data as CategorySummary[];
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch categories');
+    }
+  }
+
+  static async getProducts(): Promise<ProductSummary[]> {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.INVENTORY_PRODUCTS);
+      return response.data as ProductSummary[];
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch products');
+    }
+  }
+
+  static async getOrderNos(): Promise<OrderSummary[]> {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.INVENTORY_ORDERNOS);
+      return response.data as OrderSummary[];
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch orders');
+    }
+  }
+
+  static async createOrder(items: Array<{ product_id: number; quantity: number }>, address_id?: number): Promise<any> {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.INVENTORY_CREATE_ORDER, {
+        items,
+        address_id,
+      });
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to create order');
     }
   }
 }

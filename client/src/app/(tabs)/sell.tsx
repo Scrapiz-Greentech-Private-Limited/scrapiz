@@ -28,74 +28,10 @@ import {
   Zap,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { AuthService, AddressSummary } from '../../api/apiService';
+import { AuthService, AddressSummary, ProductSummary } from '../../api/apiService';
 
 const { width } = Dimensions.get('window');
 
-const scrapCategories = [
-  {
-    id: 1,
-    name: 'Paper & Cardboard',
-    rate: 12,
-    icon: '📄',
-    color: '#10b981',
-    gradient: ['#10b981', '#059669'],
-    items: ['Newspapers', 'Magazines', 'Cardboard', 'Office Paper']
-  },
-  {
-    id: 2,
-    name: 'Plastic',
-    rate: 18,
-    icon: '🧴',
-    color: '#3b82f6',
-    gradient: ['#3b82f6', '#2563eb'],
-    items: ['Bottles', 'Containers', 'Bags', 'Electronics Cases']
-  },
-  {
-    id: 3,
-    name: 'Metal',
-    rate: 45,
-    icon: '🔧',
-    color: '#f59e0b',
-    gradient: ['#f59e0b', '#d97706'],
-    items: ['Iron', 'Steel', 'Aluminum', 'Copper']
-  },
-  {
-    id: 4,
-    name: 'Electronics',
-    rate: 85,
-    icon: '📱',
-    color: '#8b5cf6',
-    gradient: ['#8b5cf6', '#7c3aed'],
-    items: ['Mobile Phones', 'Laptops', 'Components', 'Cables']
-  },
-  {
-    id: 5,
-    name: 'Glass',
-    rate: 8,
-    icon: '🥛',
-    color: '#06b6d4',
-    gradient: ['#06b6d4', '#0891b2'],
-    items: ['Bottles', 'Jars', 'Containers', 'Windows']
-  },
-  {
-    id: 6,
-    name: 'Textiles',
-    rate: 15,
-    icon: '👕',
-    color: '#ec4899',
-    gradient: ['#ec4899', '#db2777'],
-    items: ['Clothes', 'Fabric', 'Shoes', 'Bags']
-  }
-];
-
-const timeSlots = [
-  { id: 1, time: '9:00 AM - 11:00 AM', available: true },
-  { id: 2, time: '11:00 AM - 1:00 PM', available: true },
-  { id: 3, time: '1:00 PM - 3:00 PM', available: false },
-  { id: 4, time: '3:00 PM - 5:00 PM', available: true },
-  { id: 5, time: '5:00 PM - 7:00 PM', available: true },
-];
 
 const stepTitles = [
   'Select Materials',
@@ -105,7 +41,8 @@ const stepTitles = [
 
 export default function SellScreen() {
   const router = useRouter();
-  const [selectedItems, setSelectedItems] = useState<any[]>([]);
+  const [selectedItems, setSelectedItems] = useState<Array<{ id: number; name: string; rate: number; icon: string; quantity: number }>>([]);
+  const [products, setProducts] = useState<ProductSummary[]>([]);
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
@@ -127,6 +64,7 @@ export default function SellScreen() {
     pincode: '',
     delivery_suggestion: ''
   });
+  
   const [editAddressForm, setEditAddressForm] = useState({
     name: '',
     phone_number: '',
@@ -144,6 +82,8 @@ export default function SellScreen() {
     const load = async () => {
       setLoadingAddresses(true);
       try {
+        const prods = await AuthService.getProducts();
+        setProducts(prods);
         const list = await AuthService.getAddresses();
         setAddresses(list);
         if (list.length > 0) {
@@ -158,27 +98,33 @@ export default function SellScreen() {
     load();
   }, []);
 
-  const addItem = (category: any) => {
-    const existingItem = selectedItems.find(item => item.id === category.id);
+  const addItem = (product: ProductSummary) => {
+    const rate = product.max_rate ?? product.min_rate ?? 0;
+    const existingItem = selectedItems.find(item => item.id === product.id);
     if (existingItem) {
       setSelectedItems(selectedItems.map(item =>
-        item.id === category.id
+        item.id === product.id
           ? { ...item, quantity: item.quantity + 1 }
           : item
       ));
     } else {
-      setSelectedItems([...selectedItems, { ...category, quantity: 1 }]);
+      setSelectedItems([...selectedItems, { id: product.id, name: product.name, rate, icon: '♻️', quantity: 1 }]);
     }
   };
 
   const updateQuantity = (id: number, change: number) => {
-    setSelectedItems(selectedItems.map(item => {
+    const updated: Array<{ id: number; name: string; rate: number; icon: string; quantity: number }> = [];
+    for (const item of selectedItems) {
       if (item.id === id) {
         const newQuantity = Math.max(0, item.quantity + change);
-        return newQuantity === 0 ? null : { ...item, quantity: newQuantity };
+        if (newQuantity > 0) {
+          updated.push({ ...item, quantity: newQuantity });
+        }
+      } else {
+        updated.push(item);
       }
-      return item;
-    }).filter(Boolean));
+    }
+    setSelectedItems(updated);
   };
 
   const removeItem = (id: number) => {
@@ -222,25 +168,33 @@ export default function SellScreen() {
   };
 
   const handleOrderSubmission = () => {
-    Alert.alert(
-      'Success', 
-      'Your pickup has been scheduled successfully!',
-      [
-        { 
-          text: 'View Orders', 
-          onPress: () => {
-            resetForm();
-            router.push('/(tabs)/orders');
-          }
-        },
-        {
-          text: 'Schedule Another',
-          onPress: () => {
-            resetForm();
-          }
-        }
-      ]
-    );
+    const itemsPayload = selectedItems.map(i => ({ product_id: i.id, quantity: i.quantity }));
+    const addressId = useNewAddress ? undefined : selectedAddressId || undefined;
+    AuthService.createOrder(itemsPayload, addressId)
+      .then((res) => {
+        Alert.alert(
+          'Success',
+          'Your pickup has been scheduled successfully!',
+          [
+            {
+              text: 'View Orders',
+              onPress: () => {
+                resetForm();
+                router.push('/(tabs)/orders');
+              }
+            },
+            {
+              text: 'Schedule Another',
+              onPress: () => {
+                resetForm();
+              }
+            }
+          ]
+        );
+      })
+      .catch((e: any) => {
+        Alert.alert('Error', e.message || 'Failed to create order');
+      });
   };
 
   const resetForm = () => {
@@ -386,17 +340,17 @@ export default function SellScreen() {
       </View>
       
       <View style={styles.categoriesGrid}>
-        {scrapCategories.map((category) => (
+        {products.map((product) => (
           <TouchableOpacity
-            key={category.id}
+            key={product.id}
             style={styles.categoryCard}
-            onPress={() => addItem(category)}
+            onPress={() => addItem(product)}
           >
-            <LinearGradient colors={category.gradient as [ColorValue, ColorValue, ...ColorValue[]]} style={styles.categoryGradient}>
+            <LinearGradient colors={['#10b981', '#059669']} style={styles.categoryGradient}>
               <View style={styles.categoryContent}>
-                <Text style={styles.categoryIcon}>{category.icon}</Text>
-                <Text style={styles.categoryName}>{category.name}</Text>
-                <Text style={styles.categoryRate}>₹{category.rate}/kg</Text>
+                <Text style={styles.categoryIcon}>♻️</Text>
+                <Text style={styles.categoryName}>{product.name}</Text>
+                <Text style={styles.categoryRate}>₹{product.min_rate}-{product.max_rate}/kg</Text>
               </View>
               <View style={styles.addButtonContainer}>
                 <Plus size={20} color="white" />
