@@ -52,7 +52,6 @@ export default function ProfileScreen() {
   const totalOrders = user?.orders?.length || 0;
   const membershipTier = 'Member';
 
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
   const startEditName = () => {
     setNameInput(profileName);
@@ -81,8 +80,8 @@ export default function ProfileScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <StatusBar backgroundColor="#7c3aed" barStyle="light-content" />
-        <LinearGradient colors={['#7c3aed', '#a855f7']} style={[styles.header, { flex: 1, justifyContent: 'center', alignItems: 'center' }]}>
+        <StatusBar backgroundColor="#2C3E50" barStyle="light-content" />
+        <LinearGradient colors={['#2C3E50', '#34495E']} style={[styles.header, { flex: 1, justifyContent: 'center', alignItems: 'center' }]}>
           <Text style={{ color: 'white' }}>Loading...</Text>
         </LinearGradient>
       </View>
@@ -91,10 +90,10 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor="#7c3aed" barStyle="light-content" />
+      <StatusBar backgroundColor="#2C3E50" barStyle="light-content" />
       
       {/* Header with Gradient */}
-      <LinearGradient colors={['#7c3aed', '#a855f7']} style={styles.header}>
+      <LinearGradient colors={['#2C3E50', '#34495E']} style={styles.header}>
         <View style={styles.headerContent}>
           {/* Profile Info */}
           <View style={styles.profileSection}>

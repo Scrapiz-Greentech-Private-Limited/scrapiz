@@ -19,35 +19,38 @@ module.exports = {
         inter: ["Inter", "sans-serif"],
       },
       colors: {
+        // Brand primary palette
         primary: {
-          DEFAULT: "#3B82F6", // Sky Blue
-          light: "#93C5FD", // Light Sky Blue
-          dark: "#2563EB", // Deep Sky Blue
+          DEFAULT: "#27AE60", // Green primary
+          light: "#2ECC71",
+          dark: "#1E8E4E",
         },
+        brandblue: {
+          DEFAULT: "#2C3E50", // Deep blue for headers/nav
+          light: "#34495E",
+          dark: "#22303D",
+        },
+        // Secondary/supportive
         secondary: {
-          DEFAULT: "#38BDF8", // Lighter Blue
-          light: "#BAE6FD", // Very Light Blue
-          dark: "#0284C7", // Darker Blue
+          light: "#A9DFBF",
+          DEFAULT: "#58D68D",
         },
-        accent: {
-          DEFAULT: "#60A5FA", // Medium Sky Blue
-          light: "#DBEAFE", // Pale Sky Blue
-          dark: "#2563EB", // Royal Blue
+        warning: {
+          light: "#F9E79F",
+          DEFAULT: "#F7DC6F",
         },
         neutral: {
           lightest: "#FFFFFF",
-          light: "#F0F9FF",
-          medium: "#E0F2FE",
-          dark: "#075985",
-          darkest: "#0C4A6E",
+          light: "#F8F9F9",
+          medium: "#D5DBDB",
+          dark: "#7F8C8D",
         },
-        travel: {
-          sunset: "#F6AD55",
-          ocean: "#38BDF8",
-          mountain: "#7DD3FC",
-          beach: "#F6E05E",
-          forest: "#48BB78",
-        }
+        // Accents
+        accent: {
+          orange: "#E67E22",
+          orangedark: "#D35400",
+          teal: "#1ABC9C",
+        },
       },
       spacing: {
         'screen-2': '2vh',

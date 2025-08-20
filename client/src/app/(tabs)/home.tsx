@@ -17,6 +17,7 @@ import {
   ArrowRight,
   Truck,
 } from 'lucide-react-native';
+import { Image } from 'react-native';
 import { AuthService, UserProfile } from '../../api/apiService';
 
 const { width } = Dimensions.get('window');
@@ -67,11 +68,6 @@ export default function HomeScreen() {
     return 'Good Evening';
   };
 
-  // const stats = [
-  //   { id: 1, title: 'Total Earnings', value: '₹8,420', icon: IndianRupee, color: '#16a34a' },
-  //   { id: 2, title: 'Orders Completed', value: '2', icon: Package, color: '#3b82f6' },
-  // ];
-
   const quickActions = [
     {
       id: 1,
@@ -100,9 +96,10 @@ export default function HomeScreen() {
   ];
 
   const ads = [
-    { id: 1, title: 'Get ₹100 Bonus', subtitle: 'Refer a friend and earn rewards', colors: ['#fde68a', '#fbbf24'] },
-    { id: 2, title: 'Higher Rates Today', subtitle: 'Best prices for Iron & Copper', colors: ['#bfdbfe', '#93c5fd'] },
-    { id: 3, title: 'Eco Challenge', subtitle: 'Recycle 10kg this week and win', colors: ['#c7d2fe', '#a5b4fc'] },
+    { id: 1, image: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1600&auto=format&fit=crop', alt: 'Promo 1' },
+    { id: 2, image: 'https://images.unsplash.com/photo-1520975916090-3105956dac38?q=80&w=1600&auto=format&fit=crop', alt: 'Promo 2' },
+    { id: 3, image: 'https://images.unsplash.com/photo-1503602642458-232111445657?q=80&w=1600&auto=format&fit=crop', alt: 'Promo 3' },
+    { id: 4, image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=1600&auto=format&fit=crop', alt: 'Promo 4' },
   ];
 
   const adScrollRef = useRef<ScrollView | null>(null);
@@ -158,10 +155,9 @@ export default function HomeScreen() {
             style={{ marginHorizontal: -8 }}
           >
             {ads.map((ad) => (
-              <LinearGradient key={ad.id} colors={ad.colors as any} style={[styles.adCard, { width: adCardWidth, marginHorizontal: 8 }] }>
-                <Text style={styles.adTitle}>{ad.title}</Text>
-                <Text style={styles.adSubtitle}>{ad.subtitle}</Text>
-              </LinearGradient>
+              <View key={ad.id} style={[styles.adCard, { width: adCardWidth, marginHorizontal: 8, padding: 0, overflow: 'hidden' }]}>
+                <Image source={{ uri: ad.image }} accessibilityLabel={ad.alt} style={{ width: '100%', height: 140 }} resizeMode="cover" />
+              </View>
             ))}
           </ScrollView>
           <View style={styles.adDots}>

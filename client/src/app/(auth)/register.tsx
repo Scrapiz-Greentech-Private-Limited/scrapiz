@@ -103,10 +103,7 @@ export default function RegisterScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={['#667eea', '#764ba2']}
-      style={{ flex: 1 }}
-    >
+    <LinearGradient colors={['#2C3E50', '#34495E']} style={{ flex: 1 }}>
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         <View className="flex-1 px-6 pt-20">
@@ -180,20 +177,14 @@ export default function RegisterScreen() {
               </View>
 
               {/* Register Button */}
-              <TouchableOpacity
-                onPress={handleRegister}
-                disabled={loading}
-                className={`bg-white rounded-lg py-4 items-center ${loading ? 'opacity-50' : ''}`}
-              >
-                <Text className="text-purple-600 font-bold text-lg">
-                  {loading ? 'Creating Account...' : 'Create Account'}
-                </Text>
+              <TouchableOpacity onPress={handleRegister} disabled={loading} className={`rounded-lg py-4 items-center ${loading ? 'opacity-50' : ''}`} style={{ backgroundColor: '#27AE60' }}>
+                <Text className="text-white font-bold text-lg">{loading ? 'Creating Account...' : 'Create Account'}</Text>
               </TouchableOpacity>
 
               {/* Login Link */}
               <View className="flex-row justify-center mt-8">
                 <Text className="text-white/80">Already have an account? </Text>
-                <TouchableOpacity onPress={() => router.push('/auth/login')}>
+                <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
                   <Text className="text-white font-bold underline">Sign In</Text>
                 </TouchableOpacity>
               </View>

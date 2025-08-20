@@ -3,7 +3,7 @@ import { Stack } from "expo-router";
 
 export default function AuthLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#2C3E50' } }}>
       <Stack.Screen 
         name="index" 
         options={{ 

@@ -90,7 +90,7 @@ export default function ForgotPasswordScreen() {
         text1: 'Success',
         text2: 'Password reset successfully!',
       });
-      router.replace('/auth/login');
+      router.replace('/(auth)/login');
     } catch (error: any) {
       Toast.show({
         type: 'error',
@@ -149,10 +149,7 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={['#667eea', '#764ba2']}
-      style={{ flex: 1 }}
-    >
+    <LinearGradient colors={['#2C3E50', '#34495E']} style={{ flex: 1 }}>
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         <View className="flex-1 px-6 pt-20">
@@ -182,18 +179,12 @@ export default function ForgotPasswordScreen() {
                 />
               </View>
 
-              <TouchableOpacity
-                onPress={handleSendResetEmail}
-                disabled={loading}
-                className={`bg-white rounded-lg py-4 items-center ${loading ? 'opacity-50' : ''}`}
-              >
-                <Text className="text-purple-600 font-bold text-lg">
-                  {loading ? 'Sending...' : 'Send Reset Code'}
-                </Text>
+              <TouchableOpacity onPress={handleSendResetEmail} disabled={loading} className={`rounded-lg py-4 items-center ${loading ? 'opacity-50' : ''}`} style={{ backgroundColor: '#27AE60' }}>
+                <Text className="text-white font-bold text-lg">{loading ? 'Sending...' : 'Send Reset Code'}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => router.push('/auth/login')}
+                onPress={() => router.push('/(auth)/login')}
                 className="items-center"
               >
                 <Text className="text-white/80 underline">Back to Login</Text>
@@ -217,14 +208,8 @@ export default function ForgotPasswordScreen() {
                 />
               </View>
 
-              <TouchableOpacity
-                onPress={handleVerifyOtp}
-                disabled={loading}
-                className={`bg-white rounded-lg py-4 items-center ${loading ? 'opacity-50' : ''}`}
-              >
-                <Text className="text-purple-600 font-bold text-lg">
-                  {loading ? 'Verifying...' : 'Verify OTP'}
-                </Text>
+              <TouchableOpacity onPress={handleVerifyOtp} disabled={loading} className={`rounded-lg py-4 items-center ${loading ? 'opacity-50' : ''}`} style={{ backgroundColor: '#27AE60' }}>
+                <Text className="text-white font-bold text-lg">{loading ? 'Verifying...' : 'Verify OTP'}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -273,14 +258,8 @@ export default function ForgotPasswordScreen() {
                 />
               </View>
 
-              <TouchableOpacity
-                onPress={handleResetPassword}
-                disabled={loading}
-                className={`bg-white rounded-lg py-4 items-center ${loading ? 'opacity-50' : ''}`}
-              >
-                <Text className="text-purple-600 font-bold text-lg">
-                  {loading ? 'Resetting...' : 'Reset Password'}
-                </Text>
+              <TouchableOpacity onPress={handleResetPassword} disabled={loading} className={`rounded-lg py-4 items-center ${loading ? 'opacity-50' : ''}`} style={{ backgroundColor: '#27AE60' }}>
+                <Text className="text-white font-bold text-lg">{loading ? 'Resetting...' : 'Reset Password'}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity

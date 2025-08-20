@@ -225,7 +225,7 @@ export default function RatesScreen() {
 
         {/* CTA Section */}
         <View style={styles.section}>
-          <LinearGradient colors={['#6366f1', '#8b5cf6']} style={styles.ctaCard}>
+          <LinearGradient colors={['#27AE60', '#2ECC71']} style={styles.ctaCard}>
             <Text style={styles.ctaTitle}>Ready to Sell?</Text>
             <Text style={styles.ctaSubtitle}>
               Get instant quotes based on current market rates for your scrap materials.
@@ -235,7 +235,7 @@ export default function RatesScreen() {
               onPress={() => router.push('/(tabs)/sell')}
             >
               <Text style={styles.ctaButtonText}>Schedule Pickup</Text>
-              <ArrowUp size={16} color="#6366f1" style={{ transform: [{ rotate: '45deg' }] }} />
+              <ArrowUp size={16} color="#27AE60" style={{ transform: [{ rotate: '45deg' }] }} />
             </TouchableOpacity>
           </LinearGradient>
         </View>

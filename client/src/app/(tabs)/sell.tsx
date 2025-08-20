@@ -297,7 +297,7 @@ export default function SellScreen() {
 
   const renderStepIndicator = () => (
     <View style={styles.stepIndicatorContainer}>
-      <LinearGradient colors={['#667eea', '#764ba2']} style={styles.stepIndicatorGradient}>
+      <LinearGradient colors={['#2C3E50', '#34495E']} style={styles.stepIndicatorGradient}>
         <View style={styles.stepIndicator}>
           {[1, 2, 3].map((step) => (
             <React.Fragment key={step}>
@@ -334,7 +334,7 @@ export default function SellScreen() {
   const renderStep1 = () => (
     <View style={styles.stepContent}>
       <View style={styles.stepHeader}>
-        <Sparkles size={24} color="#667eea" />
+        <Sparkles size={24} color="#27AE60" />
         <Text style={styles.stepHeaderTitle}>Choose Your Materials</Text>
         <Text style={styles.stepHeaderSubtitle}>Select the scrap materials you want to sell</Text>
       </View>
@@ -346,7 +346,7 @@ export default function SellScreen() {
             style={styles.categoryCard}
             onPress={() => addItem(product)}
           >
-            <LinearGradient colors={['#10b981', '#059669']} style={styles.categoryGradient}>
+            <LinearGradient colors={['#27AE60', '#1E8E4E']} style={styles.categoryGradient}>
               <View style={styles.categoryContent}>
                 <Text style={styles.categoryIcon}>♻️</Text>
                 <Text style={styles.categoryName}>{product.name}</Text>
@@ -362,7 +362,7 @@ export default function SellScreen() {
 
       {selectedItems.length > 0 && (
         <View style={styles.selectedItemsContainer}>
-          <LinearGradient colors={['#f8fafc', '#e2e8f0']} style={styles.selectedItemsCard}>
+          <LinearGradient colors={['#F8F9F9', '#E5E7EB']} style={styles.selectedItemsCard}>
             <Text style={styles.selectedItemsTitle}>Selected Materials</Text>
             {selectedItems.map((item) => (
               <View key={item.id} style={styles.selectedItem}>
@@ -431,7 +431,7 @@ export default function SellScreen() {
                 onPress={() => setSelectedDate(dateStr)}
               >
                 <LinearGradient 
-                  colors={selectedDate === dateStr ? ['#667eea', '#764ba2'] : ['#ffffff', '#f8fafc']}
+                  colors={selectedDate === dateStr ? ['#27AE60', '#2ECC71'] : ['#ffffff', '#f8fafc']}
                   style={styles.dateCardGradient}
                 >
                   <Text style={[
@@ -567,7 +567,7 @@ export default function SellScreen() {
             </View>
 
             <TouchableOpacity onPress={handleCreateAddress} disabled={creatingAddress} style={{ marginTop: 8, alignSelf: 'flex-end' }}>
-              <LinearGradient colors={['#667eea', '#764ba2']} style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 }}>
+              <LinearGradient colors={['#27AE60', '#2ECC71']} style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 }}>
                 <Text style={{ color: 'white', fontWeight: '700' }}>{creatingAddress ? 'Saving...' : 'Save Address'}</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -648,7 +648,7 @@ export default function SellScreen() {
                     <TouchableOpacity onPress={() => setEditingAddressId(null)} style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
                       <Text style={{ color: '#6b7280', fontWeight: '600' }}>Cancel</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={saveEditAddress} style={{ backgroundColor: '#667eea', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 }}>
+                    <TouchableOpacity onPress={saveEditAddress} style={{ backgroundColor: '#27AE60', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 }}>
                       <Text style={{ color: 'white', fontWeight: '700' }}>Save</Text>
                     </TouchableOpacity>
                   </View>
@@ -731,7 +731,7 @@ export default function SellScreen() {
       </ScrollView>
 
       {selectedItems.length > 0 && (
-        <LinearGradient colors={['#ffffff', '#f8fafc']} style={styles.footer}>
+        <LinearGradient colors={['#ffffff', '#F8F9F9']} style={styles.footer}>
           <View style={styles.footerContent}>
             <View style={styles.totalSection}>
               <Text style={styles.totalLabel}>Estimated Earnings</Text>
@@ -749,7 +749,7 @@ export default function SellScreen() {
               )}
               
               <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-                <LinearGradient colors={['#667eea', '#764ba2']} style={styles.nextButtonGradient}>
+                <LinearGradient colors={['#27AE60', '#2ECC71']} style={styles.nextButtonGradient}>
                   <Text style={styles.nextButtonText}>
                     {currentStep === 3 ? 'Confirm Pickup' : 'Continue'}
                   </Text>

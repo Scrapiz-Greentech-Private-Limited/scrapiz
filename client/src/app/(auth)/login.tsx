@@ -38,10 +38,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={['#667eea', '#764ba2']}
-      style={{ flex: 1 }}
-    >
+    <LinearGradient colors={['#2C3E50', '#34495E']} style={{ flex: 1 }}>
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         <View className="flex-1 px-6 pt-20">
@@ -91,14 +88,8 @@ export default function LoginScreen() {
             </TouchableOpacity>
 
             {/* Login Button */}
-            <TouchableOpacity
-              onPress={handleLogin}
-              disabled={loading}
-              className={`bg-white rounded-lg py-4 items-center ${loading ? 'opacity-50' : ''}`}
-            >
-              <Text className="text-purple-600 font-bold text-lg">
-                {loading ? 'Signing In...' : 'Sign In'}
-              </Text>
+            <TouchableOpacity onPress={handleLogin} disabled={loading} className={`rounded-lg py-4 items-center ${loading ? 'opacity-50' : ''}`} style={{ backgroundColor: '#27AE60' }}>
+              <Text className="text-white font-bold text-lg">{loading ? 'Signing In...' : 'Sign In'}</Text>
             </TouchableOpacity>
 
             {/* Divider */}

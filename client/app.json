@@ -4,7 +4,7 @@
     "slug": "Scrapiz",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "@/assets/images/scrapiz.jpg",
     "scheme": "Scrapiz",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -13,7 +13,12 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
+        "foregroundImage": "@/assets/images/scrapiz.jpg",
+        "backgroundColor": "#ffffff"
+      },
+      "splash": {
+        "image": "@/assets/images/scrapiz.jpg",
+        "resizeMode": "contain",
         "backgroundColor": "#ffffff"
       },
       "permissions": [
@@ -34,7 +39,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "@/assets/images/scrapiz.jpg"
     },
     "plugins": [
       "expo-router",
@@ -43,7 +48,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "@/assets/images/scrapiz.jpg",
           "resizeMode": "cover",
           "backgroundColor": "#ffffff",
           "enableFullScreenImage_legacy": true
@@ -53,8 +58,8 @@
         "expo-font",
         {
           "fonts": [
-            "./assets/fonts/Montserrat-Regular.ttf",
-            "./assets/fonts/YoungSerif-Regular.ttf"
+            "@/assets/fonts/Montserrat-Regular.ttf",
+            "@/assets/fonts/YoungSerif-Regular.ttf"
           ]
         }
       ]

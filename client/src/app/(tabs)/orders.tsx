@@ -89,10 +89,10 @@ export default function OrdersScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor="#1f2937" barStyle="light-content" />
+      <StatusBar backgroundColor="#2C3E50" barStyle="light-content" />
       
       {/* Dark Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: '#2C3E50' }]}>
         <Text style={styles.headerTitle}>My Orders</Text>
         <Text style={styles.headerSubtitle}>Track your scrap pickups</Text>
         
