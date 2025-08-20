@@ -1,17 +1,41 @@
-import { View, Text, Image } from 'react-native';
-import React, { useEffect } from 'react';
+import { View, Text } from 'react-native';
+import React, { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
+import { AuthService } from '../api/apiService';
 
 export default function SplashScreen() {
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      router.replace('/auth/login');
-    }, 2000);
+  const [isChecking, setIsChecking] = useState(true);
 
-    return () => clearTimeout(timer);
+  useEffect(() => {
+    checkAuthAndRedirect();
   }, []);
+
+  const checkAuthAndRedirect = async () => {
+    try {
+      // Check if user is already authenticated
+      const isAuthenticated = await AuthService.isAuthenticated();
+      
+      setTimeout(() => {
+        if (isAuthenticated) {
+          // User has valid token, go directly to home
+          router.replace('/(tabs)/home');
+        } else {
+          // No valid token, go to login
+          router.replace('/(auth)/login');
+        }
+        setIsChecking(false);
+      }, 2000); // Keep splash for 2 seconds for better UX
+    } catch (error) {
+      console.error('Auth check error:', error);
+      // On error, default to login screen
+      setTimeout(() => {
+        router.replace('/(auth)/login');
+        setIsChecking(false);
+      }, 2000);
+    }
+  };
 
   return (
     <LinearGradient
