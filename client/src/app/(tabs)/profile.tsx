@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,96 +9,85 @@ import {
   Alert,
   StatusBar,
   Dimensions,
+  TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
+import { AuthService, UserProfile } from '../../api/apiService';
 import { 
-  User, 
-  MapPin, 
-  Bell, 
-  Shield, 
-  CircleHelp as HelpCircle, 
-  Star, 
-  Gift, 
-  ChevronRight, 
-  Edit, 
-  Award, 
-  LogOut, 
-  Phone, 
+  Edit,
+  LogOut,
+  Phone,
   Mail,
   Camera,
-  Wallet,
-  Settings,
-  Heart,
-  TrendingUp,
   Package
 } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 
-const profileData = {
-  name: 'Rajesh Kumar',
-  email: 'rajesh.kumar@example.com',
-  phone: '+91 98765 43210',
-  address: '123, Green Valley Apartment, Sector 21, Pune - 411001',
-  joinDate: 'January 2024',
-  totalOrders: 24,
-  totalEarnings: 8420,
-  totalRecycled: 186,
-  rating: 4.8,
-  achievements: ['First Sale', 'Green Warrior', 'Top Seller'],
-  membershipTier: 'Gold',
-};
-
 export default function ProfileScreen() {
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [editingName, setEditingName] = useState<boolean>(false);
+  const [nameInput, setNameInput] = useState<string>('');
+  const [savingName, setSavingName] = useState<boolean>(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data = await AuthService.getUser();
+        setUser(data);
+      } catch (e: any) {
+        Alert.alert('Error', e.message || 'Failed to load user');
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const profileName = user?.name || 'User';
+  const profileEmail = user?.email || '';
+  const phoneFromAddress = useMemo(() => user?.addresses?.[0]?.phone_number || '', [user]);
+  const totalOrders = user?.orders?.length || 0;
+  const membershipTier = 'Member';
+
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
-  const achievements = [
-    { id: 1, title: 'First Sale', desc: 'Completed your first order', icon: '🎯', earned: true },
-    { id: 2, title: 'Green Warrior', desc: 'Recycled 100kg+ waste', icon: '🌱', earned: true },
-    { id: 3, title: 'Top Seller', desc: 'Top 10% sellers this month', icon: '🏆', earned: true },
-    { id: 4, title: 'Eco Champion', desc: 'Recycled 500kg+ waste', icon: '♻️', earned: false },
-  ];
+  const startEditName = () => {
+    setNameInput(profileName);
+    setEditingName(true);
+  };
 
-  const quickStats = [
-    { label: 'Orders', value: '24', icon: Package, color: '#3b82f6' },
-    { label: 'Earnings', value: '₹8.4K', icon: Wallet, color: '#10b981' },
-    { label: 'Rating', value: '4.8★', icon: Star, color: '#f59e0b' },
-    { label: 'Recycled', value: '186kg', icon: Award, color: '#8b5cf6' },
-  ];
-
-  const menuSections = [
-    {
-      title: 'Account',
-      items: [
-        { icon: Edit, title: 'Edit Profile', subtitle: 'Update personal information', hasChevron: true },
-        { icon: MapPin, title: 'Addresses', subtitle: 'Manage pickup locations', hasChevron: true },
-        { icon: Wallet, title: 'Earnings', subtitle: 'View payment history', hasChevron: true },
-      ]
-    },
-    {
-      title: 'Preferences',
-      items: [
-        { 
-          icon: Bell, 
-          title: 'Notifications', 
-          subtitle: 'Push notifications and alerts',
-          hasSwitch: true,
-          switchValue: notificationsEnabled,
-          onSwitchChange: setNotificationsEnabled
-        },
-        { icon: Shield, title: 'Privacy & Security', subtitle: 'Account security settings', hasChevron: true },
-        { icon: Settings, title: 'App Settings', subtitle: 'Language, theme, etc.', hasChevron: true },
-      ]
-    },
-    {
-      title: 'Support',
-      items: [
-        { icon: HelpCircle, title: 'Help Center', subtitle: 'FAQs and guides', hasChevron: true },
-        { icon: Star, title: 'Rate App', subtitle: 'Share your feedback', hasChevron: true },
-        { icon: Gift, title: 'Refer Friends', subtitle: 'Earn ₹100 per referral', hasChevron: true },
-      ]
+  const saveName = async () => {
+    if (!nameInput.trim()) {
+      Alert.alert('Validation', 'Name cannot be empty');
+      return;
     }
-  ];
+    setSavingName(true);
+    try {
+      await AuthService.updateUserName(nameInput.trim());
+      const updated = await AuthService.getUser();
+      setUser(updated);
+      setEditingName(false);
+      Alert.alert('Success', 'Name updated successfully');
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to update name');
+    } finally {
+      setSavingName(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <StatusBar backgroundColor="#7c3aed" barStyle="light-content" />
+        <LinearGradient colors={['#7c3aed', '#a855f7']} style={[styles.header, { flex: 1, justifyContent: 'center', alignItems: 'center' }]}>
+          <Text style={{ color: 'white' }}>Loading...</Text>
+        </LinearGradient>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -112,7 +101,7 @@ export default function ProfileScreen() {
             <View style={styles.avatarContainer}>
               <LinearGradient colors={['#fbbf24', '#f59e0b']} style={styles.avatar}>
                 <Text style={styles.avatarText}>
-                  {profileData.name.split(' ').map(n => n[0]).join('')}
+                  {profileName.split(' ').map(n => n[0]).join('')}
                 </Text>
               </LinearGradient>
               <TouchableOpacity style={styles.cameraButton}>
@@ -121,17 +110,22 @@ export default function ProfileScreen() {
             </View>
             
             <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>{profileData.name}</Text>
-              <Text style={styles.membershipTier}>{profileData.membershipTier} Member</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={styles.profileName}>{profileName}</Text>
+                <TouchableOpacity onPress={startEditName} accessibilityLabel="Edit name" style={{ padding: 4 }}>
+                  <Edit size={18} color="#ffffff" />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.membershipTier}>{membershipTier} Member</Text>
               
               <View style={styles.contactInfo}>
                 <View style={styles.contactItem}>
                   <Mail size={14} color="rgba(255,255,255,0.8)" />
-                  <Text style={styles.contactText}>{profileData.email}</Text>
+                  <Text style={styles.contactText}>{profileEmail}</Text>
                 </View>
                 <View style={styles.contactItem}>
                   <Phone size={14} color="rgba(255,255,255,0.8)" />
-                  <Text style={styles.contactText}>{profileData.phone}</Text>
+                  <Text style={styles.contactText}>{phoneFromAddress || '—'}</Text>
                 </View>
               </View>
             </View>
@@ -139,7 +133,7 @@ export default function ProfileScreen() {
           
           {/* Quick Stats */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statsContainer}>
-            {quickStats.map((stat, index) => (
+            {[{ label: 'Orders', value: String(totalOrders), icon: Package, color: '#3b82f6' }].map((stat, index) => (
               <View key={index} style={styles.statCard}>
                 <View style={[styles.statIcon, { backgroundColor: `${stat.color}20` }]}>
                   <stat.icon size={20} color={stat.color} />
@@ -152,115 +146,94 @@ export default function ProfileScreen() {
         </View>
       </LinearGradient>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Achievements */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Achievements</Text>
-            <TouchableOpacity>
-              <Text style={styles.viewAllText}>View All</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.achievementsContainer}>
-            {achievements.map((achievement) => (
-              <View key={achievement.id} style={[styles.achievementCard, !achievement.earned && styles.achievementCardLocked]}>
-                <Text style={[styles.achievementIcon, !achievement.earned && styles.achievementIconLocked]}>
-                  {achievement.icon}
-                </Text>
-                <Text style={[styles.achievementTitle, !achievement.earned && styles.achievementTitleLocked]}>
-                  {achievement.title}
-                </Text>
-                <Text style={[styles.achievementDesc, !achievement.earned && styles.achievementDescLocked]}>
-                  {achievement.desc}
-                </Text>
-                {achievement.earned && <View style={styles.achievementBadge} />}
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Environmental Impact */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Environmental Impact</Text>
-          <LinearGradient colors={['#ecfdf5', '#d1fae5']} style={styles.impactCard}>
-            <View style={styles.impactHeader}>
-              <Text style={styles.impactEmoji}>🌍</Text>
-              <View style={styles.impactContent}>
-                <Text style={styles.impactTitle}>Making a Difference!</Text>
-                <Text style={styles.impactSubtitle}>Your recycling efforts this month</Text>
-              </View>
-              <TouchableOpacity style={styles.impactButton}>
-                <TrendingUp size={20} color="#059669" />
+      {/* Inline name editor */}
+      {editingName && (
+        <View style={{ paddingHorizontal: 20, marginTop: 16 }}>
+          <View style={{ backgroundColor: 'white', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e5e7eb' }}>
+            <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8, color: '#111827' }}>Edit Name</Text>
+            <TextInput
+              value={nameInput}
+              onChangeText={setNameInput}
+              placeholder="Enter your name"
+              style={{ borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12 }}
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+              <TouchableOpacity onPress={() => setEditingName(false)} style={{ paddingVertical: 10, paddingHorizontal: 16 }}>
+                <Text style={{ color: '#6b7280', fontWeight: '600' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity disabled={savingName} onPress={saveName} style={{ backgroundColor: '#7c3aed', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10, marginLeft: 8, opacity: savingName ? 0.6 : 1 }}>
+                <Text style={{ color: 'white', fontWeight: '700' }}>{savingName ? 'Saving...' : 'Save'}</Text>
               </TouchableOpacity>
             </View>
-            
-            <View style={styles.impactStats}>
-              <View style={styles.impactStat}>
-                <Text style={styles.impactStatValue}>124</Text>
-                <Text style={styles.impactStatLabel}>Trees Saved</Text>
-              </View>
-              <View style={styles.impactDivider} />
-              <View style={styles.impactStat}>
-                <Text style={styles.impactStatValue}>340kg</Text>
-                <Text style={styles.impactStatLabel}>CO₂ Reduced</Text>
-              </View>
-              <View style={styles.impactDivider} />
-              <View style={styles.impactStat}>
-                <Text style={styles.impactStatValue}>89%</Text>
-                <Text style={styles.impactStatLabel}>Efficiency</Text>
-              </View>
-            </View>
-          </LinearGradient>
+          </View>
         </View>
+      )}
 
-        {/* Menu Sections */}
-        {menuSections.map((section, sectionIndex) => (
-          <View key={sectionIndex} style={styles.section}>
-            <Text style={styles.sectionTitle}>{section.title}</Text>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Addresses from API */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Addresses</Text>
+          </View>
+          {user?.addresses?.length ? (
             <View style={styles.menuContainer}>
-              {section.items.map((item, itemIndex) => (
-                <TouchableOpacity 
-                  key={itemIndex} 
-                  style={[
-                    styles.menuItem,
-                    itemIndex === section.items.length - 1 && styles.menuItemLast
-                  ]}
-                  onPress={item.onSwitchChange ? undefined : () => {}}
-                >
+              {user.addresses.map((addr, idx) => (
+                <View key={addr.id} style={[styles.menuItem, idx === user.addresses.length - 1 && styles.menuItemLast]}>
                   <View style={styles.menuItemLeft}>
                     <View style={styles.menuIcon}>
-                      <item.icon size={20} color="#6b7280" />
+                      <Phone size={20} color="#6b7280" />
                     </View>
                     <View style={styles.menuItemContent}>
-                      <Text style={styles.menuItemTitle}>{item.title}</Text>
-                      <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>
+                      <Text style={styles.menuItemTitle}>{addr.name} • {addr.phone_number}</Text>
+                      <Text style={styles.menuItemSubtitle}>{addr.room_number}, {addr.street}, {addr.area}, {addr.city}, {addr.state}, {addr.country} - {addr.pincode}</Text>
                     </View>
                   </View>
-                  
-                  <View style={styles.menuItemRight}>
-                    {item.hasSwitch ? (
-                      <Switch
-                        value={item.switchValue}
-                        onValueChange={item.onSwitchChange}
-                        trackColor={{ false: '#e5e7eb', true: '#bbf7d0' }}
-                        thumbColor={item.switchValue ? '#10b981' : '#f3f4f6'}
-                      />
-                    ) : item.hasChevron ? (
-                      <ChevronRight size={16} color="#d1d5db" />
-                    ) : null}
-                  </View>
-                </TouchableOpacity>
+                </View>
               ))}
             </View>
+          ) : (
+            <Text style={{ color: '#6b7280' }}>No addresses found.</Text>
+          )}
+        </View>
+
+        {/* Orders from API */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Orders</Text>
           </View>
-        ))}
+          {user?.orders?.length ? (
+            <View style={styles.menuContainer}>
+              {user.orders.map((ord, idx) => (
+                <View key={ord.id} style={[styles.menuItem, idx === user.orders.length - 1 && styles.menuItemLast]}>
+                  <View style={styles.menuItemLeft}>
+                    <View style={styles.menuIcon}>
+                      <Package size={20} color="#6b7280" />
+                    </View>
+                    <View style={styles.menuItemContent}>
+                      <Text style={styles.menuItemTitle}>#{ord.order_number}</Text>
+                      <Text style={styles.menuItemSubtitle}>{new Date(ord.created_at).toLocaleString()} • {ord.orders.length} items</Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={{ color: '#6b7280' }}>No orders found.</Text>
+          )}
+        </View>
 
         {/* Logout Button */}
         <View style={styles.section}>
           <TouchableOpacity 
             style={styles.logoutButton}
-            onPress={() => Alert.alert('Logout', 'Are you sure you want to logout?')}
+            onPress={async () => {
+              try {
+                await AuthService.logout();
+                router.replace('/(auth)/login');
+              } catch (e: any) {
+                Alert.alert('Logout Failed', e.message || 'Please try again');
+              }
+            }}
           >
             <LogOut size={20} color="#dc2626" />
             <Text style={styles.logoutText}>Logout</Text>

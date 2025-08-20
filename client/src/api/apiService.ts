@@ -2,6 +2,58 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_CONFIG, ApiResponse, RegisterRequest, LoginRequest, VerifyOtpRequest, PasswordResetRequest } from './config';
 
+// User types
+export interface ProductSummary {
+  id: number;
+  name: string;
+  max_rate: number;
+  min_rate: number;
+  unit: string;
+  description: string;
+  category: number;
+}
+
+export interface OrderItemSummary {
+  id: number;
+  order_no: number;
+  product: ProductSummary;
+  quantity: string;
+}
+
+export interface OrderSummary {
+  id: number;
+  order_number: string;
+  user: string;
+  created_at: string;
+  status: string | null;
+  address: number;
+  orders: OrderItemSummary[];
+}
+
+export interface AddressSummary {
+  id: number;
+  name: string;
+  phone_number: string;
+  room_number: string;
+  street: string;
+  area: string;
+  city: string;
+  state: string;
+  country: string;
+  pincode: number;
+  delivery_suggestion: string;
+  user: number;
+}
+
+export interface UserProfile {
+  id: number;
+  name: string;
+  email: string;
+  is_staff: boolean;
+  orders: OrderSummary[];
+  addresses: AddressSummary[];
+}
+
 // Create axios instance
 const apiClient = axios.create({
   baseURL: API_CONFIG.BASE_URL,
@@ -19,7 +71,9 @@ apiClient.interceptors.request.use(
 
     const token = await AsyncStorage.getItem('authToken');
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      // Backend expects raw token in Authorization header (no "Bearer " prefix)
+      if (!config.headers) config.headers = {} as any;
+      (config.headers as any).Authorization = token;
     }
     return config;
   },
@@ -31,8 +85,15 @@ apiClient.interceptors.request.use(
 // Response interceptor for error handling
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    console.error('API Error:', error.response?.data || error.message);
+  async (error) => {
+    const status = error?.response?.status;
+    const data = error?.response?.data;
+    console.error('API Error:', data || error.message);
+
+    if (status === 401 || status === 403) {
+      // Clear token on auth errors so app can redirect to login
+      try { await AsyncStorage.removeItem('authToken'); } catch {}
+    }
     return Promise.reject(error);
   }
 );
@@ -131,6 +192,36 @@ export class AuthService {
       return await AsyncStorage.getItem('authToken');
     } catch (error) {
       return null;
+    }
+  }
+
+  // Get current user profile
+  static async getUser(): Promise<UserProfile> {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.USER);
+      return response.data as UserProfile;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch user');
+    }
+  }
+
+  // Update current user's name
+  static async updateUserName(name: string): Promise<ApiResponse> {
+    try {
+      const response = await apiClient.patch(API_CONFIG.ENDPOINTS.USER, { name });
+      return response.data as ApiResponse;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to update user');
+    }
+  }
+
+  // Delete current user
+  static async deleteUser(): Promise<ApiResponse> {
+    try {
+      const response = await apiClient.delete(API_CONFIG.ENDPOINTS.USER);
+      return response.data as ApiResponse;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to delete user');
     }
   }
 }

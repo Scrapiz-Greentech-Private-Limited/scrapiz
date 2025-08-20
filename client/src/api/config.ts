@@ -15,9 +15,10 @@ export const API_CONFIG = {
     LOGIN: '/authentication/login',
     LOGOUT: '/authentication/logout',
     VERIFY_OTP: '/authentication/register', // PUT request
-    RESEND_OTP: '/authentication/resend-otp',
+    RESEND_OTP: '/authentication/resendotp',
     PASSWORD_RESET_REQUEST: '/authentication/password-reset-request',
     PASSWORD_RESET: '/authentication/password-reset',
+    USER: '/authentication/user',
   },
   HEADERS: {
     'Content-Type': 'application/json',
