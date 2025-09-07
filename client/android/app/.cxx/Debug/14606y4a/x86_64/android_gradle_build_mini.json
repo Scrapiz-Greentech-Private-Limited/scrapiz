@@ -1,0 +1,115 @@
+{
+  "buildFiles": [
+    "/home/fareed-sayed/Documents/Scrapiz/client/node_modules/@react-native-async-storage/async-storage/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/home/fareed-sayed/Documents/Scrapiz/client/node_modules/@react-native-community/slider/android/src/main/jni/CMakeLists.txt",
+    "/home/fareed-sayed/Documents/Scrapiz/client/node_modules/@react-native-picker/picker/android/src/main/jni/CMakeLists.txt",
+    "/home/fareed-sayed/Documents/Scrapiz/client/node_modules/react-native-gesture-handler/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/home/fareed-sayed/Documents/Scrapiz/client/node_modules/react-native-reanimated/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/home/fareed-sayed/Documents/Scrapiz/client/node_modules/react-native-safe-area-context/android/src/main/jni/CMakeLists.txt",
+    "/home/fareed-sayed/Documents/Scrapiz/client/node_modules/react-native-screens/android/src/main/jni/CMakeLists.txt",
+    "/home/fareed-sayed/Documents/Scrapiz/client/node_modules/react-native-svg/android/src/main/jni/CMakeLists.txt",
+    "/home/fareed-sayed/Documents/Scrapiz/client/node_modules/react-native-webview/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/home/fareed-sayed/Documents/Scrapiz/client/node_modules/react-native/ReactAndroid/cmake-utils/default-app-setup/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/home/fareed-sayed/Android/Sdk/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/home/fareed-sayed/Documents/Scrapiz/client/android/app/.cxx/Debug/14606y4a/x86_64",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/home/fareed-sayed/Android/Sdk/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/home/fareed-sayed/Documents/Scrapiz/client/android/app/.cxx/Debug/14606y4a/x86_64",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "react_codegen_RNCSlider::@4898bc4726ecf1751b6a": {
+      "artifactName": "react_codegen_RNCSlider",
+      "abi": "x86_64",
+      "output": "/home/fareed-sayed/Documents/Scrapiz/client/android/app/build/intermediates/cxx/Debug/14606y4a/obj/x86_64/libreact_codegen_RNCSlider.so",
+      "runtimeFiles": [
+        "/home/fareed-sayed/.gradle/caches/8.13/transforms/492d12ddde8d0414cdeaa8d1c9a89b37/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.x86_64/libfbjni.so",
+        "/home/fareed-sayed/.gradle/caches/8.13/transforms/ecf58a1d5a3b5cc4faabc13e873181f2/transformed/react-android-0.79.5-debug/prefab/modules/jsi/libs/android.x86_64/libjsi.so",
+        "/home/fareed-sayed/.gradle/caches/8.13/transforms/ecf58a1d5a3b5cc4faabc13e873181f2/transformed/react-android-0.79.5-debug/prefab/modules/reactnative/libs/android.x86_64/libreactnative.so"
+      ]
+    },
+    "react_codegen_rnreanimated::@8afabad14bfffa3f8b9a": {
+      "artifactName": "react_codegen_rnreanimated",
+      "abi": "x86_64",
+      "runtimeFiles": []
+    },
+    "react_codegen_safeareacontext::@7984cd80db47aa7b952a": {
+      "artifactName": "react_codegen_safeareacontext",
+      "abi": "x86_64",
+      "output": "/home/fareed-sayed/Documents/Scrapiz/client/android/app/build/intermediates/cxx/Debug/14606y4a/obj/x86_64/libreact_codegen_safeareacontext.so",
+      "runtimeFiles": [
+        "/home/fareed-sayed/.gradle/caches/8.13/transforms/492d12ddde8d0414cdeaa8d1c9a89b37/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.x86_64/libfbjni.so",
+        "/home/fareed-sayed/.gradle/caches/8.13/transforms/ecf58a1d5a3b5cc4faabc13e873181f2/transformed/react-android-0.79.5-debug/prefab/modules/jsi/libs/android.x86_64/libjsi.so",
+        "/home/fareed-sayed/.gradle/caches/8.13/transforms/ecf58a1d5a3b5cc4faabc13e873181f2/transformed/react-android-0.79.5-debug/prefab/modules/reactnative/libs/android.x86_64/libreactnative.so"
+      ]
+    },
+    "react_codegen_rngesturehandler_codegen::@39f233abcd2c728bc6ec": {
+      "artifactName": "react_codegen_rngesturehandler_codegen",
+      "abi": "x86_64",
+      "runtimeFiles": []
+    },
+    "react_codegen_RNCWebViewSpec::@eb48929f9f7453740a6c": {
+      "artifactName": "react_codegen_RNCWebViewSpec",
+      "abi": "x86_64",
+      "runtimeFiles": []
+    },
+    "react_codegen_rnscreens::@25bcbd507e98d3a854ad": {
+      "artifactName": "react_codegen_rnscreens",
+      "abi": "x86_64",
+      "output": "/home/fareed-sayed/Documents/Scrapiz/client/android/app/build/intermediates/cxx/Debug/14606y4a/obj/x86_64/libreact_codegen_rnscreens.so",
+      "runtimeFiles": [
+        "/home/fareed-sayed/.gradle/caches/8.13/transforms/ecf58a1d5a3b5cc4faabc13e873181f2/transformed/react-android-0.79.5-debug/prefab/modules/reactnative/libs/android.x86_64/libreactnative.so",
+        "/home/fareed-sayed/.gradle/caches/8.13/transforms/ecf58a1d5a3b5cc4faabc13e873181f2/transformed/react-android-0.79.5-debug/prefab/modules/jsi/libs/android.x86_64/libjsi.so",
+        "/home/fareed-sayed/.gradle/caches/8.13/transforms/492d12ddde8d0414cdeaa8d1c9a89b37/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.x86_64/libfbjni.so"
+      ]
+    },
+    "appmodules::@6890427a1f51a3e7e1df": {
+      "artifactName": "appmodules",
+      "abi": "x86_64",
+      "output": "/home/fareed-sayed/Documents/Scrapiz/client/android/app/build/intermediates/cxx/Debug/14606y4a/obj/x86_64/libappmodules.so",
+      "runtimeFiles": [
+        "/home/fareed-sayed/Documents/Scrapiz/client/android/app/build/intermediates/cxx/Debug/14606y4a/obj/x86_64/libreact_codegen_RNCSlider.so",
+        "/home/fareed-sayed/Documents/Scrapiz/client/android/app/build/intermediates/cxx/Debug/14606y4a/obj/x86_64/libreact_codegen_rnpicker.so",
+        "/home/fareed-sayed/Documents/Scrapiz/client/android/app/build/intermediates/cxx/Debug/14606y4a/obj/x86_64/libreact_codegen_safeareacontext.so",
+        "/home/fareed-sayed/Documents/Scrapiz/client/android/app/build/intermediates/cxx/Debug/14606y4a/obj/x86_64/libreact_codegen_rnscreens.so",
+        "/home/fareed-sayed/Documents/Scrapiz/client/android/app/build/intermediates/cxx/Debug/14606y4a/obj/x86_64/libreact_codegen_rnsvg.so",
+        "/home/fareed-sayed/.gradle/caches/8.13/transforms/492d12ddde8d0414cdeaa8d1c9a89b37/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.x86_64/libfbjni.so",
+        "/home/fareed-sayed/.gradle/caches/8.13/transforms/ecf58a1d5a3b5cc4faabc13e873181f2/transformed/react-android-0.79.5-debug/prefab/modules/jsi/libs/android.x86_64/libjsi.so",
+        "/home/fareed-sayed/.gradle/caches/8.13/transforms/ecf58a1d5a3b5cc4faabc13e873181f2/transformed/react-android-0.79.5-debug/prefab/modules/reactnative/libs/android.x86_64/libreactnative.so"
+      ]
+    },
+    "react_codegen_rnsvg::@4f40eb209d0c0b4a3b65": {
+      "artifactName": "react_codegen_rnsvg",
+      "abi": "x86_64",
+      "output": "/home/fareed-sayed/Documents/Scrapiz/client/android/app/build/intermediates/cxx/Debug/14606y4a/obj/x86_64/libreact_codegen_rnsvg.so",
+      "runtimeFiles": [
+        "/home/fareed-sayed/.gradle/caches/8.13/transforms/ecf58a1d5a3b5cc4faabc13e873181f2/transformed/react-android-0.79.5-debug/prefab/modules/reactnative/libs/android.x86_64/libreactnative.so",
+        "/home/fareed-sayed/.gradle/caches/8.13/transforms/ecf58a1d5a3b5cc4faabc13e873181f2/transformed/react-android-0.79.5-debug/prefab/modules/jsi/libs/android.x86_64/libjsi.so",
+        "/home/fareed-sayed/.gradle/caches/8.13/transforms/492d12ddde8d0414cdeaa8d1c9a89b37/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.x86_64/libfbjni.so"
+      ]
+    },
+    "react_codegen_rnasyncstorage::@1596841e19ec5b9eeffe": {
+      "artifactName": "react_codegen_rnasyncstorage",
+      "abi": "x86_64",
+      "runtimeFiles": []
+    },
+    "react_codegen_rnpicker::@e8bb2e9e833f47d0d516": {
+      "artifactName": "react_codegen_rnpicker",
+      "abi": "x86_64",
+      "output": "/home/fareed-sayed/Documents/Scrapiz/client/android/app/build/intermediates/cxx/Debug/14606y4a/obj/x86_64/libreact_codegen_rnpicker.so",
+      "runtimeFiles": [
+        "/home/fareed-sayed/.gradle/caches/8.13/transforms/ecf58a1d5a3b5cc4faabc13e873181f2/transformed/react-android-0.79.5-debug/prefab/modules/reactnative/libs/android.x86_64/libreactnative.so",
+        "/home/fareed-sayed/.gradle/caches/8.13/transforms/ecf58a1d5a3b5cc4faabc13e873181f2/transformed/react-android-0.79.5-debug/prefab/modules/jsi/libs/android.x86_64/libjsi.so",
+        "/home/fareed-sayed/.gradle/caches/8.13/transforms/492d12ddde8d0414cdeaa8d1c9a89b37/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.x86_64/libfbjni.so"
+      ]
+    }
+  }
+}

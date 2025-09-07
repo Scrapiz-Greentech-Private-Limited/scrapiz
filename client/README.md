@@ -47,6 +47,25 @@ This React Native app with Expo Router implements a complete authentication syst
 - All authentication endpoints defined
 - TypeScript interfaces for type safety
 
+#### Frontend Key Header (x-auth-app)
+- The backend expects an `x-auth-app` header on every request.
+- This app reads the key from `app.json` at `expo.extra.env.EXPO_PUBLIC_FRONTEND_SECRET` (with a fallback to `process.env.EXPO_PUBLIC_FRONTEND_SECRET`).
+- Example `app.json`:
+  ```json
+  {
+    "expo": {
+      "extra": {
+        "env": {
+          "EXPO_PUBLIC_API_URL": "http://192.168.1.104:8000/api",
+          "EXPO_PUBLIC_FRONTEND_SECRET": "<your-frontend-secret>"
+        }
+      }
+    }
+  }
+  ```
+-
+The header is automatically injected on every request by the API client.
+
 ### API Service (`/api/apiService.ts`)
 - Complete authentication service class
 - Axios interceptors for token management

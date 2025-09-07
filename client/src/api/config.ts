@@ -1,19 +1,34 @@
 // API Configuration
+import Constants from 'expo-constants';
+
+const FRONTEND_KEY =
+  (Constants.expoConfig?.extra as any)?.env?.EXPO_PUBLIC_FRONTEND_SECRET ||
+  (Constants.manifest as any)?.extra?.env?.EXPO_PUBLIC_FRONTEND_SECRET ||
+  process.env.EXPO_PUBLIC_FRONTEND_SECRET ||
+  'Scrapiz#0nn$(tab!z';
+
 export const API_CONFIG = {
-  BASE_URL: 'http://192.168.0.107:8000/api',
+  BASE_URL: 'http://192.168.0.104:8000/api',
   ENDPOINTS: {
     // Authentication endpoints
-    REGISTER: '/register',
-    LOGIN: '/login',
-    LOGOUT: '/logout',
-    VERIFY_OTP: '/register', // PUT request
-    RESEND_OTP: '/resendotp',
-    PASSWORD_RESET_REQUEST: '/password-reset-request',
-    PASSWORD_RESET: '/password-reset',
-    OAUTH_LOGIN: '/oauth-login',
+    REGISTER: '/authentication/register',
+    LOGIN: '/authentication/login',
+    LOGOUT: '/authentication/logout',
+    VERIFY_OTP: '/authentication/register', // PUT request
+    RESEND_OTP: '/authentication/resendotp',
+    PASSWORD_RESET_REQUEST: '/authentication/password-reset-request',
+    PASSWORD_RESET: '/authentication/password-reset',
+    USER: '/authentication/user',
+    USER_ADDRESSES: '/user/address/',
+    // Inventory
+    INVENTORY_CATEGORIES: '/inventory/categories/',
+    INVENTORY_PRODUCTS: '/inventory/products/',
+    INVENTORY_ORDERNOS: '/inventory/ordernos/',
+    INVENTORY_CREATE_ORDER: '/inventory/create-order/',
   },
   HEADERS: {
     'Content-Type': 'application/json',
+    'x-auth-app': FRONTEND_KEY,
   },
 };
 

@@ -1,0 +1,1 @@
+/home/fareed-sayed/Documents/Scrapiz/client/android/app/build/intermediates/cxx/Debug/14606y4a/obj/arm64-v8a
