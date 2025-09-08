@@ -7,7 +7,7 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = [
     '127.0.0.1',
@@ -52,6 +52,15 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+STORAGES = {
+    "default": {
+        "BACKEND": "server.storages.MediaStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "server.storages.StaticStorage",
+    },
+}
+
 
 ROOT_URLCONF = 'server.urls'
 
@@ -111,8 +120,10 @@ AWS_S3_USE_SSL = True
 AWS_S3_VERIFY = True
 
 # Direct S3 backend without custom classes
-STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+STATICFILES_STORAGE = 'server.storages.StaticStorage'
+DEFAULT_FILE_STORAGE = 'server.storage.MediaStorage'
+# Dummy local path just to satisfy Django
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/static/'
 MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'

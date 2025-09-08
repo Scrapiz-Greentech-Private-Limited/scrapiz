@@ -15,7 +15,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     date_joined = models.DateTimeField(default=timezone.now)  # Add this line
     is_superuser = models.BooleanField(default=False)
     phone_number = models.CharField(max_length=14, default= False, null=True)
-    
+    session_id = models.CharField(max_length=255, null=True, blank=True)
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
 
