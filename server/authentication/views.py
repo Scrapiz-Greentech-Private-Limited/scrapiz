@@ -6,20 +6,39 @@ from rest_framework.exceptions import AuthenticationFailed
 import jwt
 import datetime
 from django.utils import timezone
-from .models import User
+from .models import User, AuditLog
 from .serializers import UserSerializer,PasswordResetRequestSerializer,PasswordResetSerializer
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
-from django.utils.html import strip_tags
 from django.utils.crypto import get_random_string
 from django.core.cache import cache
 import ssl
 from dotenv import load_dotenv
 import os 
+from utils.usercheck import authenticate_request
+import uuid
+from utils.audit_client_ip import get_client_ip
+from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
 
 load_dotenv()
 # Disable SSL verification
 ssl._create_default_https_context = ssl._create_unverified_context
+
+
+# ------------------ Custom Throttles ------------------
+class ResendOtpThrottle(UserRateThrottle):
+    rate = '1/min'  # 1 request per minute per user
+
+class LoginThrottle(AnonRateThrottle):
+    rate = '5/min'  # 5 attempts per minute per IP (anon)
+
+class PasswordResetRequestThrottle(AnonRateThrottle):
+    rate = '1/10m'  # 1 request per 10 minutes per IP/email ✅ corrected below
+
+class PasswordResetThrottle(UserRateThrottle):
+    rate = '5/min'  # 5 attempts per minute per user ✅ corrected
+
+# ------------------ Views ------------------
 class RegisterView(APIView):
     @csrf_exempt
     def post(self, request):
@@ -27,10 +46,7 @@ class RegisterView(APIView):
         name = request.data.get('name')
         password = request.data.get('password')
         confirm_password = request.data.get('confirm_password')
-        secret_key = request.headers.get('x-auth-app')
-
-        if not secret_key or secret_key != os.getenv('FRONTEND_SECRET') :
-            return Response({"error": "Invalid secret key"}, status=status.HTTP_401_UNAUTHORIZED)
+        authenticate_request(request)
 
         if not email or not name or not password or not confirm_password:
             return Response({"message": "Email, name, password, and confirm_password are required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -43,7 +59,7 @@ class RegisterView(APIView):
         if existing_user and existing_user.is_active:
             return Response({"message": "Email already exists"}, status=status.HTTP_400_BAD_REQUEST)
 
-        otp = get_random_string(length=4, allowed_chars='0123456789')
+        otp = get_random_string(length=6, allowed_chars='0123456789')
 
         if existing_user:
             # If user exists but inactive, update their details & OTP
@@ -66,7 +82,7 @@ class RegisterView(APIView):
         send_mail(
             'Your OTP Code',
             f'Your OTP code is {otp}',
-            'teamscrapiz@gmail.com',
+            'crodlintech@gmail.com',
             [email],
             fail_silently=False,
             html_message=html_message,
@@ -77,12 +93,9 @@ class RegisterView(APIView):
 
     def put(self, request):
         email = request.data.get('email')
-        otp = request.data.get('otp')
+        otp = request.data.get('otp')   
         user = User.objects.filter(email=email).first()
-        secret_key = request.headers.get('x-auth-app')
-
-        if not secret_key or secret_key != os.getenv('FRONTEND_SECRET') :
-            return Response({"error": "Invalid secret key"}, status=status.HTTP_401_UNAUTHORIZED)
+        authenticate_request(request)
 
         if user and user.otp == otp and user.otp_expiration > timezone.now():
             user.is_active = True
@@ -92,9 +105,9 @@ class RegisterView(APIView):
             # Send a welcome email or any other post-verification action
             html_message = render_to_string('email/welcome.html', {'name': user.name})
             send_mail(
-                'Welcome to SCRAPIZ',
+                'Welcome to Crodlin Connect',
                 'Thank you for verifying your email.',
-                'teamscrapiz@gmail.com',  # Replace with your email
+                'crodlintech@gmail.com',  # Replace with your email
                 [email],
                 fail_silently=False,
                 html_message=html_message,
@@ -107,17 +120,15 @@ class RegisterView(APIView):
 
 
 class ResendotpView(APIView):
+    throttle_classes = [ResendOtpThrottle]
     @csrf_exempt
     def post(self, request):
         email = request.data.get('email')
         user = User.objects.filter(email=email).first()
-        secret_key = request.headers.get('x-auth-app')
-
-        if not secret_key or secret_key != os.getenv('FRONTEND_SECRET') :
-            return Response({"error": "Invalid secret key"}, status=status.HTTP_401_UNAUTHORIZED)
+        authenticate_request(request)
 
         if user:
-            otp = get_random_string(length=4, allowed_chars='0123456789')
+            otp = get_random_string(length=6, allowed_chars='0123456789')
             user.otp = otp
             user.otp_expiration = timezone.now() + timezone.timedelta(minutes=5)
             user.save()
@@ -125,7 +136,7 @@ class ResendotpView(APIView):
             send_mail(
                 'Your OTP Code',
                 f'Your OTP code is {otp}',
-                'teamscrapiz@gmail.com',  # Replace with your email
+                'crodlintech@gmail.com',  # Replace with your email
                 [email],
                 fail_silently=False,
                 html_message=html_message,
@@ -137,19 +148,16 @@ class ResendotpView(APIView):
 
 
 
+# ----------------- Login -----------------
 class LoginView(APIView):
+    throttle_classes = [LoginThrottle]
+
     @csrf_exempt
     def post(self, request):
-        email = request.data['email']
-
-        password = request.data['password']
-
+        email = request.data.get('email')
+        password = request.data.get('password')
         user = User.objects.filter(email=email).first()
-        secret_key = request.headers.get('x-auth-app')
-        # print(secret_key)
-        if not secret_key or secret_key != os.getenv('FRONTEND_SECRET') :
-            return Response({"error": "Invalid secret key"}, status=status.HTTP_401_UNAUTHORIZED)
-
+        authenticate_request(request)
 
         if user is None:
             raise AuthenticationFailed('User Not found!')
@@ -160,163 +168,137 @@ class LoginView(APIView):
         if not user.is_active:
             raise AuthenticationFailed('Account not activated. Please verify your email.')
 
+        # Generate new session ID
+        session_id = str(uuid.uuid4())
+        user.session_id = session_id
+        user.save()
+
+        # Audit log
+        ip = get_client_ip(request)
+        AuditLog.objects.create(user=user, action="login", ip_address=ip)
+
         payload = {
             'id': user.id,
+            'session_id': session_id,
             'exp': datetime.datetime.utcnow() + datetime.timedelta(days=7),
             'iat': datetime.datetime.utcnow()
         }
 
         token = jwt.encode(payload, 'secret', algorithm='HS256')
+        return Response({'jwt': token})
 
-        response = Response()
-        response.data = {
-            'jwt': token  # No "Bearer" prefix
-        }
-
-        return response
-    
-
-
-
-
+# ----------------- Logout -----------------
 class LogoutView(APIView):
     @csrf_exempt
     def post(self, request):
-        secret_key = request.headers.get('x-auth-app')
+        user = authenticate_request(request, need_user=True)
+        # Clear session
+        user.session_id = None
+        user.save()
 
-        if not secret_key or secret_key != os.getenv('FRONTEND_SECRET') :
-            return Response({"error": "Invalid secret key"}, status=status.HTTP_401_UNAUTHORIZED)
+        # Audit log
+        ip = get_client_ip(request)
+        AuditLog.objects.create(user=user, action="logout", ip_address=ip)
 
         response = Response()
         response.delete_cookie('jwt')
-        response.data = {
-            'message': "Logged out successfully"
-        }
+        response.data = {"message": "Logged out successfully"}
         return response
 
-
-
-# views.py
-
-
-
+# ----------------- Password Reset Request -----------------
 class PasswordResetRequestView(APIView):
+    throttle_classes = [PasswordResetRequestThrottle]
+
+    @csrf_exempt
     def post(self, request):
         serializer = PasswordResetRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
-        secret_key = request.headers.get('x-auth-app')
-
-        if not secret_key or secret_key != os.getenv('FRONTEND_SECRET') :
-            return Response({"error": "Invalid secret key"}, status=status.HTTP_401_UNAUTHORIZED)
-
+        authenticate_request(request)
 
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
             return Response({"message": "User with this email does not exist."}, status=status.HTTP_400_BAD_REQUEST)
 
-        otp = get_random_string(length=4, allowed_chars='0123456789')
-        # cache.set(f'otp_{email}', otp, timeout=300)  # OTP valid for 5 minutes
+        # 6-digit OTP
+        otp = get_random_string(length=6, allowed_chars='0123456789')
         user.otp = otp
         user.otp_expiration = timezone.now() + timezone.timedelta(minutes=5)
         user.save()
-        html_message = render_to_string('email/password_reset.html', {'otp': otp})
 
+        # Send OTP email
+        html_message = render_to_string('email/password_reset.html', {'otp': otp})
         send_mail(
             'Password Reset OTP',
             f'Your OTP for password reset is {otp}.',
-            'teamscrapiz@gmail.com',
+            'crodlintech@gmail.com',
             [email],
             fail_silently=False,
             html_message=html_message,
         )
+
         return Response({"message": "OTP sent to your email."}, status=status.HTTP_200_OK)
 
-
+# ----------------- Password Reset -----------------
 class PasswordResetView(APIView):
+
+    throttle_classes = [PasswordResetThrottle]
+    @csrf_exempt
     def post(self, request):
         serializer = PasswordResetSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
         otp = serializer.validated_data['otp']
         new_password = serializer.validated_data['new_password']
-        secret_key = request.headers.get('x-auth-app')
-
-        if not secret_key or secret_key != os.getenv('FRONTEND_SECRET') :
-            return Response({"error": "Invalid secret key"}, status=status.HTTP_401_UNAUTHORIZED)
-
+        authenticate_request(request)
 
         try:
             user = User.objects.get(email=email)
-            if user.otp != otp or user.otp_expiration < timezone.now():
-                return Response({"message": "Invalid OTP or OTP expired."}, status=status.HTTP_400_BAD_REQUEST)
-            user.set_password(new_password)
-            user.save()
-            cache.delete(f'otp_{email}')
-            # Send confirmation email
-            html_message = render_to_string('email/password_reset_sucessful.html', {'name': user.name})
-            send_mail(
-                'Password Reset Successful',
-                'Your password has been reset successfully.',
-                'teamscrapiz@gmail.com',
-                [email],
-                fail_silently=False,
-                html_message=html_message,
-            )
-            return Response({"message": "Password reset successful."}, status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return Response({"message": "User with this email does not exist."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Validate OTP
+        if user.otp != otp or user.otp_expiration < timezone.now():
+            return Response({"message": "Invalid OTP or OTP expired."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Reset password & clear session/OTP
+        user.set_password(new_password)
+        user.session_id = None
+        user.otp = None
+        user.otp_expiration = None
+        user.last_password_reset = timezone.now()
+        user.save()
+
+        # Audit log
+        ip = get_client_ip(request)
+        AuditLog.objects.create(user=user, action="password_reset", ip_address=ip)
+
+        # Send confirmation email
+        html_message = render_to_string('email/password_reset_sucessful.html', {'name': user.name})
+        send_mail(
+            'Password Reset Successful',
+            'Your password has been reset successfully.',
+            'crodlintech@gmail.com',
+            [email],
+            fail_silently=False,
+            html_message=html_message,
+        )
+
+        return Response({"message": "Password reset successful."}, status=status.HTTP_200_OK)
 class UserView(APIView):
     @csrf_exempt
     def get(self, request):
 
-        token = request.headers.get('Authorization')
-        secret_key = request.headers.get('x-auth-app')
-
-        if not secret_key or secret_key != os.getenv('FRONTEND_SECRET') :
-            return Response({"error": "Invalid secret key"}, status=status.HTTP_401_UNAUTHORIZED)
-
-
-
-        if not token:
-            raise AuthenticationFailed('Unauthenticated!')
-
-        try:
-            payload = jwt.decode(token, 'secret', algorithms="HS256")
-        except jwt.ExpiredSignatureError:
-            raise AuthenticationFailed('Token expired!')
-        except jwt.InvalidTokenError:
-            raise AuthenticationFailed('Invalid token!')
-
-        user = User.objects.filter(id=payload['id']).first()
+        user = authenticate_request(request, need_user=True)
         serializer = UserSerializer(user)
 
         return Response(serializer.data)
 
     @csrf_exempt
     def patch(self, request):
-        token = request.headers.get('Authorization')
-        secret_key = request.headers.get('x-auth-app')
-
-        if not secret_key or  secret_key != os.getenv('FRONTEND_SECRET'):
-            return Response({"error": "Invalid secret key"}, status=status.HTTP_401_UNAUTHORIZED)
-
-        if not token:
-            raise AuthenticationFailed('Unauthenticated!')
-
-        try:
-            payload = jwt.decode(token, 'secret', algorithms="HS256")
-        except jwt.ExpiredSignatureError:
-            raise AuthenticationFailed('Token expired!')
-        except jwt.InvalidTokenError:
-            raise AuthenticationFailed('Invalid token!')
-
-        user = User.objects.filter(id=payload['id']).first()
-        if not user:
-            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        user = authenticate_request(request, need_user=True)
 
         data = request.data
         if "name" in data:
@@ -329,7 +311,7 @@ class UserView(APIView):
         send_mail(
                 'Name Reset Successful',
                 'Your name has been reset successfully.',
-                'teamscrapiz@gmail.com',
+                'crodlintech@gmail.com',
                 [user.email],
                 fail_silently=False,
                 html_message=html_message,
@@ -339,33 +321,14 @@ class UserView(APIView):
         
     @csrf_exempt
     def delete(self, request):
-        token = request.headers.get('Authorization')
-        secret_key = request.headers.get('x-auth-app')
-
-        if not secret_key or secret_key != os.getenv('FRONTEND_SECRET'):
-            return Response({"error": "Invalid secret key"}, status=status.HTTP_401_UNAUTHORIZED)
-
-        if not token:
-            raise AuthenticationFailed('Unauthenticated!')
-
-        try:
-            payload = jwt.decode(token, 'secret', algorithms="HS256")
-        except jwt.ExpiredSignatureError:
-            raise AuthenticationFailed('Token expired!')
-        except jwt.InvalidTokenError:
-            raise AuthenticationFailed('Invalid token!')
-
-        user = User.objects.filter(id=payload['id']).first()
-        if not user:
-            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
-
+        user = authenticate_request(request, need_user=True)
         # User can delete only their own account
         user.delete()
         html_message = render_to_string('email/account_deleted_sucessful.html', {'name': user.name})
         send_mail(
                 'Account Deleted Successful',
                 'Your account has been permanently deleted successfully.',
-                'teamscrapiz@gmail.com',
+                'crodlintech@gmail.com',
                 [user.email],
                 fail_silently=False,
                 html_message=html_message,

@@ -205,3 +205,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+staticfiles
+server/server/test/s3_test.py
+server/server/test/*

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User
+from .models import User, AuditLog
 
 # ✅ User admin customization
 @admin.register(User)
@@ -20,6 +20,13 @@ class UserAdmin(BaseUserAdmin):
             'fields': ('email', 'name', 'password1', 'password2'),
         }),
     )
+# ------------------ AuditLog Admin ------------------
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    list_display = ('user', 'action', 'ip_address', 'timestamp')
+    list_filter = ('action', 'user')
+    search_fields = ('user__email', 'user__name', 'ip_address')
+    ordering = ('-timestamp',)
 
 # ✅ Admin site branding
 admin.site.site_header = "Scrapiz Administrator"
