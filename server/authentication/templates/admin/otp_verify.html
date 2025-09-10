@@ -1,0 +1,26 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block title %}OTP Verification | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <h1 style="margin-bottom: 20px;">Enter OTP</h1>
+
+  {% if error %}
+    <p class="errornote">{{ error }}</p>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="form-row">
+      <label for="id_otp">OTP:</label>
+      <input type="text" name="otp" maxlength="6" required id="id_otp">
+    </div>
+
+    <div class="submit-row">
+      <input type="submit" value="Verify OTP">
+    </div>
+  </form>
+</div>
+{% endblock %}

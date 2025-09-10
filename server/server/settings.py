@@ -145,3 +145,8 @@ CACHES = {
         'LOCATION': 'unique-snowflake',
     }
 }
+
+
+# Session 24 hours
+SESSION_COOKIE_AGE = 60 * 60 * 24  # 24 hours in seconds
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False

@@ -16,4 +16,4 @@ class AddressModel(models.Model):
 
 
     def __str__(self):
-        return f"{self.name} of user{self.user.email}"
+        return f"{self.name} of user {self.user.email}"
