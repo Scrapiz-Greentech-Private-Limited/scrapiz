@@ -6,10 +6,10 @@ from datetime import timedelta
 import random
 from ..models import User
 from django.core.mail import send_mail
-from django.conf import settings
 from django.views import View
 from django.http import HttpResponseForbidden
 from django.template.loader import render_to_string
+
 
 class SuperuserLoginView(LoginView):
     template_name = "admin/login_superuser.html"
