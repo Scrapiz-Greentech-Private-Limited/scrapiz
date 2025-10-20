@@ -1,245 +1,280 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
   StatusBar,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { 
-  TrendingUp, 
-  CircleAlert as AlertCircle, 
-  ArrowLeft, 
-  ArrowUp, 
-  ArrowDown,
-  BarChart3,
-  Calendar,
-  RefreshCw,
-  Bookmark,
-  Share
+import {
+  TrendingUp,
+  CircleAlert as AlertCircle,
+  ArrowLeft,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import Toast from 'react-native-toast-message';
 import { AuthService, CategorySummary, ProductSummary } from '../../api/apiService';
 
-const { width } = Dimensions.get('window');
+const getImageForProduct = (productName: string) => {
+  const name = productName.toLowerCase();
+  
+  // Paper products
+  if (name.includes('newspaper')) return require('../../../assets/images/Scrap_Rates_Photos/Newspaper.jpg');
+  if (name.includes('cardboard') || name.includes('corrugated')) return require('../../../assets/images/Scrap_Rates_Photos/Cardboard.jpg');
+  if (name.includes('book') || name.includes('paper')) return require('../../../assets/images/Scrap_Rates_Photos/Book.jpg');
+
+  // Plastic products
+
+  if (name.includes('plastic')) return require('../../../assets/images/Scrap_Rates_Photos/Plastics.jpg');
+
+  // Metal products
+  if (name.includes('iron') || name.includes('steel')) return require('../../../assets/images/Scrap_Rates_Photos/Iron.jpg');
+  if (name.includes('aluminum') || name.includes('aluminium')) return require('../../../assets/images/Scrap_Rates_Photos/Aluminium.jpg');
+  if (name.includes('copper')) return require('../../../assets/images/Scrap_Rates_Photos/Copper.jpg');
+  if (name.includes('brass')) return require('../../../assets/images/Scrap_Rates_Photos/Brass.jpg');
+  if (name.includes('brass')) return require('../../../assets/images/Scrap_Rates_Photos/Tin.jpg');
+
+  // Electronics
+  if (name.includes('refrigerator')) return require('../../../assets/images/Scrap_Rates_Photos/fridge.jpg');
+  if (name.includes('battery')) return require('../../../assets/images/Scrap_Rates_Photos/Battery.jpg');
+  if(name.includes('front load machine')) return require('../../../assets/images/Scrap_Rates_Photos/FrontLoadMachine.jpg');
+  if (name.includes('tv') || name.includes('television')) return require('../../../assets/images/Scrap_Rates_Photos/TV.jpg');
+  if (name.includes('laptops')) return require('../../../assets/images/Scrap_Rates_Photos/Laptops.jpg');
+  if (name.includes('windowac')) return require('../../../assets/images/Scrap_Rates_Photos/WindowAC.jpg');
+  if (name.includes('printer')) return require('../../../assets/images/Scrap_Rates_Photos/Printer.jpg');
+  if (name.includes('microwave')) return require('../../../assets/images/Scrap_Rates_Photos/Microwave.jpg');
+  // Glass products 
+  if (name.includes('glass')) return require('../../../assets/images/Scrap_Rates_Photos/glass.jpg');
+
+  return null;
+};
+
+const getCategoryIcon = (categoryName: string) => {
+  const name = categoryName.toLowerCase();
+  if (name.includes('paper') || name.includes('cardboard')) return require('../../../assets/images/icons/box.png');
+  if (name.includes('plastic')) return require('../../../assets/images/icons/bottle-plastic.png');
+  if (name.includes('metal') || name.includes('iron') || name.includes('steel')) return require('../../../assets/images/icons/steel.png');
+  if (name.includes('electronic') || name.includes('e-waste')) return require('../../../assets/images/icons/laptop.png');
+  if (name.includes('glass')) return require('../../../assets/images/icons/glass.png');
+  return '♻️';
+};
 
 export default function RatesScreen() {
   const router = useRouter();
   const [categories, setCategories] = useState<CategorySummary[]>([]);
   const [products, setProducts] = useState<ProductSummary[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const [cats, prods] = await Promise.all([
-          AuthService.getCategories(),
-          AuthService.getProducts(),
-        ]);
-        setCategories(cats);
-        setProducts(prods);
-        if (cats.length > 0) setSelectedCategoryId(cats[0].id);
-      } catch (e) {}
-    };
-    load();
+    loadData();
   }, []);
 
-  const filteredProducts = useMemo(() => {
-    if (!selectedCategoryId) return products;
-    return products.filter(p => p.category === selectedCategoryId);
-  }, [products, selectedCategoryId]);
-
-  const getTrendIcon = (minRate: number, maxRate: number) => {
-    // Placeholder trend based on spread
-    const spread = maxRate - minRate;
-    if (spread > 20) return <ArrowUp size={12} color="#10b981" />;
-    if (spread < 5) return <View style={{ width: 12, height: 12, backgroundColor: '#6b7280', borderRadius: 6 }} />;
-    return <ArrowDown size={12} color="#ef4444" />;
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [cats, prods] = await Promise.all([
+        AuthService.getCategories(),
+        AuthService.getProducts(),
+      ]);
+      setCategories(cats);
+      setProducts(prods);
+    } catch (e: any) {
+      setError(e.message || 'Failed to load rates');
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: e.message || 'Failed to load rates',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const getTrendColor = (minRate: number, maxRate: number) => {
-    const spread = maxRate - minRate;
-    if (spread > 20) return '#10b981';
-    if (spread < 5) return '#6b7280';
-    return '#ef4444';
-  };
+  const renderCategorySection = (category: CategorySummary) => {
+    const categoryProducts = products.filter((p) => p.category === category.id);
+    
+    if (categoryProducts.length === 0) return null;
 
-  const renderCategoryTabs = () => (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesContainer}>
-      {categories.map((cat) => (
-        <TouchableOpacity
-          key={cat.id}
-          style={[
-            styles.categoryTab,
-            selectedCategoryId === cat.id && { backgroundColor: '#3b82f6' }
-          ]}
-          onPress={() => setSelectedCategoryId(cat.id)}
-        >
-          <Text style={[
-            styles.categoryTabText,
-            selectedCategoryId === cat.id && styles.categoryTabTextActive
-          ]}>
-            {cat.name}
+    // Get category color based on name
+    const getCategoryColor = (name: string) => {
+      const lowerName = name.toLowerCase();
+      if (lowerName.includes('paper')) return '#10b981';
+      if (lowerName.includes('plastic')) return '#3b82f6';
+      if (lowerName.includes('metal')) return '#f59e0b';
+      if (lowerName.includes('electronic')) return '#8b5cf6';
+      if (lowerName.includes('glass')) return '#06b6d4';
+      return '#6b7280';
+    };
+
+    const getCategoryBgColor = (name: string) => {
+      const lowerName = name.toLowerCase();
+      if (lowerName.includes('paper')) return '#d1fae5';
+      if (lowerName.includes('plastic')) return '#dbeafe';
+      if (lowerName.includes('metal')) return '#fef3c7';
+      if (lowerName.includes('electronic')) return '#ede9fe';
+      if (lowerName.includes('glass')) return '#cffafe';
+      return '#f3f4f6';
+    };
+
+    const categoryColor = getCategoryColor(category.name);
+    const categoryBgColor = getCategoryBgColor(category.name);
+    const categoryIcon = getCategoryIcon(category.name);
+
+    return (
+      <View key={category.id} style={styles.categorySection}>
+        <View style={[styles.categoryHeader, { backgroundColor: categoryBgColor }]}>
+          <Text style={styles.categoryIcon}>{categoryIcon}</Text>
+          <Text style={[styles.categoryTitle, { color: categoryColor }]}>
+            {category.name}
           </Text>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
-  );
+        </View>
 
-  const renderRateCard = (item: ProductSummary) => (
-    <View key={item.id} style={styles.rateCard}>
-      <LinearGradient colors={['#eef2ff', '#e0e7ff']} style={styles.rateCardGradient}>
-        <View style={styles.rateCardHeader}>
-          <View style={styles.rateCardLeft}>
-            <Text style={styles.rateCardIcon}>♻️</Text>
-            <View style={styles.rateCardInfo}>
-              <Text style={styles.rateCardName}>{item.name}</Text>
-              <Text style={styles.rateCardDescription}>{item.description}</Text>
-            </View>
-          </View>
-          <TouchableOpacity style={styles.bookmarkButton}>
-            <Bookmark size={16} color="#3b82f6" />
-          </TouchableOpacity>
+        <View style={styles.itemsGrid}>
+          {categoryProducts.map((item) => {
+            const productImage = getImageForProduct(item.name);
+            return (
+              <View key={item.id} style={styles.rateItem}>
+                <View style={[styles.itemIcon, !productImage && { backgroundColor: categoryColor }]}>
+                  {productImage ? (
+                    <Image source={productImage} style={styles.itemImage} />
+                  ) : (
+                    <Text style={styles.itemEmoji}>{categoryIcon}</Text>
+                  )}
+                </View>
+                <Text style={styles.itemName}>{item.name}</Text>
+                <Text style={[styles.itemRate, { color: categoryColor }]}>
+                  ₹{item.min_rate}-{item.max_rate}
+                </Text>
+                <Text style={styles.itemUnit}>Per {item.unit}</Text>
+                <Text style={styles.itemDescription} numberOfLines={2}>
+                  {item.description}
+                </Text>
+              </View>
+            );
+          })}
         </View>
-        <View style={styles.rateCardContent}>
-          <View style={styles.priceContainer}>
-            <Text style={[styles.ratePrice, { color: '#3b82f6' }]}>₹{item.min_rate}-{item.max_rate}</Text>
-            <Text style={styles.rateUnit}>per kg</Text>
-          </View>
-          <View style={styles.trendContainer}>
-            {getTrendIcon(item.min_rate, item.max_rate)}
-            <Text style={[styles.trendText, { color: getTrendColor(item.min_rate, item.max_rate) }]}>range</Text>
-          </View>
-        </View>
-        <View style={styles.rateCardFooter}>
-          {/* <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#3b82f6' }]}> 
-            <Text style={styles.actionButtonText}>Get Quote</Text>
-          </TouchableOpacity> */}
-          {/* <TouchableOpacity style={styles.shareButton}>
-            <Share size={16} color="#3b82f6" />
-          </TouchableOpacity> */}
-        </View>
-      </LinearGradient>
-    </View>
-  );
+      </View>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color="#16a34a" />
+        <Text style={styles.loadingText}>Loading rates...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor="#1e293b" barStyle="light-content" />
+      <StatusBar barStyle="light-content" />
       
       {/* Header */}
-      <LinearGradient colors={['#1e293b', '#334155']} style={styles.header}>
-        <View style={styles.headerContent}>
-          <View style={styles.headerTop}>
-            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-              <ArrowLeft size={24} color="white" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Market Rates</Text>
-            <TouchableOpacity style={styles.refreshButton} onPress={async () => {
-              try {
-                const [cats, prods] = await Promise.all([
-                  AuthService.getCategories(),
-                  AuthService.getProducts(),
-                ]);
-                setCategories(cats);
-                setProducts(prods);
-                if (cats.length > 0 && !cats.find(c => c.id === selectedCategoryId)) setSelectedCategoryId(cats[0].id);
-              } catch {}
-            }}>
-              <RefreshCw size={24} color="white" />
-            </TouchableOpacity>
-          </View>
-          
-          <Text style={styles.headerSubtitle}>Real-time scrap material prices</Text>
-          
-          <View style={styles.marketSummary}>
-            <View style={styles.summaryItem}>
-              <View style={styles.summaryIconContainer}>
-                <TrendingUp size={20} color="#10b981" />
-              </View>
-              <View>
-                <Text style={styles.summaryLabel}>Market Status</Text>
-                <Text style={styles.summaryValue}>Active</Text>
-              </View>
-            </View>
-            
-            <View style={styles.summaryItem}>
-              <View style={styles.summaryIconContainer}>
-                <BarChart3 size={20} color="#3b82f6" />
-              </View>
-              <View>
-                <Text style={styles.summaryLabel}>Avg. Spread</Text>
-                <Text style={styles.summaryValue}>~₹{Math.max(0, Math.round((products.reduce((s, p) => s + (p.max_rate - p.min_rate), 0) / Math.max(1, products.length))))}</Text>
-              </View>
-            </View>
-            
-            <View style={styles.summaryItem}>
-              <View style={styles.summaryIconContainer}>
-                <Calendar size={20} color="#f59e0b" />
-              </View>
-              <View>
-                <Text style={styles.summaryLabel}>Updated</Text>
-                <Text style={styles.summaryValue}>Today</Text>
-              </View>
-            </View>
-          </View>
+      <LinearGradient colors={['#16a34a', '#15803d']} style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <ArrowLeft size={24} color="white" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Scrap Rates</Text>
+        <View style={styles.headerRight}>
+          <TrendingUp size={24} color="white" />
         </View>
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Categories */}
-        <View style={styles.section}>
-          {renderCategoryTabs()}
+        {/* Disclaimer */}
+        <View style={styles.disclaimerCard}>
+          <View style={styles.disclaimerHeader}>
+            <AlertCircle size={20} color="#16a34a" />
+            <Text style={styles.disclaimerTitle}>Important Note</Text>
+          </View>
+          <Text style={styles.disclaimerText}>
+            The prices shown are for reference only. Actual rates may vary based on:
+          </Text>
+          <View style={styles.disclaimerList}>
+            <Text style={styles.disclaimerItem}>• Current market conditions</Text>
+            <Text style={styles.disclaimerItem}>• Quality and quantity of materials</Text>
+            <Text style={styles.disclaimerItem}>• Location and transportation costs</Text>
+            <Text style={styles.disclaimerItem}>• Seasonal demand fluctuations</Text>
+          </View>
+          <Text style={styles.disclaimerFooter}>
+            Contact us for accurate pricing based on your specific materials.
+          </Text>
         </View>
 
-        {/* Disclaimer */}
-        <View style={styles.section}>
-          <View style={styles.disclaimerCard}>
-            <AlertCircle size={20} color="#f59e0b" />
-            <View style={styles.disclaimerContent}>
-              <Text style={styles.disclaimerTitle}>Price Disclaimer</Text>
-              <Text style={styles.disclaimerText}>
-                Rates vary based on quality, quantity, location, and market conditions. 
-                Contact us for accurate pricing.
-              </Text>
+        {/* Last Updated */}
+        <View style={styles.lastUpdated}>
+          <Text style={styles.lastUpdatedText}>
+            Last updated: {new Date().toLocaleDateString('en-IN', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            })}
+          </Text>
+        </View>
+
+        {/* Rate Categories */}
+        {categories.length > 0 ? (
+          categories.map((category) => renderCategorySection(category))
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No rates available</Text>
+          </View>
+        )}
+
+        {/* Market Trends */}
+        {products.length > 0 && (
+          <View style={styles.trendsSection}>
+            <Text style={styles.trendsTitle}>Market Trends</Text>
+            <View style={styles.trendsCard}>
+              <View style={styles.trendItem}>
+                <View style={[styles.trendIndicator, { backgroundColor: '#16a34a' }]} />
+                <Text style={styles.trendText}>
+                  {products.length} products available
+                </Text>
+              </View>
+              <View style={styles.trendItem}>
+                <View style={[styles.trendIndicator, { backgroundColor: '#f59e0b' }]} />
+                <Text style={styles.trendText}>
+                  Average rate: ₹
+                  {Math.round(
+                    products.reduce((sum, p) => sum + (p.max_rate + p.min_rate) / 2, 0) /
+                      products.length
+                  )}
+                  /kg
+                </Text>
+              </View>
+              <View style={styles.trendItem}>
+                <View style={[styles.trendIndicator, { backgroundColor: '#3b82f6' }]} />
+                <Text style={styles.trendText}>
+                  {categories.length} categories available
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
+        )}
 
-        {/* Rates Grid */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Products</Text>
-            <TouchableOpacity style={styles.filterButton}>
-              <BarChart3 size={16} color="#6b7280" />
-              <Text style={styles.filterText}>Filter</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.ratesGrid}>
-            {filteredProducts.map((item) => renderRateCard(item))}
-          </View>
-        </View>
-
-        {/* CTA Section */}
-        <View style={styles.section}>
-          <LinearGradient colors={['#27AE60', '#2ECC71']} style={styles.ctaCard}>
-            <Text style={styles.ctaTitle}>Ready to Sell?</Text>
-            <Text style={styles.ctaSubtitle}>
-              Get instant quotes based on current market rates for your scrap materials.
-            </Text>
-            <TouchableOpacity 
-              style={styles.ctaButton}
-              onPress={() => router.push('/(tabs)/sell')}
-            >
-              <Text style={styles.ctaButtonText}>Schedule Pickup</Text>
-              <ArrowUp size={16} color="#27AE60" style={{ transform: [{ rotate: '45deg' }] }} />
-            </TouchableOpacity>
-          </LinearGradient>
+        {/* Contact Section */}
+        <View style={styles.contactSection}>
+          <Text style={styles.contactTitle}>Need Accurate Pricing?</Text>
+          <Text style={styles.contactText}>
+            Get real-time quotes for your specific materials by scheduling a pickup.
+          </Text>
+          <TouchableOpacity
+            style={styles.contactButton}
+            onPress={() => router.push('/(tabs)/sell')}
+          >
+            <Text style={styles.contactButtonText}>Schedule Pickup</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
+      <Toast />
     </View>
   );
 }
@@ -249,301 +284,268 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#6b7280',
+    fontFamily: 'Inter-Regular',
+  },
   header: {
     paddingTop: 60,
-    paddingBottom: 24,
-  },
-  headerContent: {
     paddingHorizontal: 20,
-  },
-  headerTop: {
+    paddingBottom: 20,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'space-between',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: 'white',
-    fontFamily: 'Inter-ExtraBold',
-  },
-  refreshButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontFamily: 'Inter-Regular',
-    marginBottom: 24,
-  },
-  marketSummary: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  summaryItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  summaryIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  summaryLabel: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontFamily: 'Inter-Regular',
-  },
-  summaryValue: {
-    fontSize: 14,
+    fontSize: 20,
     fontWeight: '600',
     color: 'white',
     fontFamily: 'Inter-SemiBold',
+  },
+  headerRight: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   content: {
     flex: 1,
-  },
-  section: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  categoriesContainer: {
-    marginHorizontal: -8,
-  },
-  categoryTab: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    marginHorizontal: 8,
-    borderRadius: 25,
-    backgroundColor: '#e2e8f0',
-  },
-  categoryTabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#64748b',
-    fontFamily: 'Inter-SemiBold',
-  },
-  categoryTabTextActive: {
-    color: 'white',
+    padding: 20,
   },
   disclaimerCard: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: '#f0fdf4',
     borderRadius: 16,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
+    padding: 20,
+    marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#fde68a',
+    borderColor: '#bbf7d0',
   },
-  disclaimerContent: {
-    flex: 1,
+  disclaimerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   disclaimerTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#92400e',
+    color: '#16a34a',
     fontFamily: 'Inter-SemiBold',
-    marginBottom: 4,
+    marginLeft: 8,
   },
   disclaimerText: {
-    fontSize: 12,
-    color: '#78716c',
+    fontSize: 14,
+    color: '#166534',
     fontFamily: 'Inter-Regular',
-    lineHeight: 16,
+    lineHeight: 20,
+    marginBottom: 12,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  disclaimerList: {
+    marginBottom: 12,
+  },
+  disclaimerItem: {
+    fontSize: 13,
+    color: '#166534',
+    fontFamily: 'Inter-Regular',
+    lineHeight: 18,
+    marginBottom: 4,
+  },
+  disclaimerFooter: {
+    fontSize: 13,
+    color: '#166534',
+    fontFamily: 'Inter-Medium',
+    fontWeight: '500',
+  },
+  lastUpdated: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 24,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
-    fontFamily: 'Inter-Bold',
+  lastUpdatedText: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontFamily: 'Inter-Regular',
   },
-  filterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: 'white',
+  categorySection: {
+    marginBottom: 32,
+  },
+  categoryHeader: {
     borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  categoryIcon: {
+    fontSize: 24,
+  },
+  categoryTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+  },
+  itemsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  rateItem: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 16,
+    width: '48%',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  filterText: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontFamily: 'Inter-Medium',
-  },
-  ratesGrid: {
-    gap: 16,
-  },
-  rateCard: {
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  rateCardGradient: {
-    borderRadius: 20,
-    padding: 20,
-  },
-  rateCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  rateCardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  rateCardIcon: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  rateCardInfo: {
-    flex: 1,
-  },
-  rateCardName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-    fontFamily: 'Inter-Bold',
-    marginBottom: 2,
-  },
-  rateCardDescription: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontFamily: 'Inter-Regular',
-  },
-  bookmarkButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+  itemIcon: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 12,
+    overflow: 'hidden',
   },
-  rateCardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
+  itemEmoji: {
+    fontSize: 48,
   },
-  priceContainer: {
-    alignItems: 'flex-start',
+  itemImage: {
+    width: 96,
+    height: 96,
+    resizeMode: 'contain',
   },
-  ratePrice: {
-    fontSize: 24,
-    fontWeight: '800',
-    fontFamily: 'Inter-ExtraBold',
+  itemName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    fontFamily: 'Inter-SemiBold',
+    textAlign: 'center',
+    marginBottom: 4,
   },
-  rateUnit: {
-    fontSize: 12,
+  itemRate: {
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+    marginBottom: 2,
+  },
+  itemUnit: {
+    fontSize: 11,
     color: '#6b7280',
     fontFamily: 'Inter-Regular',
-    marginTop: 2,
+    marginBottom: 8,
   },
-  trendContainer: {
+  itemDescription: {
+    fontSize: 11,
+    color: '#9ca3af',
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+    lineHeight: 14,
+  },
+  trendsSection: {
+    marginBottom: 24,
+  },
+  trendsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    fontFamily: 'Inter-SemiBold',
+    marginBottom: 16,
+  },
+  trendsCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  trendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    marginBottom: 12,
+  },
+  trendIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 12,
   },
   trendText: {
     fontSize: 14,
-    fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
-  },
-  rateCardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  actionButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 12,
-    flex: 1,
-    marginRight: 12,
-  },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'white',
-    fontFamily: 'Inter-SemiBold',
-    textAlign: 'center',
-  },
-  shareButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  ctaCard: {
-    borderRadius: 24,
-    padding: 24,
-    alignItems: 'center',
-  },
-  ctaTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: 'white',
-    fontFamily: 'Inter-ExtraBold',
-    marginBottom: 8,
-  },
-  ctaSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: '#374151',
     fontFamily: 'Inter-Regular',
-    textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 22,
   },
-  ctaButton: {
+  contactSection: {
     backgroundColor: 'white',
     borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  contactTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    fontFamily: 'Inter-SemiBold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  contactText: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+    maxWidth: 280,
+  },
+  contactButton: {
+    backgroundColor: '#16a34a',
+    borderRadius: 12,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
-  ctaButtonText: {
+  contactButtonText: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#6366f1',
-    fontFamily: 'Inter-Bold',
+    fontWeight: '600',
+    color: 'white',
+    fontFamily: 'Inter-SemiBold',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    fontFamily: 'Inter-Regular',
   },
 });

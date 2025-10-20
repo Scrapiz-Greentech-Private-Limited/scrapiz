@@ -4,12 +4,16 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  ActivityIndicator,
+  RefreshControl,
   TouchableOpacity,
   Dimensions,
   StatusBar,
 } from 'react-native';
-import { Clock, CheckCircle, Truck, Package, MapPin, Calendar, IndianRupee, Phone, MessageCircle, Search, Filter, Eye } from 'lucide-react-native';
-import { AuthService, OrderSummary } from '../../api/apiService';
+import Toast from 'react-native-toast-message';
+import {useOrdersData} from '../../hooks/useOrderData'
+import {useOrderDetails , useFilteredOrders , useOrderTabs} from '../../hooks/userOrderDetails'
+import { Clock,ChevronRight, CheckCircle, Truck, Package, MapPin, Calendar, IndianRupee, Phone, MessageCircle, Search, Filter, Eye } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
@@ -53,61 +57,53 @@ export default function OrdersScreen() {
   const [selectedTab, setSelectedTab] = useState('all');
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [serverOrders, setServerOrders] = useState<OrderSummary[]>([]);
-
-  const loadOrders = async () => {
-    try {
-      const data = await AuthService.getOrderNos();
-      setServerOrders(data);
-    } catch (e) {}
-  };
-
-  useEffect(() => {
-    loadOrders();
-  }, []);
+  const [refreshing, setRefreshing] = useState(false);
+  const {orders, products, loading, error, refetch} = useOrdersData();
+  const orderDataWithDetails = useOrderDetails(orders, products)
+  const filteredOrders = useFilteredOrders(orderDataWithDetails, selectedTab)
+  const tabs = useOrderTabs(orderDataWithDetails)
 
   useFocusEffect(
     React.useCallback(() => {
-      loadOrders();
+      refetch();
     }, [])
   );
 
-  const filterOrders = (status?: string) => {
-    if (status === 'all' || !status) return serverOrders;
-    return serverOrders.filter(order => (order.status?.name || '').toLowerCase().replace(' ', '_') === status);
-  };
+   useEffect(() => {
+    if (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error,
+      });
+    }
+  }, [error]);
 
-  const tabs = [
-    { id: 'all', label: 'All', count: serverOrders.length },
-    { id: 'scheduled', label: 'Scheduled', count: serverOrders.filter(o => (o.status?.name || '').toLowerCase() === 'scheduled').length },
-    { id: 'in_transit', label: 'In Transit', count: serverOrders.filter(o => (o.status?.name || '').toLowerCase() === 'in transit').length },
-    { id: 'completed', label: 'Completed', count: serverOrders.filter(o => (o.status?.name || '').toLowerCase() === 'completed').length }
-  ];
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  };
 
   const toggleOrderDetails = (orderId: string) => {
     setExpandedOrder(expandedOrder === orderId ? null : orderId);
   };
 
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color="#16a34a" />
+        <Text style={styles.loadingText}>Loading orders...</Text>
+      </View>
+    );
+  }
+
+
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor="#2C3E50" barStyle="light-content" />
-      
-      {/* Dark Header */}
-      <View style={[styles.header, { backgroundColor: '#2C3E50' }]}>
+      <View style={styles.header}>
         <Text style={styles.headerTitle}>My Orders</Text>
-        <Text style={styles.headerSubtitle}>Track your scrap pickups</Text>
         
-        {/* Search and Filter */}
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBox}>
-            <Search size={20} color="#9ca3af" />
-            <Text style={styles.searchPlaceholder}>Search orders...</Text>
-          </View>
-          <TouchableOpacity style={styles.filterButton}>
-            <Filter size={20} color="#d1d5db" />
-          </TouchableOpacity>
-        </View>
-        
-        {/* Tabs */}
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={false} 
@@ -146,107 +142,98 @@ export default function OrdersScreen() {
         </ScrollView>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {filterOrders(selectedTab).map((order) => {
-          const statusName = (order.status?.name || 'unknown').toLowerCase().replace(' ', '_');
-          const statusConfig = getStatusConfig(statusName);
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#16a34a']} />
+        }
+      >
+        {filteredOrders.map((order) => {
+          const statusConfig = getStatusConfig(order.statusName);
           const StatusIcon = statusConfig.icon;
-          
+
           return (
             <View key={order.id} style={styles.orderCard}>
-              {/* Order Header */}
-              <View style={styles.orderHeader}>
-                <View style={[styles.statusPill, { backgroundColor: statusConfig.bgColor }]}>
-                  <StatusIcon size={16} color={statusConfig.darkColor} />
-                  <Text style={[styles.statusText, { color: statusConfig.darkColor }]}> 
-                    {order.status?.name || 'Status'}
-                  </Text>
-                </View>
-                <TouchableOpacity 
-                  style={styles.viewButton}
-                  onPress={() => toggleOrderDetails(String(order.id))}
-                >
-                  <Eye size={16} color="#6b7280" />
-                </TouchableOpacity>
-              </View>
-              
-              {/* Order Info */}
-              <View style={styles.orderInfo}>
-                <Text style={styles.orderId}>#{order.order_number}</Text>
-                <View style={styles.orderMeta}>
-                  <View style={styles.metaItem}>
-                    <Calendar size={14} color="#6b7280" />
-                    <Text style={styles.metaText}>{new Date(order.created_at).toLocaleString()}</Text>
+              <TouchableOpacity
+                style={styles.orderHeader}
+                onPress={() => toggleOrderDetails(String(order.id))}
+              >
+                <View style={styles.orderHeaderLeft}>
+                  <View style={[
+                    styles.statusIcon,
+                    { backgroundColor: statusConfig.bgColor }
+                  ]}>
+                    <StatusIcon size={20} color={statusConfig.darkColor} />
                   </View>
-                  <View style={styles.amountContainer}>
-                    <IndianRupee size={16} color="#10b981" />
-                    <Text style={styles.orderAmount}>{order.orders.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0)}</Text>
+                  <View style={styles.orderInfo}>
+                    <Text style={styles.orderId}>#{order.order_number}</Text>
+                    <Text style={[
+                      styles.orderStatus,
+                      { color: statusConfig.darkColor }
+                    ]}>
+                      {order.status?.name || 'Unknown'}
+                    </Text>
                   </View>
                 </View>
-              </View>
-              
-              {/* Items Preview */}
-              <View style={styles.itemsPreview}>
-                <Text style={styles.itemsCount}>
-                  {order.orders.length} item{order.orders.length > 1 ? 's' : ''}
-                </Text>
-                <Text style={styles.itemsList}>
-                  {order.orders.map(item => item.product.name).join(', ')}
-                </Text>
-              </View>
-              
-              {/* Progress Bar */}
-              <View style={styles.progressContainer}>
-                <View style={styles.progressBar}>
-                  <View 
+                <View style={styles.orderHeaderRight}>
+                  <Text style={styles.orderAmount}>₹{Math.round(order.totalAmount)}</Text>
+                  <ChevronRight 
+                    size={16} 
+                    color="#6b7280" 
                     style={[
-                      styles.progressFill, 
-                      { 
-                        width: order.status === 'completed' ? '100%' : 
-                              order.status === 'in_transit' ? '60%' : '30%',
-                        backgroundColor: statusConfig.color
-                      }
+                      styles.chevron,
+                      expandedOrder === String(order.id) && styles.chevronExpanded
                     ]} 
                   />
                 </View>
-                <Text style={styles.progressText}>
-                  {order.status === 'completed' ? 'Completed' : 
-                   order.status === 'in_transit' ? 'In Progress' : 'Scheduled'}
-                </Text>
+              </TouchableOpacity>
+
+              <View style={styles.orderMeta}>
+                <View style={styles.orderMetaItem}>
+                  <Calendar size={14} color="#6b7280" />
+                  <Text style={styles.orderMetaText}>{order.formattedDate}</Text>
+                </View>
               </View>
 
-              {/* Expanded Details */}
               {expandedOrder === String(order.id) && (
-                <View style={styles.expandedContent}>
-                  <View style={styles.divider} />
-                  
-                  {/* Items Detail */}
-                  <View style={styles.detailSection}>
-                    <Text style={styles.detailTitle}>Items Breakdown</Text>
-                    {order.orders.map((item, index) => (
-                      <View key={index} style={styles.itemDetail}>
-                        <View style={styles.itemInfo}>
-                          <Text style={styles.itemName}>{item.product.name}</Text>
-                          <Text style={styles.itemQuantity}>{item.quantity}kg</Text>
+                <View style={styles.orderDetails}>
+                  <View style={styles.orderSection}>
+                    <Text style={styles.sectionTitle}>Items</Text>
+                    {order.orders.map((item, index) => {
+                      const product = products.find(p => p.id === item.product.id);
+                      const rate = product ? (product.max_rate + product.min_rate) / 2 : 0;
+                      const quantity = parseFloat(item.quantity) || 0;
+                      const itemTotal = rate * quantity;
+
+                      return (
+                        <View key={index} style={styles.orderItem}>
+                          <Text style={styles.itemName}>
+                            {item.product.name} ({item.quantity}{product?.unit || 'kg'})
+                          </Text>
+                          <Text style={styles.itemAmount}>
+                            ₹{Math.round(itemTotal)}
+                          </Text>
                         </View>
-                        <Text style={styles.itemTotal}>₹{item.quantity}</Text>
-                      </View>
-                    ))}
-                  </View>
-                  
-                  {/* Address */}
-                  <View style={styles.detailSection}>
-                    <Text style={styles.detailTitle}>Pickup Address</Text>
-                    <View style={styles.addressRow}>
-                      <MapPin size={16} color="#6b7280" />
-                      <Text style={styles.addressText}>Address ID: {order.address || 'NA'}</Text>
+                      );
+                    })}
+                    <View style={styles.orderItemTotal}>
+                      <Text style={styles.itemTotalText}>Total Amount</Text>
+                      <Text style={styles.itemTotalAmount}>₹{Math.round(order.totalAmount)}</Text>
                     </View>
                   </View>
-                  
-                  {/* Agent Details (not available in current API) */}
-                  
-                  {/* Action Button */}
-                  {order.status === 'in_transit' && (
+
+                  <View style={styles.orderSection}>
+                    <Text style={styles.sectionTitle}>Pickup Address</Text>
+                    <View style={styles.addressContainer}>
+                      <MapPin size={16} color="#6b7280" />
+                      <Text style={styles.addressText}>
+                        Address ID: {order.address || 'Not specified'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {order.statusName === 'in_transit' && (
                     <TouchableOpacity style={styles.trackButton}>
                       <Truck size={20} color="white" />
                       <Text style={styles.trackButtonText}>Track Live Location</Text>
@@ -258,20 +245,22 @@ export default function OrdersScreen() {
           );
         })}
 
-        {filterOrders(selectedTab).length === 0 && (
+        {filteredOrders.length === 0 && (
           <View style={styles.emptyState}>
-            <Package size={64} color="#6b7280" />
-            <Text style={styles.emptyTitle}>No Orders Found</Text>
-            <Text style={styles.emptyText}>
+            <Package size={64} color="#d1d5db" />
+            <Text style={styles.emptyStateTitle}>No Orders Found</Text>
+            <Text style={styles.emptyStateText}>
               {selectedTab === 'all' 
                 ? "You haven't placed any orders yet" 
-                : `No ${selectedTab} orders at the moment`}
+                : `No ${selectedTab.replace('_', ' ')} orders at the moment`}
             </Text>
           </View>
         )}
       </ScrollView>
+      <Toast />
     </View>
   );
+
 }
 
 const styles = StyleSheet.create({

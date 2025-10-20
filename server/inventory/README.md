@@ -204,6 +204,49 @@ Authorization: JWT_TOKEN
 
 ---
 
+### 6. Cancel Order (Custom API)
+
+* **Endpoint:** `/api/inventory/cancel-order/`
+* **Method:** `POST`
+* **Purpose:** Allows a user to cancel one of their orders. Updates the order status to `Cancelled` (creates status automatically if missing).
+* **Headers:**
+
+```json
+x-auth-app: FRONTEND_SECRET_KEY
+Authorization: JWT_TOKEN
+```
+
+* **Request Body Example:**
+
+```json
+{
+  "order_number": "F4pw0DIi"
+}
+```
+
+You can also cancel by `order_id` by sending `{ "order_id": 7 }`.
+
+* **Response Example:**
+
+```json
+{
+  "message": "Order cancelled successfully",
+  "order": {
+    "id": 7,
+    "order_number": "F4pw0DIi",
+    "user": "fareedsayed95@gmail.com",
+    "created_at": "2025-08-20T06:54:23.093086+05:30",
+    "status": {"id": 3, "name": "Cancelled"},
+    "address": 1,
+    "orders": [
+      {"id": 13, "product": {"id": 1, "name": "Iron"}, "quantity": "2.00"}
+    ]
+  }
+}
+```
+
+---
+
 ## Security
 
 * All API requests require the `x-auth-app` header with the frontend secret key.

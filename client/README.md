@@ -58,7 +58,7 @@ This React Native app with Expo Router implements a complete authentication syst
         "env": {
           "EXPO_PUBLIC_API_URL": "http://192.168.1.104:8000/api",
           "EXPO_PUBLIC_FRONTEND_SECRET": "<your-frontend-secret>"
-        }
+        }Y
       }
     }
   }

@@ -39,7 +39,9 @@ INSTALLED_APPS = [
     'storages',
     'authentication',
     'inventory',
-    'user'
+    'user',
+    'services',
+    'rest_framework',
 ]
 
 MIDDLEWARE = [

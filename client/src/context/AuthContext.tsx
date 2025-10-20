@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import {StyleSheet} from 'react-native'
 import { AuthService } from '../api/apiService';
 
 interface AuthContextType {

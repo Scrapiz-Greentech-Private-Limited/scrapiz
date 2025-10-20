@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,19 +6,37 @@ import {
   ScrollView,
   StyleSheet,
   Dimensions,
-  Alert,
+  Image,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
+
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import Toast from 'react-native-toast-message';
 import { StatusBar } from 'expo-status-bar';
-import { router } from 'expo-router';
 import {
-  Package,
   TrendingUp,
-  ArrowRight,
+  ChevronRight,
+  PackagePlus,
+  AreaChart,
+  Package,
+  Gift,
+  Lightbulb,
+  Hammer,
+  Wrench,
+  Building,
+  Trash2,
   Truck,
+  FileText,
 } from 'lucide-react-native';
-import { Image } from 'react-native';
-import { AuthService, UserProfile } from '../../api/apiService';
+
+import CustomCarousel from '../../components/Carousel';
+
+import { useHomeData } from '../../hooks/useHomeData';
+import { useScrapCategories } from '../../hooks/useScrapCategories';
+import { useRecentActivity } from '../../hooks/useRecentActivity';
+import { useEnvironmentalImpact } from '../../hooks/useImpact';
 
 const { width } = Dimensions.get('window');
 
@@ -33,33 +51,135 @@ function formatAMPM(date: Date) {
   return strTime;
 }
 
+const services = [
+  { 
+    id: 'demolition', 
+    title: 'Demolition Service', 
+    description: 'Building and structure demolition', 
+    icon: Hammer, 
+    color: '#dc2626',
+  },
+  { 
+    id: 'dismantling', 
+    title: 'Dismantling', 
+    description: 'Equipment and machinery dismantling', 
+    icon: Wrench, 
+    color: '#ea580c',
+  },
+  { 
+    id: 'paper-shredding', 
+    title: 'Paper Shredding', 
+    description: 'Secure document shredding', 
+    icon: FileText, 
+    color: '#0891b2',
+  },
+  { 
+    id: 'society-tieup', 
+    title: 'Society Tie-up', 
+    description: 'Scrap collection for societies', 
+    icon: Building, 
+    color: '#7c3aed',
+  },
+  { 
+    id: 'junk-removal', 
+    title: 'Junk Removal', 
+    description: 'Household and office junk removal', 
+    icon: Trash2, 
+    color: '#059669',
+  },
+]
+const serviceGradients = {
+   demolition: ['#dc2626', '#b91c1c'],
+  dismantling: ['#ea580c', '#c2410c'],
+  'paper-shredding': ['#0891b2', '#0ea5e9'],
+  'society-tieup': ['#7c3aed', '#a855f7'],
+  'junk-removal': ['#059669', '#34d399'],
+}
+const tips = [
+  'Recycling one aluminum can saves enough energy to run a TV for 3 hours.',
+  'The U.S. throws away $11.4 billion worth of recyclable containers and packaging every year.',
+  'Recycling plastic saves twice as much energy as burning it in an incinerator.',
+  'Around 1 billion trees worth of paper are thrown away every year in the U.S.',
+  'Glass is 100% recyclable and can be recycled endlessly without loss in quality or purity.',
+];
+  const quickActions = [
+    {
+      id: 1,
+      title: 'Sell Scrap',
+      subtitle: 'Schedule pickup',
+      icon: Package,
+       colors: ['#16a34a', '#15803d'], // Use a colors array for the gradient
+      iconColor: '#16a34a',
+        route: '/(tabs)/sell',
+    },
+    {
+      id: 2,
+      title: 'View Rates',
+      subtitle: 'Market prices',
+      icon: TrendingUp,
+      colors: ['#0ea5e9', '#0284c7'],
+      iconColor: '#0ea5e9',
+      route: '/(tabs)/rates',
+    },
+    {
+      id: 3,
+      title: 'Track Orders',
+      subtitle: 'Order status',
+      icon: Truck,
+      colors: ['#f59e0b', '#d97706'],
+      iconColor: '#f59e0b',
+      route: '/(tabs)/orders',
+    },
+    {
+      id: 4,
+      title: 'Services',
+      subtitle: 'Our offerings',
+      icon: Wrench,
+      colors: ['#8b5cf6', '#7c3aed'],
+      iconColor: '#8b5cf6',
+      route: '/(tabs)/services',
+    }
+  ];
+
 export default function HomeScreen() {
+  const router = useRouter();
+  const {user , products, categories, orders, loading, error , refetch } = useHomeData()
+  const scrapCategories = useScrapCategories(products || [], categories||[])
+  const recentActivity = useRecentActivity(orders || [], products, 2)
+  const { treesSaved , co2Reduced } = useEnvironmentalImpact(orders || [])
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [user, setUser] = useState<UserProfile | undefined>(undefined);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const randomTip = tips[Math.floor(Math.random() * tips.length)]
 
+  const adScrollRef = useRef<ScrollView | null>(null);
+  const [adIndex, setAdIndex] = useState(0);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  };
   useEffect(() => {
-    const load = async () => {
-      try {
-        const data = await AuthService.getUser();
-        setUser(data);
-      } catch (e: any) {
-        Alert.alert('Error', e.message || 'Failed to load user');
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, []);
+    if(error){
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error,
+      });
+    }
+  }, [error]);
 
-  const profileName = user?.name || 'User'; 
-
-  useEffect(() => {
+  const handleNavigate = (path: string) => {
+    router.push(path as any);
+  }
+    useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  const profileName = user?.name || 'User'; 
 
   const getGreeting = () => {
     const hour = currentTime.getHours();
@@ -68,238 +188,240 @@ export default function HomeScreen() {
     return 'Good Evening';
   };
 
-  const quickActions = [
-    {
-      id: 1,
-      title: 'Sell Scrap',
-      subtitle: 'Schedule pickup',
-      icon: Package,
-      color: '#16a34a',
-      route: '/(tabs)/sell',
-    },
-    {
-      id: 2,
-      title: 'View Rates',
-      subtitle: 'Market prices',
-      icon: TrendingUp,
-      color: '#3b82f6',
-      route: '/(tabs)/rates',
-    },
-    {
-      id: 3,
-      title: 'Track Orders',
-      subtitle: 'Order status',
-      icon: Truck,
-      color: '#f59e0b',
-      route: '/(tabs)/orders',
-    },
-  ];
+  
 
-  const ads = [
-    { id: 1, image: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1600&auto=format&fit=crop', alt: 'Promo 1' },
-    { id: 2, image: 'https://images.unsplash.com/photo-1520975916090-3105956dac38?q=80&w=1600&auto=format&fit=crop', alt: 'Promo 2' },
-    { id: 3, image: 'https://images.unsplash.com/photo-1503602642458-232111445657?q=80&w=1600&auto=format&fit=crop', alt: 'Promo 3' },
-    { id: 4, image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=1600&auto=format&fit=crop', alt: 'Promo 4' },
-  ];
 
-  const adScrollRef = useRef<ScrollView | null>(null);
-  const [adIndex, setAdIndex] = useState(0);
   const adCardWidth = width - 40; // full-bleed minus horizontal padding
+  const greeting = getGreeting();
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const next = (adIndex + 1) % ads.length;
-      setAdIndex(next);
-      try {
-        adScrollRef.current?.scrollTo({ x: next * (adCardWidth + 16), animated: true });
-      } catch {}
-    }, 3500);
-    return () => clearInterval(interval);
-  }, [adIndex, ads.length, adCardWidth]);
 
+   if (loading) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color="#16a34a" />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" />
-      
-      {/* Header with Gradient */}
-      <LinearGradient colors={['#16a34a', '#059669']} style={styles.header}>
-        <View style={styles.headerContent}>
-          <View style={styles.headerTop}>
-            <View>
-              <Text style={styles.greeting}>{getGreeting()}</Text>
-              <Text style={styles.userName}>{profileName}</Text>
-            </View>
-          </View>
+    <ScrollView 
+      style={styles.container} 
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl 
+          refreshing={refreshing} 
+          onRefresh={onRefresh} 
+          colors={['#16a34a']} 
+        />
+      }
+    >
 
+      <LinearGradient colors={['#16a34a', '#15803d']} style={styles.header}>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.greeting}>{greeting}</Text>
+            <Text style={styles.userName}>{user?.name || 'User'}</Text>
+          </View>
         </View>
       </LinearGradient>
+      <CustomCarousel />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Ads Carousel */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Ad's</Text>
-          <ScrollView
-            ref={adScrollRef}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            decelerationRate="fast"
-            snapToInterval={adCardWidth + 16}
-            snapToAlignment="start"
-            contentContainerStyle={{ paddingHorizontal: 8 }}
-            onScroll={(e) => {
-              const x = e.nativeEvent.contentOffset.x;
-              const idx = Math.round(x / (adCardWidth + 16));
-              if (idx !== adIndex) setAdIndex(idx);
-            }}
-            scrollEventThrottle={16}
-            style={{ marginHorizontal: -8 }}
-          >
-            {ads.map((ad) => (
-              <View key={ad.id} style={[styles.adCard, { width: adCardWidth, marginHorizontal: 8, padding: 0, overflow: 'hidden' }]}>
-                <Image source={{ uri: ad.image }} accessibilityLabel={ad.alt} style={{ width: '100%', height: 140 }} resizeMode="cover" />
-              </View>
-            ))}
-          </ScrollView>
-          <View style={styles.adDots}>
-            {ads.map((ad, idx) => (
-              <View key={ad.id} style={[styles.adDot, idx === adIndex && styles.adDotActive]} />
-            ))}
+
+      <View style={styles.section}>
+  <Text style={styles.sectionTitle}>Quick Actions</Text>
+  <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.actionsGrid}
+  >
+    {quickActions.map((action) => (
+      <TouchableOpacity
+        key={action.id}
+        style={styles.actionCard}
+        onPress={() => handleNavigate(action.route)}
+      >
+        <LinearGradient
+          colors={action.colors} // Dynamic gradient colors
+          style={styles.actionCardGradient}
+        >
+          <View style={[styles.actionIcon, { backgroundColor: 'white' }]}>
+            {/* Dynamic icon rendering */}
+            <action.icon size={24} color={action.iconColor} /> 
           </View>
-        </View>
+          <Text style={[styles.actionTitle, { color: 'white' }]}>{action.title}</Text>
+          <Text style={[styles.actionSubtitle, { color: '#d1fae5' }]}>{action.subtitle}</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    ))}
+  </ScrollView>
+      </View>
 
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.actionsGrid}>
-            {quickActions.map((action) => (
+      {/* Market Rates - Backend Data */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Today's Market Rates</Text>
+          <TouchableOpacity onPress={() => handleNavigate('/(tabs)/rates')}>
+            <TrendingUp size={16} color="#16a34a" />
+          </TouchableOpacity>
+        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.ratesScroll}
+        >
+          {scrapCategories.length > 0 ? (
+            scrapCategories.slice(0, 4).map((category) => (
               <TouchableOpacity
-                key={action.id}
-                style={styles.actionCard}
-                onPress={() => router.push(action.route as any)}
+                key={category.id}
+                style={styles.rateCard}
+                onPress={() => handleNavigate('/(tabs)/rates')}
               >
-                <View style={[styles.actionIcon, { backgroundColor: action.color }]}>
-                  <action.icon size={24} color="white" />
-                </View>
-                <Text style={styles.actionTitle}>{action.title}</Text>
-                {/* <Text style={styles.actionSubtitle}>{action.subtitle}</Text> */}
-                <ArrowRight size={26} color="#6b7280" style={styles.actionArrow} />
+                <Image source={category.icon} style={styles.categoryIconImage} width={24} height={24} />
+                <Text style={styles.categoryName}>{category.name}</Text>
+                <Text style={[styles.categoryRate, { color: category.color }]}>
+                  {category.rate}
+                </Text>
               </TouchableOpacity>
-            ))}
+            ))
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>No rates available</Text>
+            </View>
+          )}
+        </ScrollView>
+      </View>
+
+      {/* Tip of the Day */}
+      <View style={styles.section}>
+        <LinearGradient
+          colors={['#f0f9ff', '#e0f2fe']}
+          style={styles.tipCard}
+        >
+          <Lightbulb size={24} color="#0284c7" />
+          <View style={styles.tipTextContainer}>
+            <Text style={styles.tipTitle}>Tip of the Day</Text>
+            <Text style={styles.tipText}>{randomTip}</Text>
           </View>
-            </View>      
-        {/* Tips Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tips for Better Recycling</Text>
-          <View style={styles.tipCard}>
-            <Text style={styles.tipTitle}>💡 Did you know?</Text>
-            <Text style={styles.tipText}>
-              Separating your metal scraps can increase their value by up to 30%. 
-              Clean copper and aluminum fetch higher rates!
-            </Text>
-          </View>
+        </LinearGradient>
+      </View>
+
+      {/* Services */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Services</Text>
+          <TouchableOpacity onPress={() => handleNavigate('/(tabs)/services')}>
+            <Text style={styles.moreServicesText}>More Services</Text>
+          </TouchableOpacity>
         </View>
-      </ScrollView>
-    </View>
+        <View style={styles.servicesList}>
+          {services.map((service) => (
+            <LinearGradient
+              key={service.id}
+              colors={serviceGradients[service.id as keyof typeof serviceGradients]}
+              style={styles.serviceCard}
+            >
+              <TouchableOpacity
+                style={styles.serviceCardTouchable}
+                onPress={() => handleNavigate(`/services/${service.id}`)}
+              >
+                <View style={[styles.serviceIconContainer, { backgroundColor: 'white' }]}>
+                  <service.icon size={22} color={service.color} />
+                </View>
+                <View style={styles.serviceInfo}>
+                  <Text style={[styles.serviceTitle, { color: 'white' }]}>
+                    {service.title}
+                  </Text>
+                  <Text style={[styles.serviceDescription, { color: 'white' }]}>
+                    {service.description}
+                  </Text>
+                </View>
+                <ChevronRight size={18} color="#f1f5f9" />
+              </TouchableOpacity>
+            </LinearGradient>
+          ))}
+        </View>
+      </View>
+
+      {/* Refer & Earn */}
+      <View style={styles.section}>
+        <TouchableOpacity
+          style={styles.referCard}
+          onPress={() => handleNavigate('/profile/refer-friends')}
+        >
+          <LinearGradient
+            colors={['#fffbeb', '#fef3c7']}
+            style={styles.referCardGradient}
+          >
+            <Gift size={32} color="#f59e0b" />
+            <View style={styles.referTextContainer}>
+              <Text style={styles.referTitle}>Refer & Earn</Text>
+              <Text style={styles.referSubtitle}>
+                Share with friends and earn exciting rewards!
+              </Text>
+            </View>
+            <ChevronRight size={20} color="#d4d4d8" />
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+
+      {/* Environmental Impact - Backend Data */}
+      {(treesSaved > 0 || co2Reduced > 0) && (
+        <View style={[styles.section, styles.impactSection]}>
+          <Text style={styles.sectionTitle}>Environmental Impact</Text>
+          <LinearGradient colors={['#ecfdf5', '#a7f3d0']} style={styles.impactCard}>
+            <Text style={styles.impactEmoji}>🌱</Text>
+            <Text style={styles.impactText}>
+              You've helped save{' '}
+              <Text style={styles.impactHighlight}>{treesSaved} trees</Text> and reduced{' '}
+              <Text style={styles.impactHighlight}>{co2Reduced}kg CO₂</Text> emissions this
+              year!
+            </Text>
+          </LinearGradient>
+        </View>
+      )}
+
+      <Toast />
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f9fafb',
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#6b7280',
   },
   header: {
     paddingTop: 60,
-    paddingBottom: 20,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-  },
-  headerContent: {
+    paddingBottom: 24,
     paddingHorizontal: 20,
   },
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
   },
   greeting: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontFamily: 'Inter-Regular',
+    fontSize: 16,
+    color: '#d1fae5',
+    marginBottom: 4,
   },
   userName: {
     fontSize: 24,
-    fontWeight: '700',
+    fontWeight: 'bold',
     color: 'white',
-    fontFamily: 'Inter-Bold',
-    marginTop: 4,
-  },
-  notificationButton: {
-    position: 'relative',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#f59e0b',
-  },
-  statsContainer: {
-    marginHorizontal: -8,
-  },
-  statCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 16,
-    padding: 16,
-    marginHorizontal: 8,
-    minWidth: 120,
-    alignItems: 'center',
-    backdropFilter: 'blur(10px)',
-  },
-  statIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: 'white',
-    fontFamily: 'Inter-Bold',
-    marginBottom: 4,
-  },
-  statTitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontFamily: 'Inter-Medium',
-    textAlign: 'center',
-  },
-  content: {
-    flex: 1,
-    paddingTop: 24,
   },
   section: {
     paddingHorizontal: 20,
-    marginBottom: 32,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
-    fontFamily: 'Inter-Bold',
-    marginBottom: 16,
+    marginBottom: 24,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -307,66 +429,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  seeAllText: {
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  moreServicesText: {
     fontSize: 14,
     color: '#16a34a',
-    fontFamily: 'Inter-SemiBold',
-    fontWeight: '600',
+    fontWeight: '500',
   },
   actionsGrid: {
+    flexDirection: 'row',
     gap: 12,
   },
-  adCard: {
-    marginHorizontal: 8,
-    borderRadius: 16,
-    padding: 16,
-    minWidth: 240,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  adTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-    fontFamily: 'Inter-Bold',
-    marginBottom: 6,
-  },
-  adSubtitle: {
-    fontSize: 14,
-    color: '#374151',
-    fontFamily: 'Inter-Regular',
-  },
-  adDots: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 8,
-  },
-  adDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#e5e7eb',
-  },
-  adDotActive: {
-    backgroundColor: '#6b7280',
-  },
   actionCard: {
-    backgroundColor: 'white',
-    borderRadius: 20,
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  actionCardGradient: {
     padding: 20,
-    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
-    position: 'relative',
   },
   actionIcon: {
     width: 56,
@@ -374,145 +458,161 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginBottom: 12,
   },
   actionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
-    fontFamily: 'Inter-SemiBold',
-    flex: 1,
+    marginBottom: 4,
   },
   actionSubtitle: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontFamily: 'Inter-Regular',
-    marginTop: 2,
+    fontSize: 12,
   },
-  actionArrow: {
-    position: 'absolute',
-    right: 20,
+  ratesScroll: {
+    marginHorizontal: -20,
+    paddingHorizontal: 20,
   },
-  activityCard: {
+  categoryIconImage: {
+        width: 50, // Adjust size as needed
+        height: 50, // Adjust size as needed
+        borderRadius: 5,
+        marginBottom: 5,
+    },
+  rateCard: {
     backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: 12,
+    padding: 16,
+    marginRight: 12,
+    width: 120,
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  activityItem: {
+  categoryIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  categoryName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  categoryRate: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#9ca3af',
+  },
+  tipCard: {
+    borderRadius: 16,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 16,
+  },
+  tipTextContainer: {
+    flex: 1,
+  },
+  tipTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0284c7',
+    marginBottom: 8,
+  },
+  tipText: {
+    fontSize: 14,
+    color: '#475569',
+    lineHeight: 20,
+  },
+  servicesList: {
+    gap: 12,
+  },
+  serviceCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  serviceCardTouchable: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 16,
   },
-  activityIcon: {
+  serviceIconContainer: {
     width: 44,
     height: 44,
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
-  activityContent: {
+  serviceInfo: {
     flex: 1,
   },
-  activityTitle: {
+  serviceTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
-    fontFamily: 'Inter-SemiBold',
+    marginBottom: 4,
   },
-  activitySubtitle: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontFamily: 'Inter-Regular',
-    marginTop: 2,
+  serviceDescription: {
+    fontSize: 13,
+    opacity: 0.9,
   },
-  activityTime: {
-    fontSize: 12,
-    color: '#9ca3af',
-    fontFamily: 'Inter-Regular',
-    marginTop: 4,
+  referCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
   },
-  activityDivider: {
-    height: 1,
-    backgroundColor: '#f3f4f6',
-    marginVertical: 16,
-  },
-  impactCard: {
-    borderRadius: 20,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: '#bbf7d0',
-  },
-  impactHeader: {
+  referCardGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    padding: 20,
+    gap: 16,
   },
-  impactEmoji: {
-    fontSize: 32,
-    marginRight: 12,
-  },
-  impactContent: {
+  referTextContainer: {
     flex: 1,
   },
-  impactTitle: {
+  referTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#166534',
-    fontFamily: 'Inter-Bold',
+    color: '#f59e0b',
+    marginBottom: 4,
   },
-  impactDescription: {
+  referSubtitle: {
     fontSize: 14,
-    color: '#166534',
-    fontFamily: 'Inter-Regular',
-    marginTop: 4,
-  },
-  impactStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  impactStat: {
-    alignItems: 'center',
-  },
-  impactStatValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#16a34a',
-    fontFamily: 'Inter-Bold',
-  },
-  impactStatLabel: {
-    fontSize: 12,
-    color: '#166534',
-    fontFamily: 'Inter-Medium',
-    marginTop: 4,
-  },
-  tipCard: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 20,
-    borderLeftWidth: 4,
-    borderLeftColor: '#fbbf24',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  tipTitle: {
-    fontSize: 16,
-    fontWeight: '600',
     color: '#92400e',
-    fontFamily: 'Inter-SemiBold',
-    marginBottom: 8,
   },
-  tipText: {
-    fontSize: 14,
-    color: '#78716c',
-    fontFamily: 'Inter-Regular',
-    lineHeight: 20,
+  impactSection: {
+    marginBottom: 40,
+  },
+  impactCard: {
+    borderRadius: 16,
+    padding: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  impactEmoji: {
+    fontSize: 48,
+  },
+  impactText: {
+    flex: 1,
+    fontSize: 15,
+    color: '#065f46',
+    lineHeight: 22,
+  },
+  impactHighlight: {
+    fontWeight: '700',
+    color: '#047857',
   },
 });

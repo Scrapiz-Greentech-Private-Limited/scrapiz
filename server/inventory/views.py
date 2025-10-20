@@ -21,6 +21,7 @@ from django.utils import timezone
 import os
 from dotenv import load_dotenv
 from user.models import AddressModel
+from utils.usercheck import authenticate_request
 
 load_dotenv()
 class CategoryViewSet(viewsets.ModelViewSet):
@@ -63,7 +64,7 @@ class CreateOrderAPIView(APIView):
             token = request.headers.get('Authorization')
             secret_key = request.headers.get('x-auth-app')
 
-            if not secret_key or secret_key != os.getenv('FRONTEND_SECRET'):
+            if not secret_key or secret_key != 'Scrapiz#0nn$(tab!z':
                 return Response({"error": "Invalid secret key"}, status=status.HTTP_401_UNAUTHORIZED)
 
             if not token:
@@ -125,3 +126,51 @@ class CreateOrderAPIView(APIView):
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class CancelOrderAPIView(APIView):
+    def post(self, request):
+        try:
+            user = authenticate_request(request, need_user=True)
+        except AuthenticationFailed as auth_error:
+            raise auth_error
+
+        order_number = request.data.get("order_number")
+        order_id = request.data.get("order_id")
+        #Verify the user owns the order
+        if not order_number and not order_id:
+            return Response(
+                {"error": "order_number or order_id is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        order_queryset = OrderNo.objects.filter(user=user)
+        order = None
+
+        if order_number:
+            order = order_queryset.filter(order_number=order_number).first()
+        elif order_id:
+            order = order_queryset.filter(id=order_id).first()
+
+        if not order:
+            return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if order.status and order.status.name.lower() == "cancelled":
+            serialized = OrderNoSerializer(order)
+            return Response(
+                {"message": "Order already cancelled", "order": serialized.data},
+                status=status.HTTP_200_OK,
+            )
+
+        cancelled_status = Status.objects.filter(name__iexact="cancelled").first()
+        if not cancelled_status:
+            cancelled_status = Status.objects.create(name="Cancelled")
+
+        order.status = cancelled_status
+        order.save(update_fields=["status"])
+
+        serialized_order = OrderNoSerializer(order)
+        return Response(
+            {"message": "Order cancelled successfully", "order": serialized_order.data},
+            status=status.HTTP_200_OK,
+        )

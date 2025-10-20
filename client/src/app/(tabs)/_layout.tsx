@@ -1,14 +1,20 @@
-import { Tabs } from "expo-router";
+import { Redirect, Tabs } from "expo-router";
 import React from "react";
 import { 
   Home, 
   ShoppingBag, 
   User, 
   TrendingUp, 
-  Package 
+  Package ,
+  Wrench,
+  ShoppingBagIcon,
+  Clock
+
 } from "lucide-react-native";
+import { useAuth } from "@/src/context/AuthContext";
 
 export default function TabsLayout() {
+
   return (
     <Tabs
       screenOptions={{
@@ -46,6 +52,15 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="services"
+        options={{
+          title: 'Services',
+          tabBarIcon: ({ color, size }) => (
+            <Wrench size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="sell"
         options={{
           title: 'Sell',
@@ -58,8 +73,8 @@ export default function TabsLayout() {
         name="orders"
         options={{
           title: 'Orders',
-          tabBarIcon: ({ color, size }) => (
-            <ShoppingBag size={size} color={color} />
+          tabBarIcon: ({ size, color }) => (
+            <ShoppingBagIcon size={size} color={color} />
           ),
         }}
       />

@@ -1,6 +1,8 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_CONFIG, ApiResponse, RegisterRequest, LoginRequest, VerifyOtpRequest, PasswordResetRequest } from './config';
+import { API_CONFIG, ApiResponse, RegisterRequest, LoginRequest, VerifyOtpRequest, PasswordResetRequest, NotificationSettings, ServiceBookingPayload, ServiceBooking } from './config';
+
+export type { NotificationSettings, ServiceBookingPayload, ServiceBooking } from './config';
 
 // User types
 export interface ProductSummary {
@@ -118,6 +120,39 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+const notificationKeyMap: Record<keyof NotificationSettings, string> = {
+  pushNotifications: 'push_notifications',
+  pickupReminders: 'pickup_reminders',
+  orderUpdates: 'order_updates',
+  paymentAlerts: 'payment_alerts',
+  promotionalOffers: 'promotional_offers',
+  weeklyReports: 'weekly_reports',
+  emailNotifications: 'email_notifications',
+  smsNotifications: 'sms_notifications',
+};
+
+const mapNotificationResponse = (data: any): NotificationSettings => ({
+  pushNotifications: !!data?.push_notifications,
+  pickupReminders: !!data?.pickup_reminders,
+  orderUpdates: !!data?.order_updates,
+  paymentAlerts: !!data?.payment_alerts,
+  promotionalOffers: !!data?.promotional_offers,
+  weeklyReports: !!data?.weekly_reports,
+  emailNotifications: !!data?.email_notifications,
+  smsNotifications: !!data?.sms_notifications,
+});
+
+const mapNotificationPayload = (payload: Partial<NotificationSettings>) => {
+  const result: Record<string, boolean> = {};
+  Object.entries(payload).forEach(([key, value]) => {
+    const mappedKey = notificationKeyMap[key as keyof NotificationSettings];
+    if (mappedKey !== undefined && value !== undefined) {
+      result[mappedKey] = value;
+    }
+  });
+  return result;
+};
 
 // Authentication API Service
 export class AuthService {
@@ -335,6 +370,61 @@ export class AuthService {
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Failed to create order');
+    }
+  }
+
+  static async cancelOrder(payload: { order_number?: string; order_id?: number }): Promise<any> {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.INVENTORY_CANCEL_ORDER, payload);
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to cancel order');
+    }
+  }
+
+  static async getNotificationSettings(): Promise<NotificationSettings> {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.USER_NOTIFICATION_SETTINGS);
+      return mapNotificationResponse(response.data);
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch notification settings');
+    }
+  }
+
+  static async updateNotificationSettings(payload: Partial<NotificationSettings>): Promise<NotificationSettings> {
+    try {
+      const response = await apiClient.patch(
+        API_CONFIG.ENDPOINTS.USER_NOTIFICATION_SETTINGS,
+        mapNotificationPayload(payload)
+      );
+      return mapNotificationResponse(response.data);
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to update notification settings');
+    }
+  }
+
+  static async createServiceBooking(payload: ServiceBookingPayload): Promise<ServiceBooking> {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.SERVICE_BOOKINGS, {
+        service: payload.service,
+        name: payload.name,
+        phone: payload.phone,
+        address: payload.address,
+        preferred_datetime: payload.preferredDateTime,
+        notes: payload.notes,
+      });
+      return response.data?.booking as ServiceBooking;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to submit service booking');
+    }
+  }
+
+  static async getServiceBookings(): Promise<ServiceBooking[]> {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.SERVICE_BOOKINGS);
+      return response.data as ServiceBooking[];
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch bookings');
     }
   }
 }

@@ -1,6 +1,14 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import CategoryViewSet, ProductViewSet, StatusViewSet, OrderNoViewSet, OrderViewSet, CreateOrderAPIView
+from .views import (
+    CategoryViewSet,
+    ProductViewSet,
+    StatusViewSet,
+    OrderNoViewSet,
+    OrderViewSet,
+    CreateOrderAPIView,
+    CancelOrderAPIView,
+)
 
 router = DefaultRouter()
 router.register("categories", CategoryViewSet)
@@ -12,5 +20,6 @@ router.register("orders", OrderViewSet)
 urlpatterns = [
     path("", include(router.urls)),
     path("create-order/", CreateOrderAPIView.as_view(), name="create-order"),
+    path("cancel-order/", CancelOrderAPIView.as_view(), name="cancel-order"),
 
 ]

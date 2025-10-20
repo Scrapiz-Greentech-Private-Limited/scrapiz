@@ -4,13 +4,12 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed
-from .serializers import AddressSerializer
-from .models import AddressModel
+from .serializers import AddressSerializer, NotificationPreferenceSerializer
+from .models import AddressModel, NotificationPreference
 from authentication.models import User
 
 
-class AddressAPIView(APIView):
-    # ✅ helper function to get logged-in user
+class AuthenticatedAPIView(APIView):
     def authenticate_user(self, request):
         token = request.headers.get('Authorization')
         secret_key = request.headers.get('x-auth-app')
@@ -33,6 +32,9 @@ class AddressAPIView(APIView):
             raise AuthenticationFailed('User not found!')
 
         return user
+
+
+class AddressAPIView(AuthenticatedAPIView):
 
     # ✅ Get all addresses of logged-in user
     def get(self, request):
@@ -82,3 +84,20 @@ class AddressAPIView(APIView):
 
         address.delete()
         return Response({"message": "Address deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+
+
+class NotificationPreferenceAPIView(AuthenticatedAPIView):
+    def get(self, request):
+        user = self.authenticate_user(request)
+        preference, _ = NotificationPreference.objects.get_or_create(user=user)
+        serializer = NotificationPreferenceSerializer(preference)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def patch(self, request):
+        user = self.authenticate_user(request)
+        preference, _ = NotificationPreference.objects.get_or_create(user=user)
+        serializer = NotificationPreferenceSerializer(preference, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

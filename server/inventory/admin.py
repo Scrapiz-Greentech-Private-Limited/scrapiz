@@ -1,14 +1,12 @@
 from django.contrib import admin
 from .models import Category, Product, Status, OrderNo, Order, AddressModel
 
-# Orders tabular inline
 class OrderInline(admin.TabularInline):  
     model = Order
     extra = 0  
     fields = ('product', 'quantity')  
-    readonly_fields = ('product', 'quantity')  # agar edit allowed nahi chahiye
+    readonly_fields = ('product', 'quantity')  
 
-# OrderNo admin
 class OrderNoAdmin(admin.ModelAdmin):
     list_display = (
         'id', 
@@ -84,7 +82,7 @@ class AddressModelAdmin(admin.ModelAdmin):
     search_fields = ('id', 'name', 'user__email', 'city', 'phone_number')
     list_filter = ('city', 'user')  # optional filter
 
-# Register models
+
 admin.site.register(Category)
 admin.site.register(Product)
 admin.site.register(Status)

@@ -21,11 +21,14 @@ export const API_CONFIG = {
     PASSWORD_RESET: '/authentication/password-reset',
     USER: '/authentication/user',
     USER_ADDRESSES: '/user/address/',
+    USER_NOTIFICATION_SETTINGS: '/user/notification-settings/',
+  SERVICE_BOOKINGS: '/services/bookings/',
     // Inventory
     INVENTORY_CATEGORIES: '/inventory/categories/',
     INVENTORY_PRODUCTS: '/inventory/products/',
     INVENTORY_ORDERNOS: '/inventory/ordernos/',
     INVENTORY_CREATE_ORDER: '/inventory/create-order/',
+    INVENTORY_CANCEL_ORDER: '/inventory/cancel-order/',
   },
   HEADERS: {
     'Content-Type': 'application/json',
@@ -56,9 +59,40 @@ export interface VerifyOtpRequest {
   email: string;
   otp: string;
 }
-
 export interface PasswordResetRequest {
   email: string;
   otp: string;
   new_password: string;
+}
+
+export interface NotificationSettings {
+  pushNotifications: boolean;
+  pickupReminders: boolean;
+  orderUpdates: boolean;
+  paymentAlerts: boolean;
+  promotionalOffers: boolean;
+  weeklyReports: boolean;
+  emailNotifications: boolean;
+  smsNotifications: boolean;
+}
+
+export interface ServiceBookingPayload {
+  service: string;
+  name: string;
+  phone: string;
+  address: string;
+  preferredDateTime: string;
+  notes?: string;
+}
+
+export interface ServiceBooking {
+  id: number;
+  service: string;
+  name: string;
+  phone: string;
+  address: string;
+  preferred_datetime: string;
+  status: string;
+  created_at: string;
+  notes?: string | null;
 }
