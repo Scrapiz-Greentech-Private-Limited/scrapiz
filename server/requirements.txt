@@ -8,7 +8,7 @@ djangorestframework==3.16.0
 djangorestframework-simplejwt==5.3.1
 gunicorn==23.0.0
 jmespath==1.0.1
-packaging==25.as0
+packaging==25.0
 pillow==11.3.0
 psycopg==3.2.9
 PyJWT==2.8.0
