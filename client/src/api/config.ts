@@ -7,9 +7,9 @@ const FRONTEND_KEY =
   process.env.EXPO_PUBLIC_FRONTEND_SECRET ||
   'Scrapiz#0nn$(tab!z';
 
-console.log("frontednt key is ",FRONTEND_KEY)
+console.log("frontend key is ",FRONTEND_KEY)
 export const API_CONFIG = {
-  BASE_URL: 'http://15.206.44.215/api',
+  BASE_URL: 'http://13.204.50.150/api',
   ENDPOINTS: {
     // Authentication endpoints
     REGISTER: '/authentication/register',
