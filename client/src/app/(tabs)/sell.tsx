@@ -177,23 +177,32 @@ export default function SellScreen() {
           }
         break;
         case 2:
-          const scheduleResult = scheduleSchema.safeParse(scheduleForm)
+          console.log('Validating step 2, scheduleForm:', scheduleForm);
+          const scheduleResult = scheduleSchema.safeParse(scheduleForm);
           if(!scheduleResult.success){
+            console.log('Schedule validation failed:', scheduleResult.error);
             scheduleResult.error.errors.forEach((err) => {
               newErrors[err.path[0]] = err.message;
             });
           }
-        break
+        break;
         case 3:
+          console.log('Validating step 3, contactform:', contactform);
+          console.log('useNewAddress:', useNewAddress);
+          console.log('addressForm:', addressForm);
+          
           const contactResult = contactSchema.safeParse(contactform); 
           if (!contactResult.success) {
+            console.log('Contact validation failed:', contactResult.error);
             contactResult.error.errors.forEach((err) => {
               newErrors[err.path[0]] = err.message;
             });
           }
+          
           if(useNewAddress){
             const addressResult = addressSchema.safeParse(addressForm);
             if (!addressResult.success) {
+              console.log('Address validation failed:', addressResult.error);
               addressResult.error.errors.forEach((err) => {
                 newErrors[err.path[0]] = err.message;
               });
@@ -204,22 +213,22 @@ export default function SellScreen() {
         break;
 
       }
+      
+      console.log('Validation errors:', newErrors);
       setErrors(newErrors);
       return Object.keys(newErrors).length === 0;
 
     } catch(error:any) {
+      console.error('Validation exception:', error);
       Alert.alert('Error', error.message || 'Validation failed');
-    } finally {
-      setErrors(newErrors);
+      return false;
     }
   }
 
   const handleNext = () =>{
-    if(!validateStep(currentStep)){
-      const errorMessages = Object.values(errors);
-      if(errorMessages.length > 0){
-        Alert.alert('Validation Error', errorMessages[0]);
-      }
+    const validationResult = validateStep(currentStep);
+    if(!validationResult){
+      // Errors are already set in validateStep and will be displayed
       return;
     }
     if(currentStep < 4) setCurrentStep(currentStep + 1);
@@ -260,7 +269,7 @@ export default function SellScreen() {
       }else{
         addressId = selectedAddressId || 0;
       }
-      await AuthService.createOrder(itemsPayload, addressId);
+      await AuthService.createOrder(itemsPayload, addressId, selectedImages);
       Alert.alert('Success', 'Your pickup has been scheduled successfully!', [
         {
           text: 'View Orders',
@@ -807,58 +816,92 @@ export default function SellScreen() {
   );
   
 
-  const renderStep4 =() =>{
-    return(
+  const renderStep4 = () => {
+    console.log('Rendering step 4');
+    console.log('selectedItems:', selectedItems);
+    console.log('scheduleForm:', scheduleForm);
+    console.log('addressForm:', addressForm);
+    console.log('useNewAddress:', useNewAddress);
+    console.log('selectedAddressId:', selectedAddressId);
+    console.log('addresses:', addresses);
+    
+    return (
       <View style={styles.stepContent}>
-      <View style={styles.stepHeader}>
-        <CheckCircle size={24} color={"#10b981" }/>
-        <Text style={styles.stepHeaderTitle}>Order Summary</Text>
+        <View style={styles.stepHeader}>
+          <CheckCircle size={24} color="#10b981" />
+          <Text style={styles.stepHeaderTitle}>Order Summary</Text>
           <Text style={styles.stepSubtitle}>Review your pickup details</Text>
-          <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Items</Text>
-          {selectedItems.map((item) =>(
-            <View key={item.id} style={styles.summaryItem}>
-              <View style={{flexDirection: 'row', alignItems:'center'}}>
-                <Image source={item.image} style={styles.summaryItemIconImage}/>
-                <Text style={styles.summaryItemName}>
-                  {item.name}({item.quantity} kg)
-                </Text>
+        </View>
 
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>Items</Text>
+          {selectedItems && selectedItems.length > 0 ? selectedItems.map((item) => (
+            <View key={item.id} style={styles.summaryItem}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={styles.itemIcon}>♻️</Text>
+                <Text style={styles.summaryItemName}>
+                  {item.name} ({item.quantity} {item.unit})
+                </Text>
               </View>
               <Text style={styles.summaryItemAmount}>
-                ₹{item.rate * item.quantity}
+                ₹{Math.round(item.rate * item.quantity)}
               </Text>
             </View>
-          ))}
-          <View style={styles.summaryDivider}>
+          )) : <Text>No items selected</Text>}
+          <View style={styles.summaryDivider} />
           <View style={styles.summaryTotal}>
-          <Text style={styles.summaryTotalLabel}>Estimated Total</Text>
-          <Text style={styles.summaryTotalAmount}>₹{getTotalAmount()}</Text>
-        </View>
+            <Text style={styles.summaryTotalLabel}>Estimated Total</Text>
+            <Text style={styles.summaryTotalAmount}>₹{getTotalAmount()}</Text>
           </View>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>Pickup Date</Text>
-            <View style={styles.summaryDetail}>
-              <Calendar size={16} color={"#6b7280"}/>
-              <Text style={styles.summaryDetailText}>{selectedDate}*{selectedTime}</Text>
+        </View>
 
-            </View>
-            <View style={styles.summaryDetail}> 
-              <MapPin size={16} color={"#6b7280"}/>
-              <View style={styles.summaryAddressTitle}>{addressForm.title}</View>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>Pickup Schedule</Text>
+          <View style={styles.summaryDetail}>
+            <Calendar size={16} color="#6b7280" />
+            <Text style={styles.summaryDetailText}>
+              {scheduleForm.date} at {scheduleForm.time}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>Pickup Address</Text>
+          <View style={styles.summaryDetail}>
+            <MapPin size={16} color="#6b7280" />
+            <View style={styles.summaryAddressContainer}>
               {useNewAddress && addressForm.title && (
                 <Text style={styles.summaryAddressTitle}>{addressForm.title}</Text>
               )}
+              {!useNewAddress && selectedAddressId && (
+                <Text style={styles.summaryAddressTitle}>
+                  {addresses.find((a) => a.id === selectedAddressId)?.name || 'Selected Address'}
+                </Text>
+              )}
               <Text style={styles.summaryDetailText}>
-                {useNewAddress ? formatAddress() : formatAddress(addresses.find(a => a.id === selectedAddressId)!)}
+                {useNewAddress
+                  ? formatAddress(addressForm)
+                  : (addresses.find((a) => a.id === selectedAddressId) 
+                      ? formatAddress(addresses.find((a) => a.id === selectedAddressId)!)
+                      : 'Address not found')}
               </Text>
             </View>
           </View>
+        </View>
+
+        {selectedImages.length > 0 && (
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryTitle}>Uploaded Photos</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {selectedImages.map((uri, index) => (
+                <Image key={index} source={{ uri }} style={styles.selectedImage} />
+              ))}
+            </ScrollView>
           </View>
+        )}
       </View>
-    </View>
-    )
-  }
+    );
+  };
 
    return (
     <View style={styles.container}>

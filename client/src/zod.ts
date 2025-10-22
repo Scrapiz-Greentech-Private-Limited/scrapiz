@@ -41,20 +41,11 @@ export const scheduleSchema = z.object({
 
 
 export const addressSchema = z.object({
-  // Map 'Address Title' to 'name'
-title: z.string().min(2, 'Address title is required').trim(),
- addressLine: z.string().min(5, 'Address line is required').trim(),
- phone_number: z.string()
-    .regex(/^(\+91|91)?[6-9]\d{9}$/, 'Please enter a valid phone number')
-    .nonempty('Phone number is required'),
-room_number: z.string().min(1, 'Room number is required').trim().nonempty('Room number is required'),
- landmark: z.string().optional(), 
- city: z.string().min(2, 'City is required').trim().nonempty('City is required'),
- area: z.string().min(2, 'Area is required').trim().nonempty('Area is required'),
- country: z.string().min(2, 'Country is required').trim().nonempty('Country is required'),
- state: z.string().min(2, 'State is required').trim().nonempty('State is required'),
- pincode: z.string().regex(/^\d{6}$/, 'PIN code must be 6 digits').nonempty('PIN code is required'),
- delivery_suggestion: z.string().max(200, 'Delivery suggestion must be under 200 characters').trim().optional(),
+  title: z.string().min(2, 'Address title is required').trim(),
+  addressLine: z.string().min(5, 'Address line is required').trim(),
+  landmark: z.string().optional(), 
+  city: z.string().min(2, 'City is required').trim(),
+  pinCode: z.string().regex(/^\d{6}$/, 'PIN code must be 6 digits'),
 });
 
 

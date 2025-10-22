@@ -361,12 +361,52 @@ export class AuthService {
     }
   }
 
-  static async createOrder(items: Array<{ product_id: number; quantity: number }>, address_id?: number): Promise<any> {
+  static async createOrder(
+    items: Array<{ product_id: number; quantity: number }>,
+    address_id?: number,
+    imageUris?: string[]
+  ): Promise<any> {
     try {
-      const response = await apiClient.post(API_CONFIG.ENDPOINTS.INVENTORY_CREATE_ORDER, {
-        items,
-        address_id,
-      });
+      const formData = new FormData();
+      
+      // Add items as JSON string
+      formData.append('items', JSON.stringify(items));
+      
+      // Add address_id if provided
+      if (address_id) {
+        formData.append('address_id', address_id.toString());
+      }
+
+      // Add images if provided
+      if (imageUris && imageUris.length > 0) {
+        for (let i = 0; i < imageUris.length; i++) {
+          const uri = imageUris[i];
+          const filename = uri.split('/').pop() || `image_${i}.jpg`;
+          const match = /\.(\w+)$/.exec(filename);
+          const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+          formData.append('images', {
+            uri,
+            name: filename,
+            type,
+          } as any);
+        }
+      }
+
+      const token = await AsyncStorage.getItem('authToken');
+      const frontendKey = API_CONFIG.HEADERS['x-auth-app'] as string;
+
+      const response = await apiClient.post(
+        API_CONFIG.ENDPOINTS.INVENTORY_CREATE_ORDER,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'x-auth-app': frontendKey,
+            Authorization: token || '',
+          },
+        }
+      );
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Failed to create order');
