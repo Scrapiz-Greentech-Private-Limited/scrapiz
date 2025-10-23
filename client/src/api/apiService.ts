@@ -367,6 +367,11 @@ export class AuthService {
     imageUris?: string[]
   ): Promise<any> {
     try {
+      console.log('createOrder called with:');
+      console.log('- items:', items);
+      console.log('- address_id:', address_id);
+      console.log('- imageUris:', imageUris);
+      
       const formData = new FormData();
       
       // Add items as JSON string
@@ -379,18 +384,23 @@ export class AuthService {
 
       // Add images if provided
       if (imageUris && imageUris.length > 0) {
+        console.log(`Adding ${imageUris.length} images to FormData`);
         for (let i = 0; i < imageUris.length; i++) {
           const uri = imageUris[i];
           const filename = uri.split('/').pop() || `image_${i}.jpg`;
           const match = /\.(\w+)$/.exec(filename);
           const type = match ? `image/${match[1]}` : 'image/jpeg';
 
+          console.log(`Image ${i}: uri=${uri}, filename=${filename}, type=${type}`);
+          
           formData.append('images', {
             uri,
             name: filename,
             type,
           } as any);
         }
+      } else {
+        console.log('No images to upload');
       }
 
       const token = await AsyncStorage.getItem('authToken');

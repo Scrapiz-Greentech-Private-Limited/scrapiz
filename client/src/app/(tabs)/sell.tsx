@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
-
+import * as ImageManipulator from 'expo-image-manipulator'
 import Toast from 'react-native-toast-message';
 import {View,Text,Image,StyleSheet,ScrollView,TouchableOpacity,TextInput,Alert,Dimensions,StatusBar,ActivityIndicator,ColorValue,} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -107,6 +107,27 @@ export default function SellScreen() {
     load();
   },[])
 
+const compressImage = async(uri:string) =>{
+  try {
+    console.log('Compressing image: ', uri)
+    const manipResult = await ImageManipulator.manipulateAsync(
+      uri,[
+        {resize:{width: 1920}}
+      ],
+      {
+        compress: 0.7,
+        format: ImageManipulator.SaveFormat.JPEG,
+
+      }
+    );
+    console.log('Image Compressed !: ', manipResult.uri)
+    return manipResult.uri
+  } catch (error) {
+    console.error(error)
+    return uri;
+  }
+}
+
   const pickImage = async() =>{
     const {status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if(status !== 'granted'){
@@ -115,11 +136,22 @@ export default function SellScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
     allowsMultipleSelection:true,
-    quality: 0.5,
+    quality: 0.8,
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
   });
   if (!result.canceled) {
-      const uris = result.assets.map((asset) => asset.uri);
-      setSelectedImages((prev) => [...prev, ...uris]);
+    const compressedUris: string[] = [];
+    for(const asset of result.assets){
+      const compressedUri = await compressImage(asset.uri)
+      compressedUris.push(compressedUri);
+    }
+      // const uris = result.assets.map((asset) => asset.uri);
+      setSelectedImages((prev) => [...prev, ...compressedUris]);
+      Toast.show({
+        type:"success",
+        text1:"Image Added",
+        text2: `${compressedUris.length} images are compressed and ready`
+      })
     }
   }
 
@@ -269,7 +301,13 @@ export default function SellScreen() {
       }else{
         addressId = selectedAddressId || 0;
       }
-      await AuthService.createOrder(itemsPayload, addressId, selectedImages);
+      console.log('Submitting order with images:', selectedImages);
+      console.log('Items payload:', itemsPayload);
+      console.log('Address ID:', addressId);
+      
+      const result = await AuthService.createOrder(itemsPayload, addressId, selectedImages);
+      console.log('Order creation result:', result);
+      
       Alert.alert('Success', 'Your pickup has been scheduled successfully!', [
         {
           text: 'View Orders',
@@ -824,6 +862,7 @@ export default function SellScreen() {
     console.log('useNewAddress:', useNewAddress);
     console.log('selectedAddressId:', selectedAddressId);
     console.log('addresses:', addresses);
+    console.log('selectedImages:', selectedImages);
     
     return (
       <View style={styles.stepContent}>
