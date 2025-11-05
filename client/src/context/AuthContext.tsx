@@ -9,6 +9,9 @@ interface AuthContextType {
   logout: () => Promise<void>;
   register: (email: string, name: string, password: string, confirmPassword: string) => Promise<void>;
   verifyOtp: (email: string, otp: string) => Promise<void>;
+  setAuthenticatedState: (authenticated: boolean) => void;
+  refreshAuthStatus: () => Promise<void>;
+  clearAuthState: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -80,6 +83,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const setAuthenticatedState = (authenticated: boolean) => {
+    setIsAuthenticated(authenticated);
+  };
+
+  const refreshAuthStatus = async () => {
+    await checkAuthStatus();
+  };
+
+  const clearAuthState = async () => {
+    try {
+      // Clear authentication token from AsyncStorage
+      await AuthService.logout();
+      
+      // Update authentication state
+      setIsAuthenticated(false);
+    } catch (error) {
+      console.error('Error clearing auth state:', error);
+      // Even if logout fails, clear local state
+      setIsAuthenticated(false);
+    }
+  };
+
   const value = {
     isAuthenticated,
     isLoading,
@@ -87,6 +112,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     logout,
     register,
     verifyOtp,
+    setAuthenticatedState,
+    refreshAuthStatus,
+    clearAuthState,
   };
 
   return (

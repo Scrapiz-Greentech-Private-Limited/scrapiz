@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Dimensions,
+  Image,
 } from 'react-native';
 import {
   User,
@@ -21,11 +22,13 @@ import {
   ArrowRight,
   Chrome,
   Phone,
+  Gift,
 } from 'lucide-react-native';
 import { Link, useRouter } from 'expo-router';
 import ScrapizLogo from '../../components/ScrapizLogo';
 import { AuthService } from '../../api/apiService';
 import Toast from 'react-native-toast-message';
+import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 
 const { width, height } = Dimensions.get('window');
 
@@ -38,6 +41,7 @@ export default function RegisterScreen() {
     phone: '',
     password: '',
     confirmPassword: '',
+    referralCode: '', // Optional referral/promo code
   });
   const [otp, setOtp] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -45,7 +49,73 @@ export default function RegisterScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  
+ const { signInWithGoogle, isLoading: isGoogleLoading, error: googleError, authSuccess } = useGoogleAuth();
+
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.fullName.trim()) {
+      newErrors.fullName = 'Full name is required';
+    } else if (formData.fullName.trim().length < 2) {
+      newErrors.fullName = 'Name must be at least 2 characters';
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    if (!formData.phone.trim()) {
+      newErrors.phone = 'Phone number is required';
+    } else if (!/^[6-9]\d{9}$/.test(formData.phone.replace(/[\s\-()]/g, ''))) {
+      newErrors.phone = 'Please enter a valid 10-digit Indian mobile number';
+    }
+
+    if (!formData.password.trim()) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters';
+    }
+
+    if (!formData.confirmPassword.trim()) {
+      newErrors.confirmPassword = 'Please confirm your password';
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+
+    // Referral code validation (optional field)
+    if (formData.referralCode.trim()) {
+      const referralCode = formData.referralCode.trim().toUpperCase();
+      // Validate format: Should be alphanumeric with hyphen, 9 characters (XXXX-XXXX)
+      if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(referralCode)) {
+        newErrors.referralCode = 'Invalid referral code format (e.g., ABCD-1234)';
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleInputChange = (field: string, value: string) => {
+    // Auto-uppercase and format referral code as user types
+    if (field === 'referralCode') {
+      value = value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+      // Auto-add hyphen after 4 characters
+      if (value.length === 4 && !value.includes('-')) {
+        value = value + '-';
+      }
+      // Limit to 9 characters (XXXX-XXXX)
+      value = value.slice(0, 9);
+    }
+
+    setFormData(prev => ({ ...prev, [field]: value }));
+    
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
 
   const handleRegister = async () => {
     if (!validateForm()) return;
@@ -53,13 +123,20 @@ export default function RegisterScreen() {
     setIsLoading(true);
     
     try {
-      // Call actual backend API
-      await AuthService.register({
+      // Call actual backend API with optional promo code
+      const registerData: any = {
         email: formData.email,
         name: formData.fullName,
         password: formData.password,
         confirm_password: formData.confirmPassword,
-      });
+      };
+
+      // Add promo_code only if provided
+      if (formData.referralCode.trim()) {
+        registerData.promo_code = formData.referralCode.trim().toUpperCase();
+      }
+
+      await AuthService.register(registerData);
       
       Toast.show({
         type: 'success',
@@ -81,7 +158,7 @@ export default function RegisterScreen() {
   };
 
   const handleVerifyOtp = async () => {
-    if (!otp || otp.length !== 4) {
+    if (!otp || otp.length !== 6) {
       Toast.show({
         type: 'error',
         text1: 'Invalid OTP',
@@ -106,7 +183,7 @@ export default function RegisterScreen() {
       });
       
       // Navigate to tabs/home after successful verification
-      router.replace('/(tabs)');
+      router.replace('/(auth)/login');
     } catch (error: any) {
       Toast.show({
         type: 'error',
@@ -141,27 +218,44 @@ export default function RegisterScreen() {
   };
 
   const handleGoogleSignUp = async () => {
-    setIsLoading(true);
-    
     try {
-      // Keep this as mock/simulated - Google OAuth not in backend
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      Alert.alert('Success', 'Google sign up successful!', [
-        { text: 'OK', onPress: () => router.replace('/(tabs)') }
-      ]);
+      await signInWithGoogle();
+      // Navigation will be handled by useEffect when authSuccess changes
     } catch (error) {
-      Alert.alert('Error', 'Google sign up failed. Please try again.');
-    } finally {
-      setIsLoading(false);
+      console.error('Google sign-up error:', error);
     }
   };
+
+  // Handle Google auth success
+  useEffect(() => {
+    if (authSuccess) {
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: 'Sign up successful!',
+      });
+      router.replace('/(tabs)/home');
+    }
+  }, [authSuccess]);
+
+  // Show Google error toast
+  useEffect(() => {
+    if (googleError) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: googleError,
+      });
+    }
+  }, [googleError]);
+
+  const isanyLoading = isLoading || isGoogleLoading;
 
   // Render OTP screen
   if (step === 'otp') {
     return (
       <KeyboardAvoidingView 
-        style={styles.container} 
+        className='flex-1 bg-slate-50'
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView 
@@ -169,28 +263,29 @@ export default function RegisterScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.header}>
+          <View className='items-center mb-8'>
             <ScrapizLogo size={56} />
-            <Text style={styles.welcomeText}>Verify Your Email</Text>
-            <Text style={styles.subtitleText}>
-              Enter the 4-digit OTP sent to {formData.email}
+            <Text className='text-2xl font-semibold text-gray-900 font-inter-semibold mb-2 mt-5'>Verify Your Email</Text>
+            <Text className='text-base text-gray-500 font-inter-regular text-center leading-6 max-w-xs'>
+              Enter the 6-digit OTP sent to {formData.email}
             </Text>
           </View>
 
-          <View style={styles.formContainer}>
-            <View style={styles.inputContainer}>
+          <View className='flex-1 mb-6'>
+            <View className='mb-4'>
               <TextInput
                 style={[styles.otpInput, errors.otp && styles.inputError]}
-                placeholder="0000"
+                placeholder="000000"
                 placeholderTextColor="#9ca3af"
                 value={otp}
                 onChangeText={setOtp}
                 keyboardType="number-pad"
-                maxLength={4}
+                maxLength={6}
                 textAlign="center"
+                editable={!isLoading}
               />
               {errors.otp && (
-                <Text style={styles.errorText}>{errors.otp}</Text>
+                <Text className='text-xs text-red-500 font-inter-regular mt-1.5 ml-1'>{errors.otp}</Text>
               )}
             </View>
 
@@ -200,30 +295,30 @@ export default function RegisterScreen() {
               disabled={isLoading}
             >
               {isLoading ? (
-                <Text style={styles.registerButtonText}>Verifying...</Text>
+                <Text className='text-base font-semibold text-white font-inter-semibold'>Verifying...</Text>
               ) : (
                 <>
-                  <Text style={styles.registerButtonText}>Verify OTP</Text>
+                  <Text className='text-base font-semibold text-white font-inter-semibold'>Verify OTP</Text>
                   <ArrowRight size={20} color="white" />
                 </>
               )}
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.resendButton}
+              className='items-center mt-4'
               onPress={handleResendOtp}
               disabled={isLoading}
             >
-              <Text style={styles.resendButtonText}>
+              <Text className='text-sm text-green-600 font-inter-medium underline'>
                 Didn't receive OTP? Resend
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.backButton}
+              className='items-center mt-6'
               onPress={() => setStep('register')}
             >
-              <Text style={styles.backButtonText}>Back to Register</Text>
+              <Text className='text-sm text-gray-500 font-inter-regular'>Back to Register</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -235,7 +330,7 @@ export default function RegisterScreen() {
   // Render registration form
   return (
     <KeyboardAvoidingView 
-      style={styles.container} 
+      className='flex-1 bg-slate-50'
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView 
@@ -243,18 +338,18 @@ export default function RegisterScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.header}>
+        <View className='items-center mb-8'>
           <ScrapizLogo size={56} />
-          <Text style={styles.welcomeText}>Create Account</Text>
-          <Text style={styles.subtitleText}>
+          <Text className='text-2xl font-semibold text-gray-900 font-inter-semibold mb-2 mt-5'>Create Account</Text>
+          <Text className='text-base text-gray-500 font-inter-regular text-center leading-6 max-w-xs'>
             Join thousands of users earning money while helping the environment
           </Text>
         </View>
 
-        <View style={styles.formContainer}>
-          <View style={styles.inputContainer}>
-            <View style={styles.inputWrapper}>
-              <User size={20} color="#6b7280" style={styles.inputIcon} />
+        <View className='flex-1 mb-6'>
+          <View className='mb-4'>
+            <View className='flex-row items-center bg-white rounded-2xl border border-gray-200 px-4 h-14 shadow-sm shadow-black/5'>
+              <User size={20} color="#6b7280" className='mr-3' />
               <TextInput
                 style={[styles.input, errors.fullName && styles.inputError]}
                 placeholder="Full Name"
@@ -263,16 +358,17 @@ export default function RegisterScreen() {
                 onChangeText={(text) => handleInputChange('fullName', text)}
                 autoCapitalize="words"
                 autoComplete="name"
+                editable={!isanyLoading}
               />
             </View>
             {errors.fullName && (
-              <Text style={styles.errorText}>{errors.fullName}</Text>
+              <Text className='text-xs text-red-500 font-inter-regular mt-1.5 ml-1'>{errors.fullName}</Text>
             )}
           </View>
 
-          <View style={styles.inputContainer}>
-            <View style={styles.inputWrapper}>
-              <Mail size={20} color="#6b7280" style={styles.inputIcon} />
+          <View className='mb-4'>
+            <View className='flex-row items-center bg-white rounded-2xl border border-gray-200 px-4 h-14 shadow-sm shadow-black/5'>
+              <Mail size={20} color="#6b7280" className='mr-3' />
               <TextInput
                 style={[styles.input, errors.email && styles.inputError]}
                 placeholder="Email Address"
@@ -282,16 +378,17 @@ export default function RegisterScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoComplete="email"
+                editable={!isanyLoading}
               />
             </View>
             {errors.email && (
-              <Text style={styles.errorText}>{errors.email}</Text>
+              <Text className='text-xs text-red-500 font-inter-regular mt-1.5 ml-1'>{errors.email}</Text>
             )}
           </View>
 
-          <View style={styles.inputContainer}>
-            <View style={styles.inputWrapper}>
-              <Phone size={20} color="#6b7280" style={styles.inputIcon} />
+          <View className='mb-4'>
+            <View className='flex-row items-center bg-white rounded-2xl border border-gray-200 px-4 h-14 shadow-sm shadow-black/5'>
+              <Phone size={20} color="#6b7280" className='mr-3' />
               <TextInput
                 style={[styles.input, errors.phone && styles.inputError]}
                 placeholder="Phone Number"
@@ -300,16 +397,42 @@ export default function RegisterScreen() {
                 onChangeText={(text) => handleInputChange('phone', text)}
                 keyboardType="phone-pad"
                 autoComplete="tel"
+                editable={!isanyLoading}
               />
             </View>
             {errors.phone && (
-              <Text style={styles.errorText}>{errors.phone}</Text>
+              <Text className='text-xs text-red-500 font-inter-regular mt-1.5 ml-1'>{errors.phone}</Text>
             )}
           </View>
 
-          <View style={styles.inputContainer}>
-            <View style={styles.inputWrapper}>
-              <Lock size={20} color="#6b7280" style={styles.inputIcon} />
+          {/* Referral Code Input */}
+          <View className='mb-4'>
+            <View className='flex-row items-center bg-white rounded-2xl border border-gray-200 px-4 h-14 shadow-sm shadow-black/5'>
+              <Gift size={20} color="#16a34a" className='mr-3' />
+              <TextInput
+                style={[styles.input, errors.referralCode && styles.inputError]}
+                placeholder="Referral Code (Optional)"
+                placeholderTextColor="#9ca3af"
+                value={formData.referralCode}
+                onChangeText={(text) => handleInputChange('referralCode', text)}
+                autoCapitalize="characters"
+                maxLength={9}
+                editable={!isanyLoading}
+              />
+            </View>
+            {errors.referralCode && (
+              <Text className='text-xs text-red-500 font-inter-regular mt-1.5 ml-1'>{errors.referralCode}</Text>
+            )}
+            {!errors.referralCode && formData.referralCode.trim() && formData.referralCode.length === 9 && (
+              <Text className='text-xs text-green-600 font-inter-medium mt-1.5 ml-1'>
+                🎁 You'll get ₹5 bonus on your first order over ₹500!
+              </Text>
+            )}
+          </View>
+
+          <View className='mb-4'>
+            <View className='flex-row items-center bg-white rounded-2xl border border-gray-200 px-4 h-14 shadow-sm shadow-black/5'>
+              <Lock size={20} color="#6b7280" className='mr-3' />
               <TextInput
                 style={[styles.input, errors.password && styles.inputError]}
                 placeholder="Password"
@@ -318,9 +441,10 @@ export default function RegisterScreen() {
                 onChangeText={(text) => handleInputChange('password', text)}
                 secureTextEntry={!showPassword}
                 autoComplete="new-password"
+                editable={!isanyLoading}
               />
               <TouchableOpacity
-                style={styles.eyeIcon}
+                className='p-1'
                 onPress={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? (
@@ -331,13 +455,13 @@ export default function RegisterScreen() {
               </TouchableOpacity>
             </View>
             {errors.password && (
-              <Text style={styles.errorText}>{errors.password}</Text>
+              <Text className='text-xs text-red-500 font-inter-regular mt-1.5 ml-1'>{errors.password}</Text>
             )}
           </View>
 
-          <View style={styles.inputContainer}>
-            <View style={styles.inputWrapper}>
-              <Lock size={20} color="#6b7280" style={styles.inputIcon} />
+          <View className='mb-4'>
+            <View className='flex-row items-center bg-white rounded-2xl border border-gray-200 px-4 h-14 shadow-sm shadow-black/5'>
+              <Lock size={20} color="#6b7280" className='mr-3' />
               <TextInput
                 style={[styles.input, errors.confirmPassword && styles.inputError]}
                 placeholder="Confirm Password"
@@ -346,9 +470,10 @@ export default function RegisterScreen() {
                 onChangeText={(text) => handleInputChange('confirmPassword', text)}
                 secureTextEntry={!showConfirmPassword}
                 autoComplete="new-password"
+                editable={!isanyLoading}
               />
               <TouchableOpacity
-                style={styles.eyeIcon}
+                className='p-1'
                 onPress={() => setShowConfirmPassword(!showConfirmPassword)}
               >
                 {showConfirmPassword ? (
@@ -359,7 +484,7 @@ export default function RegisterScreen() {
               </TouchableOpacity>
             </View>
             {errors.confirmPassword && (
-              <Text style={styles.errorText}>{errors.confirmPassword}</Text>
+              <Text className='text-xs text-red-500 font-inter-regular mt-1.5 ml-1'>{errors.confirmPassword}</Text>
             )}
           </View>
 
@@ -369,45 +494,30 @@ export default function RegisterScreen() {
             disabled={isLoading}
           >
             {isLoading ? (
-              <Text style={styles.registerButtonText}>Creating Account...</Text>
+              <Text className='text-base font-semibold text-white font-inter-semibold'>Creating Account...</Text>
             ) : (
               <>
-                <Text style={styles.registerButtonText}>Create Account</Text>
+                <Text className='text-base font-semibold text-white font-inter-semibold'>Create Account</Text>
                 <ArrowRight size={20} color="white" />
               </>
             )}
           </TouchableOpacity>
 
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or sign up with</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <TouchableOpacity
-            style={[styles.googleButton, isLoading && styles.googleButtonDisabled]}
-            onPress={handleGoogleSignUp}
-            disabled={isLoading}
-          >
-            <Chrome size={20} color="#4285f4" />
-            <Text style={styles.googleButtonText}>Continue with Google</Text>
-          </TouchableOpacity>
-
-          <View style={styles.termsContainer}>
-            <Text style={styles.termsText}>
+          <View className='px-2'>
+            <Text className='text-xs text-gray-500 font-inter-regular text-center leading-[18px]'>
               By creating an account, you agree to our{' '}
-              <Text style={styles.termsLink}>Terms of Service</Text>
+              <Text className='text-green-600 font-inter-medium'>Terms of Service</Text>
               {' '}and{' '}
-              <Text style={styles.termsLink}>Privacy Policy</Text>
+              <Text className='text-green-600 font-inter-medium'>Privacy Policy</Text>
             </Text>
           </View>
         </View>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Already have an account? </Text>
+        <View className='flex-row justify-center items-center'>
+          <Text className='text-sm text-gray-500 font-inter-regular'>Already have an account? </Text>
           <Link href="/(auth)/login" asChild>
             <TouchableOpacity>
-              <Text style={styles.footerLink}>Sign In</Text>
+              <Text className='text-sm text-green-600 font-inter-semibold'>Sign In</Text>
             </TouchableOpacity>
           </Link>
         </View>
@@ -418,73 +528,18 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
+
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 60,
     paddingBottom: 40,
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  welcomeText: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#111827',
-    fontFamily: 'Inter-SemiBold',
-    marginBottom: 8,
-    marginTop: 20,
-  },
-  subtitleText: {
-    fontSize: 16,
-    color: '#6b7280',
-    fontFamily: 'Inter-Regular',
-    textAlign: 'center',
-    lineHeight: 24,
-    maxWidth: 320,
-  },
-  formContainer: {
-    flex: 1,
-    marginBottom: 24,
-  },
-  inputContainer: {
-    marginBottom: 16,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    paddingHorizontal: 16,
-    height: 56,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: '#111827',
-    fontFamily: 'Inter-Regular',
-  },
+
   inputError: {
     borderColor: '#ef4444',
   },
-  eyeIcon: {
-    padding: 4,
-  },
+
   errorText: {
     fontSize: 12,
     color: '#ef4444',
@@ -492,6 +547,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginLeft: 4,
   },
+
   otpInput: {
     backgroundColor: 'white',
     borderRadius: 16,
@@ -530,40 +586,9 @@ const styles = StyleSheet.create({
     color: 'white',
     fontFamily: 'Inter-SemiBold',
   },
-  resendButton: {
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  resendButtonText: {
-    fontSize: 14,
-    color: '#16a34a',
-    fontFamily: 'Inter-Medium',
-    textDecorationLine: 'underline',
-  },
-  backButton: {
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  backButtonText: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontFamily: 'Inter-Regular',
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e5e7eb',
-  },
-  dividerText: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontFamily: 'Inter-Regular',
-    paddingHorizontal: 16,
+
+  googleIcon: {
+    marginRight: 12,
   },
   googleButton: {
     backgroundColor: 'white',
@@ -590,34 +615,5 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#374151',
     fontFamily: 'Inter-Medium',
-  },
-  termsContainer: {
-    paddingHorizontal: 8,
-  },
-  termsText: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontFamily: 'Inter-Regular',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  termsLink: {
-    color: '#16a34a',
-    fontFamily: 'Inter-Medium',
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontFamily: 'Inter-Regular',
-  },
-  footerLink: {
-    fontSize: 14,
-    color: '#16a34a',
-    fontFamily: 'Inter-SemiBold',
   },
 });

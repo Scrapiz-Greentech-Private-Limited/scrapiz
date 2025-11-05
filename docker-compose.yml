@@ -12,8 +12,55 @@ services:
       - media_volume:/media
     expose:
       - "8000"
+    depends_on:
+      - redis
     networks:
       - templet
+    env_file:
+      - ./server/.env
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis_scrapiz
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - templet
+    command: redis-server --appendonly yes
+
+  celery_worker:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: celery_worker_scrapiz
+    command: celery -A server worker -l info
+    volumes:
+      - ./server:/app
+    depends_on:
+      - redis
+      - server
+    networks:
+      - templet
+    env_file:
+      - ./server/.env
+
+  celery_beat:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: celery_beat_scrapiz
+    command: celery -A server beat -l info
+    volumes:
+      - ./server:/app
+    depends_on:
+      - redis
+      - server
+    networks:
+      - templet
+    env_file:
+      - ./server/.env
 
   nginx:
     image: nginx:alpine
@@ -36,3 +83,4 @@ networks:
 volumes:
   static_volume:
   media_volume:
+  redis_data:

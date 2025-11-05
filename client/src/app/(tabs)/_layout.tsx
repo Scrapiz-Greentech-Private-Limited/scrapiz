@@ -8,7 +8,8 @@ import {
   Package ,
   Wrench,
   ShoppingBagIcon,
-  Clock
+  Clock,
+  House
 
 } from "lucide-react-native";
 import { useAuth } from "@/src/context/AuthContext";
@@ -47,7 +48,16 @@ export default function TabsLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, size }) => (
-            <Home size={size} color={color} />
+            <House size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="sell"
+        options={{
+          title: 'Sell',
+          tabBarIcon: ({ color, size }) => (
+            <ShoppingBag size={size} color={color} />
           ),
         }}
       />
@@ -57,24 +67,6 @@ export default function TabsLayout() {
           title: 'Services',
           tabBarIcon: ({ color, size }) => (
             <Wrench size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="sell"
-        options={{
-          title: 'Sell',
-          tabBarIcon: ({ color, size }) => (
-            <Package size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="orders"
-        options={{
-          title: 'Orders',
-          tabBarIcon: ({ size, color }) => (
-            <ShoppingBagIcon size={size} color={color} />
           ),
         }}
       />

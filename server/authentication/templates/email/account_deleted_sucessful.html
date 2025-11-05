@@ -3,21 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Account Deleted Successfully</title>
+    <title>Account Deletion Confirmed</title>
 </head>
 <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 20px;">
-    <div style="max-width: 600px; margin: auto; background-color: #ffffff; padding: 20px; border-radius: 8px; border-top: 5px solid #4CAF50;">
+    <div style="max-width: 600px; margin: auto; background-color: #ffffff; padding: 20px; border-radius: 8px; border-top: 5px solid #16a34a;">
         <!-- Scrapiz Logo -->
         <div style="text-align: center; margin-bottom: 20px;">
             <img src="https://scrapiz.in/wp-content/uploads/2025/05/WhatsApp-Image-2025-05-08-at-1.27.50-PM.jpeg" alt="Scrapiz Logo" style="max-width: 200px;">
         </div>
 
-        <h2 style="color: #4CAF50; text-align: center;">Account Deleted Successfully</h2>
-        <p style="font-size: 16px; color: #555555;">Hello {{ name }},</p>
-        <p style="font-size: 16px; color: #555555;">Your Scrapiz account has been successfully deleted.</p>
-        <p style="font-size: 16px; color: #555555;">We’re sorry to see you go. All your personal data, addresses, and order history have been securely removed from our system.</p>
-        <p style="font-size: 16px; color: #555555;">If you deleted your account by mistake or wish to rejoin, you can always register again at any time.</p>
-        <p style="font-size: 16px; color: #555555;">Thank you for having been part of the Scrapiz community.<br>— The Scrapiz Team <br></p>
+        <h2 style="color: #16a34a; text-align: center;">Account Deletion Confirmed</h2>
+        
+        <p style="font-size: 16px; color: #555555;">Hi {{ name }},</p>
+        
+        <p style="font-size: 16px; color: #555555;">Your Scrapiz account has been successfully deleted as requested.</p>
+        
+        {% if deletion_date and deletion_time %}
+        <p style="font-size: 14px; color: #6b7280; margin: 10px 0;">
+            <strong>Deletion Date:</strong> {{ deletion_date }} at {{ deletion_time }}
+        </p>
+        {% endif %}
+        
+        <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 0 0 10px 0; font-size: 16px; color: #374151;"><strong>What's been removed:</strong></p>
+            <ul style="margin: 10px 0; padding-left: 20px; color: #555555; font-size: 15px;">
+                <li style="margin-bottom: 8px;">Your personal information (email, phone, name)</li>
+                <li style="margin-bottom: 8px;">Your profile and settings</li>
+                <li style="margin-bottom: 8px;">Your saved addresses</li>
+                <li style="margin-bottom: 8px;">Your referral data and balance</li>
+            </ul>
+            
+            <p style="margin: 15px 0 10px 0; font-size: 16px; color: #374151;"><strong>What's been preserved:</strong></p>
+            <ul style="margin: 10px 0; padding-left: 20px; color: #555555; font-size: 15px;">
+                <li style="margin-bottom: 8px;">Your order history (for audit and legal compliance)</li>
+            </ul>
+        </div>
+        
+        <p style="font-size: 16px; color: #555555;">We're sorry to see you go. If you change your mind, you're always welcome to create a new account.</p>
+        
+        <p style="font-size: 16px; color: #555555;">If you have any questions or concerns, please contact our support team at <a href="mailto:support@scrapiz.com" style="color: #16a34a; text-decoration: none;">support@scrapiz.com</a></p>
+        
+        <p style="font-size: 16px; color: #555555; margin-top: 30px;">
+            Thank you for being part of Scrapiz.<br>
+            <strong>— The Scrapiz Team</strong>
+        </p>
+        
+        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+        
+        <p style="font-size: 12px; color: #6b7280; text-align: center;">
+            This is an automated message. Please do not reply to this email.
+        </p>
     </div>
 </body>
 </html>

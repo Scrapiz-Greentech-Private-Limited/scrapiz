@@ -8,21 +8,57 @@ import {
   Linking,
   Alert,
 } from 'react-native';
-import { ArrowLeft, MessageCircle, Phone, Mail, CircleHelp as HelpCircle, FileText, ChevronRight } from 'lucide-react-native';
+import { ArrowLeft,Shield, MessageCircle, Phone, Mail, CircleHelp as HelpCircle, FileText, ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
 export default function HelpSupport(){
     const router = useRouter();
-    const handleContactSupport = (method: string) =>{
-        switch(method){
-            case 'phone':
-                Linking.openURL('tel:+1234567890')
-            break;
-            case 'email':
-                Linking.openURL('mailto:support@scrapiz.com')
-            break;
-        }
+      const handleContactSupport = async (method: string, value: string) => {
+    try {
+      let url = '';
+      let canOpen = false;
+
+      switch (method) {
+        case 'phone':
+          url = `tel:${value}`;
+          canOpen = await Linking.canOpenURL(url);
+          break;
+        case 'email':
+          url = `mailto:${value}`;
+          canOpen = await Linking.canOpenURL(url);
+          break;
+        case 'whatsapp':
+          // Remove + and spaces from phone number
+          const cleanNumber = value.replace(/[\s+]/g, '');
+          url = `whatsapp://send?phone=${cleanNumber}`;
+          canOpen = await Linking.canOpenURL(url);
+          if (!canOpen) {
+            // Fallback to web WhatsApp
+            url = `https://wa.me/${cleanNumber}`;
+            canOpen = true;
+          }
+          break;
+        case 'url':
+          url = value;
+          canOpen = await Linking.canOpenURL(url);
+          break;
+      }
+
+      if (canOpen) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert(
+          'Unable to Open',
+          `Unable to open ${method}. Please make sure you have the app installed.`
+        );
+      }
+    } catch (error) {
+      Alert.alert(
+        'Error',
+        `Failed to open ${method}. Please try again or use an alternative contact method.`
+      );
     }
+  };
     const contactMethods = [
          {
       icon: Phone,
@@ -49,19 +85,11 @@ export default function HelpSupport(){
     },
     {
       question: 'What types of scrap do you accept?',
-      answer: 'We accept paper, plastic, metal, electronics, glass, and textiles. Check our rates page for details.',
+      answer: 'We accept paper,  metal, electronics, glass, and textiles. Check our rates page for details.',
     },
     {
       question: 'How is the payment calculated?',
       answer: 'Payment is based on current market rates and the weight of materials collected.',
-    },
-    {
-      question: 'When will I receive payment?',
-      answer: 'Payment is processed within 24-48 hours after pickup completion.',
-    },
-    {
-      question: 'Can I cancel or reschedule a pickup?',
-      answer: 'Yes, you can cancel or reschedule up to 2 hours before the scheduled time.',
     },
   ];
 
@@ -109,24 +137,26 @@ export default function HelpSupport(){
             </TouchableOpacity>
           ))}
         </View>
-
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Help Resources</Text>
-          {helpSources.map((resource, index) => (
-            <TouchableOpacity key={index} style={styles.resourceCard} onPress={resource.action}>
-              <View style={styles.resourceLeft}>
-                <View style={styles.resourceIcon}>
-                  <resource.icon size={20} color="#6b7280" />
-                </View>
-                <View style={styles.resourceContent}>
-                  <Text style={styles.resourceTitle}>{resource.title}</Text>
-                  <Text style={styles.resourceSubtitle}>{resource.subtitle}</Text>
-                </View>
+          <Text style={styles.sectionTitle}>Privacy & Legal</Text>
+          <TouchableOpacity 
+            style={styles.privacyCard} 
+            onPress={() => handleContactSupport('url', 'https://www.scrapiz.in/privacy-policy')}
+          >
+            <View style={styles.privacyLeft}>
+              <View style={styles.privacyIcon}>
+                <Shield size={24} color="#16a34a" />
               </View>
-              <ChevronRight size={16} color="#d1d5db" />
-            </TouchableOpacity>
-          ))}
+              <View style={styles.privacyContent}>
+                <Text style={styles.privacyTitle}>Privacy Policy</Text>
+                <Text style={styles.privacySubtitle}>Learn how we protect your data</Text>
+              </View>
+            </View>
+            <ChevronRight size={16} color="#d1d5db" />
+          </TouchableOpacity>
         </View>
+
+          
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
@@ -293,6 +323,48 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   resourceSubtitle: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontFamily: 'Inter-Regular',
+  },
+    privacyCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+    privacyLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  privacyIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#dcfce7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  privacyContent: {
+    flex: 1,
+  },
+  privacyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    fontFamily: 'Inter-SemiBold',
+    marginBottom: 4,
+  },
+  privacySubtitle: {
     fontSize: 12,
     color: '#6b7280',
     fontFamily: 'Inter-Regular',

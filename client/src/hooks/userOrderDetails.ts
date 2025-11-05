@@ -12,7 +12,7 @@ export const useOrderDetails = (orders: OrderSummary[], products: ProductSummary
   const ordersWithDetails = useMemo(() => {
     return orders.map(order => {
       const statusName = (order.status?.name || 'unknown').toLowerCase().replace(' ', '_');
-      
+
       // Total Amount
       const totalAmount = order.orders.reduce((sum, item) => {
         const product = products.find(p => p.id === item.product.id);
@@ -46,26 +46,30 @@ export const useFilteredOrders = (orders: OrderWithDetails[], selectedTab: strin
 
 export const useOrderTabs = (orders: OrderWithDetails[]) => {
   const tabs = useMemo(() => [
-    { 
-      id: 'all', 
-      label: 'All', 
-      count: orders.length 
+    {
+      id: 'all',
+      label: 'All',
+      count: orders.length
     },
-    { 
-      id: 'scheduled', 
-      label: 'Scheduled', 
-      count: orders.filter(o => o.statusName === 'scheduled').length 
+    {
+      id: 'scheduled',
+      label: 'Scheduled',
+      count: orders.filter(o => o.statusName === 'scheduled').length
     },
-    { 
-      id: 'in_transit', 
-      label: 'In Transit', 
-      count: orders.filter(o => o.statusName === 'in_transit').length 
+    {
+      id: 'transit',
+      label: 'In Transit',
+      count: orders.filter(o => o.statusName === 'transit').length
     },
-    { 
-      id: 'completed', 
-      label: 'Completed', 
-      count: orders.filter(o => o.statusName === 'completed').length 
-    }
+    {
+      id: 'completed',
+      label: 'Completed',
+      count: orders.filter(o => o.statusName === 'completed').length
+    }, {
+      id: 'cancelled',
+      label: 'Cancelled',
+      count: orders.filter(o => o.statusName === 'cancelled').length
+    },
   ], [orders]);
 
   return tabs;

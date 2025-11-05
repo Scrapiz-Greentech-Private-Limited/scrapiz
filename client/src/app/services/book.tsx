@@ -121,7 +121,7 @@ export default function BookingScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -129,7 +129,7 @@ export default function BookingScreen() {
       >
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={handleBack} disabled={submitting}>
-            <ArrowLeft size={22} color="#111827" />
+            <ArrowLeft size={24} color="#111827" />
           </TouchableOpacity>
           <View style={styles.headerContent}>
             <View style={[styles.serviceIcon, { backgroundColor: selectedService.bgColor }]}>
@@ -254,7 +254,7 @@ export default function BookingScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -262,14 +262,15 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#f8fafc',
+    paddingTop: Platform.OS === 'android' ? 56 : 60,
   },
   flex: {
     flex: 1,
   },
   header: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 18,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 20,
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
@@ -278,12 +279,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f4f4f5',
+    backgroundColor: '#f3f4f6',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 16,
   },
   headerContent: {
-    marginTop: 16,
+    marginTop: 8,
     alignItems: 'center',
   },
   serviceIcon: {

@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Category, Product, Status, OrderNo, Order
+from user.models import AddressModel
 
 
 
@@ -8,9 +9,6 @@ class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = '__all__'
-
-
-
 class CategorySerializer(serializers.ModelSerializer):
     products = ProductSerializer(many=True, read_only=True)  # ✅ nested products
 
@@ -43,7 +41,23 @@ class OrderNoSerializer(serializers.ModelSerializer):
     status_id = serializers.PrimaryKeyRelatedField(
         queryset=Status.objects.all(), source="status", write_only=True, allow_null=True, required=False
     )
+    address_id = serializers.PrimaryKeyRelatedField(
+        queryset=AddressModel.objects.all(), source="address", write_only=True, allow_null=True, required=False
+    )
 
     class Meta:
         model = OrderNo
-        fields = ["id", "order_number", "user", "created_at", "status", "address","status_id", "orders"]
+        fields = [
+            "id", 
+            "order_number", 
+            "user", 
+            "created_at", 
+            "status", 
+            "address", 
+            "status_id", 
+            "address_id", 
+            "orders", 
+            "images",
+            "redeemed_referral_bonus",
+            "estimated_order_value"
+        ]

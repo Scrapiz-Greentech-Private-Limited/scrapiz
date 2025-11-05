@@ -1,517 +1,611 @@
-import React, { useEffect, useState } from 'react';
-import * as ImagePicker from 'expo-image-picker';
-import * as ImageManipulator from 'expo-image-manipulator'
-import Toast from 'react-native-toast-message';
-import {View,Text,Image,StyleSheet,ScrollView,TouchableOpacity,TextInput,Alert,Dimensions,StatusBar,ActivityIndicator,ColorValue,} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import {Plus, Minus,Calendar,MapPin,User,Phone,Camera,X,IndianRupee,ArrowRight,ArrowLeft,Trash2,Clock,CheckCircle,Sparkles,Zap,
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Alert,
+  Dimensions,
+  Image,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+} from 'react-native';
+import {
+  Plus,
+  Minus,
+  Calendar,
+  Wallet,
+  MapPin,
+  Camera,
+  IndianRupee,
+  ArrowRight,
+  ArrowLeft,
+  Trash2,
+  Phone,
+  User,
+  X,
+  FileText,
+  Scale,
+  AlertCircle,
 } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { useRouter } from 'expo-router';
-import { AuthService, AddressSummary, ProductSummary } from '../../api/apiService';
-import { AddressForm, addressSchema, contactSchema, scheduleSchema } from '@/src/zod';
-import { roundToNearestMinutes } from 'date-fns';
+import { LinearGradient } from 'expo-linear-gradient';
+import Toast from 'react-native-toast-message';
+import { AuthService, ProductSummary, AddressSummary } from '../../api/apiService';
+import { useReferral } from '../../context/ReferralContext';
+import {useOrderCalculationStore} from '../../store/orderCalculationStore'
+const { width, height } = Dimensions.get('window');
+
 type SelectedItem = {
-    id: number;
+  id: number;
   name: string;
   rate: number;
   unit: string;
   quantity: number;
   image?: any;
-}
+};
 
-const { width } = Dimensions.get('window');
-const stepTitles = [
-  'Select Materials',
-  'Pickup Details',
-  'Confirmation'
-];
 const timeSlots = [
   '9:00 AM - 11:00 AM',
   '11:00 AM - 1:00 PM',
   '1:00 PM - 3:00 PM',
   '3:00 PM - 5:00 PM',
-  '5:00 PM - 7:00 PM',
+  '5:00 PM - 7:00 PM'
 ];
+
+const stepTitles = [
+  'Select Items',
+  'Schedule Pickup',
+  'Pickup Address',
+  'Order Summary'
+];
+
+// Helper to get product image
+const getImageForProduct = (productName: string) => {
+  const name = productName.toLowerCase();
+  if (name.includes('newspaper')) return require('../../../assets/images/Scrap_Rates_Photos/Newspaper.jpg');
+  if (name.includes('cardboard')) return require('../../../assets/images/Scrap_Rates_Photos/Cardboard.jpg');
+  if (name.includes('book') || name.includes('paper')) return require('../../../assets/images/Scrap_Rates_Photos/Book.jpg');
+  if (name.includes('plastic')) return require('../../../assets/images/Scrap_Rates_Photos/Plastics.jpg');
+  if (name.includes('iron') || name.includes('steel')) return require('../../../assets/images/Scrap_Rates_Photos/Iron.jpg');
+  if (name.includes('aluminum') || name.includes('aluminium')) return require('../../../assets/images/Scrap_Rates_Photos/Aluminium.jpg');
+  if (name.includes('copper')) return require('../../../assets/images/Scrap_Rates_Photos/Copper.jpg');
+  if (name.includes('brass')) return require('../../../assets/images/Scrap_Rates_Photos/Brass.jpg');
+  if (name.includes('tin')) return require('../../../assets/images/Scrap_Rates_Photos/Tin.jpg');
+  if (name.includes('refrigerator')) return require('../../../assets/images/Scrap_Rates_Photos/fridge.jpg');
+  if (name.includes('battery')) return require('../../../assets/images/Scrap_Rates_Photos/Battery.jpg');
+  if (name.includes('front load machine')) return require('../../../assets/images/Scrap_Rates_Photos/FrontLoadMachine.jpg');
+  if (name.includes('tv')) return require('../../../assets/images/Scrap_Rates_Photos/TV.jpg');
+  if (name.includes('laptops')) return require('../../../assets/images/Scrap_Rates_Photos/Laptops.jpg');
+  if (name.includes('windowac')) return require('../../../assets/images/Scrap_Rates_Photos/WindowAC.jpg');
+  if (name.includes('printer')) return require('../../../assets/images/Scrap_Rates_Photos/Printer.jpg');
+  if (name.includes('microwave')) return require('../../../assets/images/Scrap_Rates_Photos/Microwave.jpg');
+  if (name.includes('glass')) return require('../../../assets/images/Scrap_Rates_Photos/glass.jpg');
+  return null;
+};
+
 export default function SellScreen() {
   const router = useRouter();
-  const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
+  
+ 
   const [products, setProducts] = useState<ProductSummary[]>([]);
+  const [addresses, setAddresses] = useState<AddressSummary[]>([]);
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
+  const [showGuidelinesModal, setShowGuidelinesModal] = useState(true);
   const [useNewAddress, setUseNewAddress] = useState(true);
-  const [addresses, setAddresses] = useState<AddressSummary[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
-  const [loadingAddresses, setLoadingAddresses] = useState<boolean>(false);
   const [loadingData, setLoadingData] = useState(false);
-  const [newAddressForm , setNewAddressForm] = useState({
-    name:'',
-    phone_number:'',
-    room_number:'',
-    street:'',
-    area:'',
-    city:'',
-    state: '', country:'India', pincode:'', delivery_suggestion: '',
-  })
-  const [editAddressForm, setEditAddressForm] = useState({
-        name: '', phone_number: '', room_number: '', street: '', area: '', city: '',
-        state: '', country: 'India', pincode: '', delivery_suggestion: '',
-    });
   const [submittingOrder, setSubmittingOrder] = useState(false);
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const [selectedImages, setSelectedImages] = useState<string[]>([]);
-  const [creatingAddress, setCreatingAddress] = useState<boolean>(false);
-  const [editingAddressId, setEditingAddressId] = useState<number | null>(null);
-  const [contactform , setContactForm] = useState({
-    name: '',
-    mobile: '',
-  });
+    const {
+    items: selectedItems,
+    estimatedValue,
+    referralBonus,
+    totalPayout,
+    useReferralBonus,
+    setItems,
+    addItem: addItemToStore,
+    updateItemQuantity,
+    removeItem: removeItemFromStore,
+    setAvailableReferralBalance,
+    toggleReferralBonus,
+    resetOrder,
+    setTotalPayout,
+  } = useOrderCalculationStore();
   
-   const [addressForm, setAddressForm] = useState({
+  const [addressForm, setAddressForm] = useState({
     title: '',
     addressLine: '',
     landmark: '',
     city: '',
-    pinCode: '',
+    pinCode: ''
   });
-  const [scheduleForm, setScheduleForm] = useState({
-    date: '',
-    time: '',
-  })
+  
+  const [contactForm, setContactForm] = useState({
+    name: '',
+    mobile: ''
+  });
+  
+  const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [notes, setNotes] = useState('');
+  
+  // Referral wallet - use context
+  const { walletBalance, setWalletBalance, updateBalanceAndCache, applyReferralDiscount } = useReferral();
+  const [useReferralBalance, setUseReferralBalance] = useState(false);
 
-  const load = async()=>{
+   useEffect(()=>{
+    setAvailableReferralBalance(walletBalance);
+  },[walletBalance, setAvailableReferralBalance])
+
+  // Load products and addresses
+  useEffect(() => {
+    loadData();
+  }, []);
+ 
+
+  const loadData = async () => {
     setLoadingData(true);
     try {
       const [prods, addrs] = await Promise.all([
         AuthService.getProducts(),
         AuthService.getAddresses()
-      ])
-      setProducts(prods)
-      setAddresses(addrs)
-      if(addrs.length > 0){
+      ]);
+      setProducts(prods);
+      setAddresses(addrs);
+      
+      if (addrs.length > 0) {
         setSelectedAddressId(addrs[0].id);
         setUseNewAddress(false);
       }
-    } catch (error) {
+    } catch (error: any) {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Failed to load data'
-      })
+        text2: error.message || 'Failed to load data'
+      });
     } finally {
       setLoadingData(false);
     }
-  }
+  };
 
-  useEffect(()=>{
-    load();
-  },[])
+  const compressImage = async (uri: string) => {
+    try {
+      const manipResult = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 1920 } }],
+        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+      );
+      return manipResult.uri;
+    } catch (error) {
+      return uri;
+    }
+  };
 
-const compressImage = async(uri:string) =>{
-  try {
-    console.log('Compressing image: ', uri)
-    const manipResult = await ImageManipulator.manipulateAsync(
-      uri,[
-        {resize:{width: 1920}}
-      ],
-      {
-        compress: 0.7,
-        format: ImageManipulator.SaveFormat.JPEG,
-
-      }
-    );
-    console.log('Image Compressed !: ', manipResult.uri)
-    return manipResult.uri
-  } catch (error) {
-    console.error(error)
-    return uri;
-  }
-}
-
-  const pickImage = async() =>{
-    const {status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if(status !== 'granted'){
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
       Alert.alert('Permission Denied', 'Permission to access media library is required!');
       return;
     }
+
+    // Check current image count
+    const MAX_IMAGES = 5;
+    if (selectedImages.length >= MAX_IMAGES) {
+      Alert.alert('Limit Reached', `You can upload a maximum of ${MAX_IMAGES} images per order.`);
+      return;
+    }
+
     const result = await ImagePicker.launchImageLibraryAsync({
-    allowsMultipleSelection:true,
-    quality: 0.8,
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-  });
-  if (!result.canceled) {
-    const compressedUris: string[] = [];
-    for(const asset of result.assets){
-      const compressedUri = await compressImage(asset.uri)
-      compressedUris.push(compressedUri);
-    }
-      // const uris = result.assets.map((asset) => asset.uri);
-      setSelectedImages((prev) => [...prev, ...compressedUris]);
+      allowsMultipleSelection: true,
+      quality: 0.8,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    });
+
+    if (!result.canceled) {
+      // Check if adding these images would exceed the limit
+      const remainingSlots = MAX_IMAGES - selectedImages.length;
+      const assetsToAdd = result.assets.slice(0, remainingSlots);
+      
+      if (result.assets.length > remainingSlots) {
+        Alert.alert(
+          'Image Limit',
+          `Only ${remainingSlots} more image(s) can be added. Maximum ${MAX_IMAGES} images per order.`
+        );
+      }
+
+      const compressedUris: string[] = [];
+      for (const asset of assetsToAdd) {
+        const compressedUri = await compressImage(asset.uri);
+        compressedUris.push(compressedUri);
+      }
+      setSelectedImages(prev => [...prev, ...compressedUris]);
       Toast.show({
-        type:"success",
-        text1:"Image Added",
-        text2: `${compressedUris.length} images are compressed and ready`
-      })
+        type: 'success',
+        text1: 'Images Added',
+        text2: `${compressedUris.length} images compressed and ready`
+      });
     }
-  }
+  };
 
   const removeImage = (uri: string) => {
-    setSelectedImages((prev) => prev.filter((imageUri) => imageUri !== uri));
-  }
-  
+    setSelectedImages(prev => prev.filter(imageUri => imageUri !== uri));
+  };
 
   const addItem = (product: ProductSummary) => {
-    const rate = product.max_rate ?? product.min_rate ?? 0;
-    const existingItem = selectedItems.find(item => item.id === product.id);
-    if (existingItem) {
-      setSelectedItems(selectedItems.map(item =>
-        item.id === product.id
-          ? { ...item, quantity: item.quantity + 1 }
-          : item
-      ));
-    } else {
-      setSelectedItems([...selectedItems, { id: product.id, name: product.name, rate, icon: '♻️', quantity: 1 }]);
-    }
+    const rate = (product.max_rate + product.min_rate) / 2;
+    addItemToStore({
+      id: product.id,
+      name: product.name,
+      rate,
+      unit: product.unit,
+      quantity: 1,
+      image: getImageForProduct(product.name)
+    });
   };
 
   const updateQuantity = (id: number, change: number) => {
-    const updated: Array<{ id: number; name: string; rate: number; icon: string; quantity: number }> = [];
-    for (const item of selectedItems) {
-      if (item.id === id) {
-        const newQuantity = Math.max(0, item.quantity + change);
-        if (newQuantity > 0) {
-          updated.push({ ...item, quantity: newQuantity });
-        }
-      } else {
-        updated.push(item);
-      }
+    const item = selectedItems.find(i => i.id === id);
+    if(item){
+       const newQuantity = Math.max(0, item.quantity + change);
+       updateItemQuantity(id, newQuantity);
     }
-    setSelectedItems(updated);
   };
 
   const removeItem = (id: number) => {
-    setSelectedItems(selectedItems.filter(item => item.id !== id));
+    removeItemFromStore(id);
   };
 
   const getTotalAmount = () => {
     return selectedItems.reduce((total, item) => total + (item.rate * item.quantity), 0);
   };
 
-  
+  // Calculate referral discount - use full wallet balance as bonus
+  const getReferralDiscount = () => {
+    if (!useReferralBalance || walletBalance === 0) return 0;
+    // Return full wallet balance as bonus (not capped at order amount)
+    return walletBalance;
+  };
 
-  const validateStep = (step:number):boolean =>{
-    const newErrors: { [key: string]: string } = {};
-    try {
-      switch(step){
-        case 1:
-          if(selectedItems.length === 0){
-            newErrors.items = 'Please select at least one item to sell';
-          }
-        break;
-        case 2:
-          console.log('Validating step 2, scheduleForm:', scheduleForm);
-          const scheduleResult = scheduleSchema.safeParse(scheduleForm);
-          if(!scheduleResult.success){
-            console.log('Schedule validation failed:', scheduleResult.error);
-            scheduleResult.error.errors.forEach((err) => {
-              newErrors[err.path[0]] = err.message;
-            });
-          }
-        break;
-        case 3:
-          console.log('Validating step 3, contactform:', contactform);
-          console.log('useNewAddress:', useNewAddress);
-          console.log('addressForm:', addressForm);
-          
-          const contactResult = contactSchema.safeParse(contactform); 
-          if (!contactResult.success) {
-            console.log('Contact validation failed:', contactResult.error);
-            contactResult.error.errors.forEach((err) => {
-              newErrors[err.path[0]] = err.message;
-            });
-          }
-          
-          if(useNewAddress){
-            const addressResult = addressSchema.safeParse(addressForm);
-            if (!addressResult.success) {
-              console.log('Address validation failed:', addressResult.error);
-              addressResult.error.errors.forEach((err) => {
-                newErrors[err.path[0]] = err.message;
-              });
-            }
-          } else if (!selectedAddressId) {
-            newErrors.address = 'Please select a saved address';
-          }
-        break;
+  // Calculate final amount (total + referral bonus)
+  const getFinalAmount = () => {
+    return getTotalAmount() + getReferralDiscount();
+  };
 
+  const getFormattedAddress = () => {
+    const { title, addressLine, landmark, city, pinCode } = addressForm;
+    let address = '';
+    if (addressLine) address += addressLine;
+    if (landmark) address += landmark ? `, ${landmark}` : '';
+    if (city) address += city ? `, ${city}` : '';
+    if (pinCode) address += pinCode ? ` - ${pinCode}` : '';
+    return address || 'Address not provided';
+  };
+
+  const getSelectedSavedAddress = () => {
+    if (!selectedAddressId) return null;
+    return addresses.find(addr => addr.id === selectedAddressId);
+  };
+
+  const getDisplayAddress = () => {
+    if (useNewAddress) {
+      return getFormattedAddress();
+    } else {
+      const savedAddress = getSelectedSavedAddress();
+      if (savedAddress) {
+        return `${savedAddress.street}, ${savedAddress.city} - ${savedAddress.pincode}`;
+      }
+      return 'No address selected';
+    }
+  };
+
+  const getAddressTitle = () => {
+    if (useNewAddress) {
+      return addressForm.title;
+    } else {
+      const savedAddress = getSelectedSavedAddress();
+      return savedAddress?.name || '';
+    }
+  };
+
+  const validateMobileNumber = (mobile: string): boolean => {
+    const mobileRegex = /^(\+91|91)?[6-9]\d{9}$/;
+    return mobileRegex.test(mobile.replace(/\s/g, ''));
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: {[key: string]: string} = {};
+
+    if (currentStep === 1 && selectedItems.length === 0) {
+      newErrors.items = '📦 Please select at least one item to sell';
+    }
+
+    if (currentStep === 2 && (!selectedDate || !selectedTime)) {
+      newErrors.schedule = '📅 Please select date and time for pickup';
+    }
+
+    if (currentStep === 3) {
+      if (useNewAddress) {
+        if (!addressForm.title.trim()) newErrors.title = '🏠 Address title is required';
+        if (!addressForm.addressLine.trim()) newErrors.addressLine = '📍 Address line is required';
+        if (!addressForm.city.trim()) newErrors.city = '🏙️ City is required';
+        if (!addressForm.pinCode.trim()) newErrors.pinCode = '📮 PIN code is required';
+        else if (!/^\d{6}$/.test(addressForm.pinCode)) newErrors.pinCode = '📮 PIN code must be 6 digits';
+      } else {
+        if (!selectedAddressId) {
+          newErrors.savedAddress = '📍 Please select a saved address';
+        }
       }
       
-      console.log('Validation errors:', newErrors);
-      setErrors(newErrors);
-      return Object.keys(newErrors).length === 0;
-
-    } catch(error:any) {
-      console.error('Validation exception:', error);
-      Alert.alert('Error', error.message || 'Validation failed');
-      return false;
+      if (!contactForm.name.trim()) newErrors.name = '👤 Name is required';
+      if (!contactForm.mobile.trim()) newErrors.mobile = '📱 Mobile number is required';
+      else if (!validateMobileNumber(contactForm.mobile)) {
+        newErrors.mobile = '📱 Please enter a valid 10-digit mobile number';
+      }
     }
-  }
 
-  const handleNext = () =>{
-    const validationResult = validateStep(currentStep);
-    if(!validationResult){
-      // Errors are already set in validateStep and will be displayed
-      return;
-    }
-    if(currentStep < 4) setCurrentStep(currentStep + 1);
-    else handleOrderSubmission();
-  }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const resetForm = () => {
+    setCurrentStep(1);
+
+    setSelectedDate('');
+    setSelectedTime('');
+    setAddressForm({
+      title: '',
+      addressLine: '',
+      landmark: '',
+      city: '',
+      pinCode: ''
+    });
+    setContactForm({
+      name: '',
+      mobile: ''
+    });
+    setUseNewAddress(true);
+    setErrors({});
+    setSelectedImages([]);
+    setNotes('');
+    resetOrder();
+  };
+
+  const handleNext = () => {
+    setErrors({});
+    
+    setTimeout(() => {
+      if (!validateForm()) {
+        return;
+      }
+      
+      if (currentStep < 4) {
+        setCurrentStep(currentStep + 1);
+      } else {
+        handleOrderSubmission();
+      }
+    }, 0);
+  };
 
   const handlePrevious = () => {
+    setErrors({});
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     }
   };
 
-  const handleOrderSubmission = async() => {
+  const handleOrderSubmission = async () => {
     setSubmittingOrder(true);
     try {
       const itemsPayload = selectedItems.map(i => ({
         product_id: i.id,
-        quantity : i.quantity,
+        quantity: i.quantity,
       }));
+
       let addressId = selectedAddressId;
-      if(useNewAddress){
-        const validateAddress = addressSchema.safeParse(addressForm);
-        const validatedContact = contactSchema.safeParse(contactform);
+      
+      if (useNewAddress) {
         const newAddr = await AuthService.createAddress({
-          name: validateAddress.data.title,
-          phone_number: validatedContact.data.mobile,
-          room_number:'',
-          street: validateAddress.data.addressLine,
-          area: validateAddress.data.landmark || '',
-          city: validateAddress.data.city,
+          name: addressForm.title,
+          phone_number: contactForm.mobile,
+          room_number: '',
+          street: addressForm.addressLine,
+          area: addressForm.landmark || '',
+          city: addressForm.city,
           state: '',
           country: 'India',
-          pincode: parseInt(validateAddress.data.pinCode, 10) || 0,
-          delivery_suggestion: ''
-        })
+          pincode: parseInt(addressForm.pinCode, 10) || 0,
+          delivery_suggestion: notes || ''
+        });
         addressId = newAddr.id;
-
-      }else{
-        addressId = selectedAddressId || 0;
       }
-      console.log('Submitting order with images:', selectedImages);
-      console.log('Items payload:', itemsPayload);
-      console.log('Address ID:', addressId);
-      
-      const result = await AuthService.createOrder(itemsPayload, addressId, selectedImages);
-      console.log('Order creation result:', result);
-      
-      Alert.alert('Success', 'Your pickup has been scheduled successfully!', [
-        {
-          text: 'View Orders',
-          onPress: () => {
-            resetForm();
-            router.push('/(tabs)/orders');
-          },
 
-        },{
-          text: 'Schedule Another',
-          onPress: () => {
-            resetForm();
+      // Calculate estimated value to send
+      const orderEstimatedValue = estimatedValue;
+
+      const result = await AuthService.createOrder(
+        itemsPayload, 
+        addressId || undefined, 
+        selectedImages,
+        orderEstimatedValue
+      );
+
+      const orderId = result.order_id;
+      const orderNumber = result.order_no;
+      
+      const orderReferralBonus = useReferralBonus ? referralBonus : 0;
+      const orderTotalPayout = useReferralBonus ? totalPayout : estimatedValue;
+      
+
+      
+
+      // If using referral balance, redeem it via backend
+      if (useReferralBonus && orderReferralBonus > 0) {
+        try {
+          // Call backend to redeem balance
+          await AuthService.redeemReferralBalance(orderId, orderReferralBonus);
+          
+          // Update local wallet balance and cache it
+          const newBalance = Math.max(0, walletBalance - orderReferralBonus);
+          await updateBalanceAndCache(newBalance);
+          
+          Toast.show({
+            type: 'success',
+            text1: 'Referral Applied',
+            text2: `₹${Math.round(orderReferralBonus)} bonus added to your payout!`
+          });
+        } catch (redeemError: any) {
+          // Log error but don't fail the order
+          console.error('Failed to redeem referral balance:', redeemError);
+          Toast.show({
+            type: 'info',
+            text1: 'Order Created',
+            text2: 'Referral redemption will be processed shortly'
+          });
+        }
+        setTotalPayout(totalPayout);
+      }
+
+      // Show success message
+      const message = orderReferralBonus > 0
+        ? `Your scrap pickup has been scheduled successfully!\n\n📋 Order: ${orderNumber}\n💰 Estimated Value: ₹${Math.round(orderEstimatedValue)}\n🎁 Referral Bonus: +₹${Math.round(orderReferralBonus)}\n💸 Total Payout: ₹${Math.round(orderTotalPayout)}\n📅 Pickup: ${selectedDate} at ${selectedTime}\n\nOur team will arrive at your doorstep at the scheduled time.`
+        : `Your scrap pickup has been scheduled successfully!\n\n📋 Order: ${orderNumber}\n💰 Total Amount: ₹${Math.round(orderEstimatedValue)}\n📅 Pickup: ${selectedDate} at ${selectedTime}\n\nOur team will arrive at your doorstep at the scheduled time.`;
+
+
+      Alert.alert(
+        '✅ Booking Confirmed!', 
+        message,
+        [
+          { 
+            text: '📦 View Order', 
+            onPress: () => {
+              resetForm();
+              router.push(`/profile/orders/${orderId}` as any);
+            }
           },
-        },
-      ]);
-    } catch (error) {
-      setErrors({ submission: (error as any).message || 'Failed to submit order' });
-    }finally{
+          {
+            text: '✨ Schedule Another',
+            onPress: () => {
+              resetForm();
+            }
+          }
+        ]
+      );
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to submit order');
+    } finally {
       setSubmittingOrder(false);
     }
   };
 
-  const resetForm = () => {
-    setCurrentStep(1);
-    setSelectedItems([]);
-    setScheduleForm({date : '', time: ''});
-    setAddressForm({
-         title: '',
-      addressLine: '',
-      landmark: '',
-      city: '',
-      pinCode: '',
-    })
-    setContactForm({
-      name: '',
-      mobile: '',
-    })
-    setErrors({});
-    setSelectedImages([]);
-  };
-
-  const formatAddress = (addr: AddressForm | AddressSummary):string =>{
-    if('addressLine' in addr){
-      const parts = [
-        addr.addressLine,
-        addr.city,
-        addr.pinCode
-      ].filter(Boolean);
-      return parts.join(', ');
-    }else{
-      const parts = [
-        addr.room_number,
-        addr.street,
-        addr.area,
-        addr.city,
-        addr.pincode
-      ].filter(Boolean);
-      return parts.join(', ');
+  // Group products by category for display
+  const groupedProducts = products.reduce((acc, product) => {
+    const categoryId = product.category;
+    if (!acc[categoryId]) {
+      acc[categoryId] = [];
     }
-  }
-
-    const clearError = (field: string) => {
-    if (errors[field]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[field];
-        return newErrors;
-      });
-    }
-  };
-
-  const handleCreateAddress = async () => {
-    if (!newAddressForm.name.trim()) {
-      Alert.alert('Error', 'Please enter address name');
-      return;
-    }
-    setCreatingAddress(true);
-    
-    try {
-      const payload = {
-        name: newAddressForm.name.trim(),
-        phone_number: newAddressForm.phone_number.trim(),
-        room_number: newAddressForm.room_number.trim(),
-        street: newAddressForm.street.trim(),
-        area: newAddressForm.area.trim(),
-        city: newAddressForm.city.trim(),
-        state: newAddressForm.state.trim(),
-        country: newAddressForm.country.trim() || 'India',
-        pincode: parseInt(newAddressForm.pincode, 10) || 0,
-        delivery_suggestion: newAddressForm.delivery_suggestion.trim(),
-      };
-      const created = await AuthService.createAddress(payload);
-      const list = await AuthService.getAddresses();
-      setAddresses(list);
-      setUseNewAddress(false);
-      setSelectedAddressId(created.id);
-      Alert.alert('Success', 'Address saved');
-    } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to save address');
-    } finally {
-      setCreatingAddress(false);
-    }
-  };
-
-  const beginEditAddress = (addr: AddressSummary) => {
-    setEditingAddressId(addr.id);
-    setEditAddressForm({
-      name: addr.name || '',
-      phone_number: addr.phone_number || '',
-      room_number: addr.room_number || '',
-      street: addr.street || '',
-      area: addr.area || '',
-      city: addr.city || '',
-      state: addr.state || '',
-      country: addr.country || 'India',
-      pincode: String(addr.pincode || ''),
-      delivery_suggestion: addr.delivery_suggestion || '',
-    });
-  };
-
-  const saveEditAddress = async () => {
-    if (!editingAddressId) return;
-    try {
-      const payload: any = { ...editAddressForm };
-      if (typeof payload.pincode === 'string') payload.pincode = parseInt(payload.pincode, 10) || 0;
-      const updated = await AuthService.updateAddress(editingAddressId, payload);
-      const list = await AuthService.getAddresses();
-      setAddresses(list);
-      setEditingAddressId(null);
-      Alert.alert('Success', 'Address updated');
-    } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to update address');
-    }
-  };
-
-  const deleteAddress = async (id: number) => {
-    Alert.alert('Delete Address', 'Are you sure you want to delete this address?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-        try {
-          await AuthService.deleteAddress(id);
-          const list = await AuthService.getAddresses();
-          setAddresses(list);
-          if (selectedAddressId === id) setSelectedAddressId(list[0]?.id ?? null);
-        } catch (e: any) {
-          Alert.alert('Error', e.message || 'Failed to delete address');
-        }
-      }}
-    ]);
-  };
+    acc[categoryId].push(product);
+    return acc;
+  }, {} as Record<number, ProductSummary[]>);
 
   const renderStepIndicator = () => (
     <View style={styles.stepIndicator}>
       {[1, 2, 3, 4].map((step) => (
         <React.Fragment key={step}>
-          <View style={[styles.stepCircle, currentStep >= step && styles.stepCircleActive]}>
-            <Text style={[styles.stepNumber, currentStep >= step && styles.stepNumberActive]}>
-              {step}
-            </Text>
+          <View style={[
+            styles.stepCircle,
+            currentStep >= step && styles.stepCircleActive
+          ]}>
+            {currentStep >= step ? (
+              <LinearGradient
+                colors={['#16a34a', '#15803d']}
+                style={styles.stepGradient}
+              >
+                <Text style={styles.stepNumberActive}>
+                  {step}
+                </Text>
+              </LinearGradient>
+            ) : (
+              <Text style={styles.stepNumber}>
+                {step}
+              </Text>
+            )}
           </View>
           {step < 4 && (
-            <View style={[styles.stepLine, currentStep > step && styles.stepLineActive]} />
+            <View style={[
+              styles.stepLine,
+              currentStep > step && styles.stepLineActive
+            ]} />
           )}
         </React.Fragment>
       ))}
     </View>
   );
 
-    const renderStep1 = () => (
+  const renderStep1 = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>Select Items to Sell</Text>
       <Text style={styles.stepSubtitle}>Choose the scrap materials you want to sell</Text>
-
+      
       {loadingData ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#16a34a" />
           <Text style={styles.loadingText}>Loading products...</Text>
         </View>
       ) : (
-        <ScrollView style={styles.productsContainer} showsVerticalScrollIndicator={false}>
-          {products.map((product) => (
-            <TouchableOpacity
-              key={product.id}
-              style={styles.itemCard}
-              onPress={() => addItem(product)}
-            >
-              <View style={styles.itemLeft}>
-                <View style={styles.itemIconContainer}>
-                  <Text style={styles.itemIcon}>♻️</Text>
-                </View>
-                <View style={styles.itemInfo}>
-                  <Text style={styles.itemName}>{product.name}</Text>
-                  <Text style={styles.itemRate}>
-                    ₹{product.min_rate}-{product.max_rate}/{product.unit}
-                  </Text>
-                  <Text style={styles.itemDescription} numberOfLines={1}>
-                    {product.description}
-                  </Text>
-                </View>
+        <ScrollView 
+          style={styles.categoriesContainer} 
+          showsVerticalScrollIndicator={false}
+          nestedScrollEnabled={true}
+          contentContainerStyle={{ paddingBottom: 16 }}
+        >
+          {Object.entries(groupedProducts).map(([categoryId, categoryProducts]) => (
+            <View key={categoryId} style={styles.categorySection}>
+              <LinearGradient
+                colors={['#16a34a', '#15803d']}
+                style={styles.categoryHeaderSell}
+              >
+                <Text style={styles.categoryTitleSell}>
+                  {categoryProducts[0]?.name.split(' ')[0] || 'Items'}
+                </Text>
+              </LinearGradient>
+              
+              <View style={styles.categoryItems}>
+                {categoryProducts.map((product) => {
+                  const productImage = getImageForProduct(product.name);
+                  return (
+                    <TouchableOpacity
+                      key={product.id}
+                      style={styles.itemCard}
+                      onPress={() => addItem(product)}
+                    >
+                      <View style={styles.itemLeft}>
+                        {productImage && <Image source={productImage} style={styles.itemIconImage} />}
+                        <View style={styles.itemInfo}>
+                          <Text style={styles.itemName}>{product.name}</Text>
+                          <Text style={styles.itemRate}>
+                            ₹{product.min_rate}-{product.max_rate}/{product.unit}
+                          </Text>
+                          <Text style={styles.itemDescription} numberOfLines={1}>
+                            {product.description}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.addButton}>
+                        <Plus size={16} color="white" />
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
-              <View style={styles.addButton}>
-                <Plus size={16} color="white" />
-              </View>
-            </TouchableOpacity>
+            </View>
           ))}
         </ScrollView>
       )}
@@ -522,7 +616,7 @@ const compressImage = async(uri:string) =>{
           {selectedItems.map((item) => (
             <View key={item.id} style={styles.selectedItemCard}>
               <View style={styles.selectedItemLeft}>
-                <Text style={styles.selectedItemIcon}>♻️</Text>
+                {item.image && <Image source={item.image} style={styles.selectedItemIconImage} />}
                 <View>
                   <Text style={styles.selectedItemName}>{item.name}</Text>
                   <Text style={styles.selectedItemRate}>
@@ -537,17 +631,17 @@ const compressImage = async(uri:string) =>{
                 >
                   <Minus size={16} color="#6b7280" />
                 </TouchableOpacity>
-                <Text style={styles.quantityText}>
-                  {item.quantity}
-                  {item.unit}
-                </Text>
+                <Text style={styles.quantityText}>{item.quantity}{item.unit}</Text>
                 <TouchableOpacity
                   style={styles.quantityButton}
                   onPress={() => updateQuantity(item.id, 1)}
                 >
                   <Plus size={16} color="#6b7280" />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.removeButton} onPress={() => removeItem(item.id)}>
+                <TouchableOpacity
+                  style={styles.removeButton}
+                  onPress={() => removeItem(item.id)}
+                >
                   <Trash2 size={16} color="#dc2626" />
                 </TouchableOpacity>
               </View>
@@ -555,44 +649,42 @@ const compressImage = async(uri:string) =>{
           ))}
         </View>
       )}
+
+      {errors.items && (
+        <Text style={styles.errorTextCentered}>{errors.items}</Text>
+      )}
     </View>
   );
 
-
-   const renderStep2 = () => (
+  const renderStep2 = () => (
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>Schedule Pickup</Text>
       <Text style={styles.stepSubtitle}>Choose your preferred date and time</Text>
-
+      
       <View style={styles.dateSection}>
         <Text style={styles.sectionLabel}>Select Date</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.datesScroll}>
           {Array.from({ length: 7 }, (_, i) => {
             const date = new Date();
             date.setDate(date.getDate() + i);
-            const dateStr = date.toLocaleDateString('en-US', {
-              weekday: 'short',
-              month: 'short',
-              day: 'numeric',
+            const dateStr = date.toLocaleDateString('en-US', { 
+              weekday: 'short', 
+              month: 'short', 
+              day: 'numeric' 
             });
             return (
               <TouchableOpacity
                 key={i}
                 style={[
                   styles.dateCard,
-                  scheduleForm.date === dateStr && styles.dateCardSelected,
+                  selectedDate === dateStr && styles.dateCardSelected
                 ]}
-                onPress={() => {
-                  setScheduleForm((prev) => ({ ...prev, date: dateStr }));
-                  clearError('date');
-                }}
+                onPress={() => setSelectedDate(dateStr)}
               >
-                <Text
-                  style={[
-                    styles.dateText,
-                    scheduleForm.date === dateStr && styles.dateTextSelected,
-                  ]}
-                >
+                <Text style={[
+                  styles.dateText,
+                  selectedDate === dateStr && styles.dateTextSelected
+                ]}>
                   {dateStr}
                 </Text>
               </TouchableOpacity>
@@ -608,24 +700,23 @@ const compressImage = async(uri:string) =>{
             key={slot}
             style={[
               styles.timeSlot,
-              scheduleForm.time === slot && styles.timeSlotSelected,
+              selectedTime === slot && styles.timeSlotSelected
             ]}
-            onPress={() => {
-              setScheduleForm((prev) => ({ ...prev, time: slot }));
-              clearError('time');
-            }}
+            onPress={() => setSelectedTime(slot)}
           >
-            <Text
-              style={[
-                styles.timeSlotText,
-                scheduleForm.time === slot && styles.timeSlotTextSelected,
-              ]}
-            >
+            <Text style={[
+              styles.timeSlotText,
+              selectedTime === slot && styles.timeSlotTextSelected
+            ]}>
               {slot}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
+
+      {errors.schedule && (
+        <Text style={styles.errorTextCentered}>{errors.schedule}</Text>
+      )}
     </View>
   );
 
@@ -633,44 +724,40 @@ const compressImage = async(uri:string) =>{
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>Contact & Address</Text>
       <Text style={styles.stepSubtitle}>Provide your contact details and pickup address</Text>
-
+      
       {/* Contact Information */}
       <View style={styles.contactCard}>
         <View style={styles.contactHeader}>
           <User size={20} color="#111827" />
           <Text style={styles.contactHeaderTitle}>Contact Information</Text>
         </View>
-
+        
         <View style={styles.contactForm}>
           <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>
-              Full Name <Text style={styles.required}>*</Text>
-            </Text>
+            <Text style={styles.formLabel}>Full Name <Text style={styles.required}>*</Text></Text>
             <TextInput
               style={[styles.formInput, errors.name && styles.formInputError]}
               placeholder="Enter your full name"
-              value={contactform.name}
+              value={contactForm.name}
               onChangeText={(text) => {
-                setContactForm((prev) => ({ ...prev, name: text }));
-                clearError('name');
+                setContactForm(prev => ({ ...prev, name: text }));
+                if (errors.name) setErrors(prev => ({ ...prev, name: '' }));
               }}
             />
             {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>
-              Mobile Number <Text style={styles.required}>*</Text>
-            </Text>
+            <Text style={styles.formLabel}>Mobile Number <Text style={styles.required}>*</Text></Text>
             <View style={styles.mobileInputContainer}>
               <Phone size={16} color="#6b7280" style={styles.mobileIcon} />
               <TextInput
                 style={[styles.mobileInput, errors.mobile && styles.formInputError]}
                 placeholder="+91 98765 43210"
-                value={contactform.mobile}
+                value={contactForm.mobile}
                 onChangeText={(text) => {
-                  setContactForm((prev) => ({ ...prev, mobile: text }));
-                  clearError('mobile');
+                  setContactForm(prev => ({ ...prev, mobile: text }));
+                  if (errors.mobile) setErrors(prev => ({ ...prev, mobile: '' }));
                 }}
                 keyboardType="phone-pad"
                 maxLength={15}
@@ -680,7 +767,7 @@ const compressImage = async(uri:string) =>{
           </View>
         </View>
       </View>
-
+      
       <View style={styles.addressCard}>
         <View style={styles.addressHeader}>
           <MapPin size={20} color="#111827" />
@@ -690,7 +777,12 @@ const compressImage = async(uri:string) =>{
         <View style={styles.addressTabs}>
           <TouchableOpacity
             style={[styles.addressTab, useNewAddress && styles.addressTabActive]}
-            onPress={() => setUseNewAddress(true)}
+            onPress={() => {
+              setUseNewAddress(true);
+              if (errors.savedAddress) {
+                setErrors(prev => ({ ...prev, savedAddress: '' }));
+              }
+            }}
           >
             <Text style={[styles.addressTabText, useNewAddress && styles.addressTabTextActive]}>
               Add New Address
@@ -698,7 +790,15 @@ const compressImage = async(uri:string) =>{
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.addressTab, !useNewAddress && styles.addressTabActive]}
-            onPress={() => setUseNewAddress(false)}
+            onPress={() => {
+              setUseNewAddress(false);
+              const addressErrors = ['title', 'addressLine', 'city', 'pinCode'];
+              if (addressErrors.some(key => errors[key])) {
+                const newErrors = { ...errors };
+                addressErrors.forEach(key => delete newErrors[key]);
+                setErrors(newErrors);
+              }
+            }}
           >
             <Text style={[styles.addressTabText, !useNewAddress && styles.addressTabTextActive]}>
               Use Saved Address
@@ -709,32 +809,28 @@ const compressImage = async(uri:string) =>{
         {useNewAddress ? (
           <View style={styles.addressForm}>
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>
-                Address Title <Text style={styles.required}>*</Text>
-              </Text>
+              <Text style={styles.formLabel}>Address Title <Text style={styles.required}>*</Text></Text>
               <TextInput
                 style={[styles.formInput, errors.title && styles.formInputError]}
                 placeholder="e.g., Home, Office"
                 value={addressForm.title}
                 onChangeText={(text) => {
-                  setAddressForm((prev) => ({ ...prev, title: text }));
-                  clearError('title');
+                  setAddressForm(prev => ({ ...prev, title: text }));
+                  if (errors.title) setErrors(prev => ({ ...prev, title: '' }));
                 }}
               />
               {errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>
-                Address Line <Text style={styles.required}>*</Text>
-              </Text>
+              <Text style={styles.formLabel}>Address Line <Text style={styles.required}>*</Text></Text>
               <TextInput
                 style={[styles.formInput, errors.addressLine && styles.formInputError]}
                 placeholder="House/Flat no, Street name"
                 value={addressForm.addressLine}
                 onChangeText={(text) => {
-                  setAddressForm((prev) => ({ ...prev, addressLine: text }));
-                  clearError('addressLine');
+                  setAddressForm(prev => ({ ...prev, addressLine: text }));
+                  if (errors.addressLine) setErrors(prev => ({ ...prev, addressLine: '' }));
                 }}
               />
               {errors.addressLine && <Text style={styles.errorText}>{errors.addressLine}</Text>}
@@ -746,32 +842,26 @@ const compressImage = async(uri:string) =>{
                 style={styles.formInput}
                 placeholder="Nearby landmark or area"
                 value={addressForm.landmark}
-                onChangeText={(text) =>
-                  setAddressForm((prev) => ({ ...prev, landmark: text }))
-                }
+                onChangeText={(text) => setAddressForm(prev => ({ ...prev, landmark: text }))}
               />
             </View>
 
             <View style={styles.formRow}>
               <View style={[styles.formGroup, { flex: 1, marginRight: 12 }]}>
-                <Text style={styles.formLabel}>
-                  City <Text style={styles.required}>*</Text>
-                </Text>
+                <Text style={styles.formLabel}>City <Text style={styles.required}>*</Text></Text>
                 <TextInput
                   style={[styles.formInput, errors.city && styles.formInputError]}
                   placeholder="City"
                   value={addressForm.city}
                   onChangeText={(text) => {
-                    setAddressForm((prev) => ({ ...prev, city: text }));
-                    clearError('city');
+                    setAddressForm(prev => ({ ...prev, city: text }));
+                    if (errors.city) setErrors(prev => ({ ...prev, city: '' }));
                   }}
                 />
                 {errors.city && <Text style={styles.errorText}>{errors.city}</Text>}
               </View>
               <View style={[styles.formGroup, { flex: 1, marginLeft: 12 }]}>
-                <Text style={styles.formLabel}>
-                  PIN Code <Text style={styles.required}>*</Text>
-                </Text>
+                <Text style={styles.formLabel}>PIN Code <Text style={styles.required}>*</Text></Text>
                 <TextInput
                   style={[styles.formInput, errors.pinCode && styles.formInputError]}
                   placeholder="123456"
@@ -779,8 +869,8 @@ const compressImage = async(uri:string) =>{
                   maxLength={6}
                   value={addressForm.pinCode}
                   onChangeText={(text) => {
-                    setAddressForm((prev) => ({ ...prev, pinCode: text }));
-                    clearError('pinCode');
+                    setAddressForm(prev => ({ ...prev, pinCode: text }));
+                    if (errors.pinCode) setErrors(prev => ({ ...prev, pinCode: '' }));
                   }}
                 />
                 {errors.pinCode && <Text style={styles.errorText}>{errors.pinCode}</Text>}
@@ -790,25 +880,43 @@ const compressImage = async(uri:string) =>{
         ) : (
           <View style={styles.savedAddresses}>
             {addresses.length > 0 ? (
-              addresses.map((addr) => (
-                <TouchableOpacity
-                  key={addr.id}
-                  style={styles.savedAddressCard}
-                  onPress={() => setSelectedAddressId(addr.id)}
+              addresses.map((address) => (
+                <TouchableOpacity 
+                  key={address.id}
+                  style={[
+                    styles.savedAddressCard,
+                    selectedAddressId === address.id && styles.savedAddressCardActive
+                  ]}
+                  onPress={() => setSelectedAddressId(address.id)}
                 >
                   <View style={styles.savedAddressInfo}>
-                    <Text style={styles.savedAddressTitle}>{addr.name}</Text>
-                    <Text style={styles.savedAddressText}>{formatAddress(addr)}</Text>
+                    <Text style={styles.savedAddressTitle}>
+                      {address.name}
+                    </Text>
+                    <Text style={styles.savedAddressText}>
+                      {address.street}, {address.city} - {address.pincode}
+                    </Text>
                   </View>
                   <View style={styles.savedAddressRadio}>
-                    {selectedAddressId === addr.id && <View style={styles.radioSelected} />}
+                    {selectedAddressId === address.id && (
+                      <View style={styles.radioSelected} />
+                    )}
                   </View>
                 </TouchableOpacity>
               ))
             ) : (
-              <Text style={styles.noAddressText}>No saved addresses. Please add a new one.</Text>
+              <View style={styles.noSavedAddress}>
+                <MapPin size={48} color="#9ca3af" />
+                <Text style={styles.noSavedAddressText}>No saved addresses yet</Text>
+                <Text style={styles.noSavedAddressSubtext}>
+                  Please add a new address to continue
+                </Text>
+              </View>
             )}
           </View>
+        )}
+        {errors.savedAddress && !useNewAddress && (
+          <Text style={styles.errorText}>{errors.savedAddress}</Text>
         )}
       </View>
 
@@ -827,14 +935,8 @@ const compressImage = async(uri:string) =>{
 
         {selectedImages.length > 0 && (
           <View style={styles.selectedImagesContainer}>
-            <Text style={styles.selectedImagesTitle}>
-              Selected Photos ({selectedImages.length})
-            </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.imagesScroll}
-            >
+            <Text style={styles.selectedImagesTitle}>Selected Photos ({selectedImages.length})</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imagesScroll}>
               {selectedImages.map((uri, index) => (
                 <View key={index} style={styles.imageContainer}>
                   <Image source={{ uri }} style={styles.selectedImage} />
@@ -852,106 +954,346 @@ const compressImage = async(uri:string) =>{
       </View>
     </View>
   );
-  
 
-  const renderStep4 = () => {
-    console.log('Rendering step 4');
-    console.log('selectedItems:', selectedItems);
-    console.log('scheduleForm:', scheduleForm);
-    console.log('addressForm:', addressForm);
-    console.log('useNewAddress:', useNewAddress);
-    console.log('selectedAddressId:', selectedAddressId);
-    console.log('addresses:', addresses);
-    console.log('selectedImages:', selectedImages);
-    
-    return (
-      <View style={styles.stepContent}>
-        <View style={styles.stepHeader}>
-          <CheckCircle size={24} color="#10b981" />
-          <Text style={styles.stepHeaderTitle}>Order Summary</Text>
-          <Text style={styles.stepSubtitle}>Review your pickup details</Text>
-        </View>
-
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Items</Text>
-          {selectedItems && selectedItems.length > 0 ? selectedItems.map((item) => (
-            <View key={item.id} style={styles.summaryItem}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={styles.itemIcon}>♻️</Text>
-                <Text style={styles.summaryItemName}>
-                  {item.name} ({item.quantity} {item.unit})
-                </Text>
-              </View>
-              <Text style={styles.summaryItemAmount}>
-                ₹{Math.round(item.rate * item.quantity)}
+  const renderStep4 = () => (
+    <View style={styles.stepContent}>
+      <Text style={styles.stepTitle}>Order Summary</Text>
+      <Text style={styles.stepSubtitle}>Review your pickup details</Text>
+      
+      <View style={styles.summaryCard}>
+        <Text style={styles.summaryTitle}>Items</Text>
+        {selectedItems.map((item) => (
+          <View key={item.id} style={styles.summaryItem}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 12 }}>
+              {item.image && <Image source={item.image} style={styles.summaryItemIconImage} />}
+              <Text style={styles.summaryItemName} numberOfLines={2}>
+                {item.name} ({item.quantity}{item.unit})
               </Text>
             </View>
-          )) : <Text>No items selected</Text>}
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryTotal}>
-            <Text style={styles.summaryTotalLabel}>Estimated Total</Text>
-            <Text style={styles.summaryTotalAmount}>₹{getTotalAmount()}</Text>
-          </View>
-        </View>
-
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Pickup Schedule</Text>
-          <View style={styles.summaryDetail}>
-            <Calendar size={16} color="#6b7280" />
-            <Text style={styles.summaryDetailText}>
-              {scheduleForm.date} at {scheduleForm.time}
+            <Text style={styles.summaryItemAmount}>
+              ₹{Math.round(item.rate * item.quantity)}
             </Text>
           </View>
+        ))}
+        <View style={styles.summaryDivider} />
+        <View style={styles.summaryTotal}>
+          <Text style={styles.summaryTotalLabel}>Estimated Total</Text>
+          <Text style={styles.summaryTotalAmount}>₹{Math.round(getTotalAmount())}</Text>
         </View>
-
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Pickup Address</Text>
-          <View style={styles.summaryDetail}>
-            <MapPin size={16} color="#6b7280" />
-            <View style={styles.summaryAddressContainer}>
-              {useNewAddress && addressForm.title && (
-                <Text style={styles.summaryAddressTitle}>{addressForm.title}</Text>
-              )}
-              {!useNewAddress && selectedAddressId && (
-                <Text style={styles.summaryAddressTitle}>
-                  {addresses.find((a) => a.id === selectedAddressId)?.name || 'Selected Address'}
+      </View>
+      {walletBalance > 0 && (
+        <View style={styles.referralCard}>
+          <View style={styles.referralHeader}>
+            <View style={styles.referralHeaderLeft}>
+              <View style={styles.referralIconContainer}>
+                <Wallet size={20} color={walletBalance >= 120 ? "#16a34a" : "#f59e0b"} />
+              </View>
+              <View>
+                <Text style={styles.referralTitle}>Referral Wallet</Text>
+                <Text style={[
+                  styles.referralBalance,
+                  walletBalance < 120 && { color: '#f59e0b' }
+                ]}>
+                  ₹{walletBalance.toFixed(2)} available
                 </Text>
+              </View>
+            </View>
+            {walletBalance >= 120 ? (
+              <TouchableOpacity
+                style={[
+                  styles.referralToggle,
+                  useReferralBonus && styles.referralToggleActive
+                ]}
+                onPress={toggleReferralBonus}
+              >
+                <View style={[
+                  styles.referralToggleCircle,
+                  useReferralBonus && styles.referralToggleCircleActive
+                ]} />
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.lockedBadge}>
+                <Text style={styles.lockedBadgeText}>🔒</Text>
+              </View>
+            )}
+          </View>
+          
+          {walletBalance >= 120 ? (
+            useReferralBonus && (
+              <View style={styles.referralDiscountInfo}>
+                <Text style={styles.referralDiscountText}>
+                  💰 Referral Applied: +₹{Math.round(referralBonus)}
+                </Text>
+                <Text style={styles.referralDiscountSubtext}>
+                  Bonus amount will be added to your total payout
+                </Text>
+              </View>
+            )
+          ) : (
+            <View style={styles.referralLockedInfo}>
+              <View style={styles.referralLockedIconContainer}>
+                <AlertCircle size={20} color="#f59e0b" />
+              </View>
+              <View style={styles.referralLockedTextContainer}>
+                <Text style={styles.referralLockedTitle}>
+                  Minimum ₹120 Required
+                </Text>
+                <Text style={styles.referralLockedSubtext}>
+                  Earn ₹{(120 - walletBalance).toFixed(2)} more to redeem your referral balance
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
+      )}
+
+       {/* Final Amount Summary */}
+      {useReferralBonus && referralBonus > 0 && (
+        <View style={styles.finalAmountCard}>
+          <View style={styles.finalAmountRow}>
+            <Text style={styles.finalAmountLabel}>Estimated Value</Text>
+            <Text style={styles.finalAmountValue}>₹{Math.round(estimatedValue)}</Text>
+          </View>
+          <View style={styles.finalAmountRow}>
+            <Text style={styles.finalAmountLabelBonus}>Referral Bonus</Text>
+            <Text style={styles.finalAmountValueBonus}>+₹{Math.round(referralBonus)}</Text>
+          </View>
+          <View style={styles.finalAmountDivider} />
+          <View style={styles.finalAmountRow}>
+            <Text style={styles.finalAmountLabelFinal}>Total Payout</Text>
+            <Text style={styles.finalAmountValueFinal}>₹{Math.round(totalPayout)}</Text>
+          </View>
+          <Text style={styles.finalAmountNote}>
+            💸 You will receive this amount from us
+          </Text>
+        </View>
+      )}
+
+      {/* Pickup Details */}
+      <View style={styles.pickupDetailsCard}>
+        <View style={styles.pickupDetailsHeader}>
+          <View style={styles.pickupDetailsIconWrapper}>
+            <Calendar size={20} color="#16a34a" />
+          </View>
+          <Text style={styles.pickupDetailsTitle}>Pickup Details</Text>
+        </View>
+        
+        <View style={styles.pickupDetailsContent}>
+          <View style={styles.pickupDetailRow}>
+            <View style={styles.pickupDetailLabel}>
+              <Calendar size={16} color="#6b7280" />
+              <Text style={styles.pickupDetailLabelText}>Schedule</Text>
+            </View>
+            <View style={styles.pickupDetailValue}>
+              <Text style={styles.pickupDetailValueText}>{selectedDate}</Text>
+              <View style={styles.pickupTimeBadge}>
+                <Text style={styles.pickupTimeText}>{selectedTime}</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.pickupDetailDivider} />
+
+          <View style={styles.pickupDetailRow}>
+            <View style={styles.pickupDetailLabel}>
+              <MapPin size={16} color="#6b7280" />
+              <Text style={styles.pickupDetailLabelText}>Location</Text>
+            </View>
+            <View style={styles.pickupDetailValue}>
+              {getAddressTitle() && (
+                <View style={styles.addressTitleBadge}>
+                  <Text style={styles.addressTitleText}>{getAddressTitle()}</Text>
+                </View>
               )}
-              <Text style={styles.summaryDetailText}>
-                {useNewAddress
-                  ? formatAddress(addressForm)
-                  : (addresses.find((a) => a.id === selectedAddressId) 
-                      ? formatAddress(addresses.find((a) => a.id === selectedAddressId)!)
-                      : 'Address not found')}
+              <Text style={styles.pickupAddressText}>
+                {getDisplayAddress()}
               </Text>
             </View>
           </View>
         </View>
-
-        {selectedImages.length > 0 && (
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>Uploaded Photos</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {selectedImages.map((uri, index) => (
-                <Image key={index} source={{ uri }} style={styles.selectedImage} />
-              ))}
-            </ScrollView>
-          </View>
-        )}
       </View>
-    );
-  };
 
-   return (
+      <View style={styles.summaryCard}>
+        <Text style={styles.summaryTitle}>Contact Information</Text>
+        <View style={styles.summaryDetail}>
+          <User size={16} color="#6b7280" />
+          <Text style={styles.summaryDetailText}>{contactForm.name}</Text>
+        </View>
+        <View style={styles.summaryDetail}>
+          <Phone size={16} color="#6b7280" />
+          <Text style={styles.summaryDetailText}>{contactForm.mobile}</Text>
+        </View>
+      </View>
+
+      {/* Notes Section */}
+      <View style={styles.summaryCard}>
+        <View style={styles.notesTitleContainer}>
+          <FileText size={18} color="#16a34a" />
+          <Text style={styles.summaryTitle}>Notes (Optional)</Text>
+        </View>
+        <TextInput
+          style={styles.notesInput}
+          placeholder="Add any special instructions or details for pickup..."
+          placeholderTextColor="#9ca3af"
+          multiline
+          numberOfLines={4}
+          value={notes}
+          onChangeText={setNotes}
+          textAlignVertical="top"
+        />
+        <Text style={styles.notesHint}>
+          E.g., Gate code, parking instructions, specific location details, etc.
+        </Text>
+      </View>
+
+      {/* Pickup Charges Section */}
+      <View style={styles.pickupChargesCard}>
+        <View style={styles.pickupChargesHeader}>
+          <View style={styles.pickupChargesTitleContainer}>
+            <View style={styles.pickupChargesIconWrapper}>
+              <Scale size={22} color="#16a34a" />
+            </View>
+            <Text style={styles.pickupChargesTitle}>Pickup Charges</Text>
+          </View>
+          <TouchableOpacity style={styles.infoIconContainer}>
+            <AlertCircle size={18} color="#6b7280" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.chargeOptionsContainer}>
+          <View style={styles.freeChargeCard}>
+            <View style={styles.chargeCardHeader}>
+              <View style={styles.freeTagLarge}>
+                <Text style={styles.freeTagLargeText}>FREE</Text>
+              </View>
+            </View>
+            <View style={styles.chargeConditionsContainer}>
+              <View style={styles.chargeCondition}>
+                <View style={styles.conditionIconCircle}>
+                  <Text style={styles.conditionIcon}>⚖️</Text>
+                </View>
+                <Text style={styles.conditionText}>Weight above{'\n'}<Text style={styles.conditionBold}>20 kg</Text></Text>
+              </View>
+              <View style={styles.orDividerContainer}>
+                <View style={styles.orDividerLine} />
+                <Text style={styles.orDividerText}>OR</Text>
+                <View style={styles.orDividerLine} />
+              </View>
+              <View style={styles.chargeCondition}>
+                <View style={styles.conditionIconCircle}>
+                  <Text style={styles.conditionIcon}>💰</Text>
+                </View>
+                <Text style={styles.conditionText}>Amount above{'\n'}<Text style={styles.conditionBold}>₹200</Text></Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.paidChargeCard}>
+            <View style={styles.chargeCardHeader}>
+              <View style={styles.paidTagLarge}>
+                <Text style={styles.paidTagLargeText}>₹30</Text>
+              </View>
+            </View>
+            <View style={styles.chargeConditionsContainer}>
+              <View style={styles.chargeCondition}>
+                <View style={styles.conditionIconCircle}>
+                  <Text style={styles.conditionIcon}>⚖️</Text>
+                </View>
+                <Text style={styles.conditionText}>Weight below{'\n'}<Text style={styles.conditionBold}>20 kg</Text></Text>
+              </View>
+              <View style={styles.andDividerContainer}>
+                <View style={styles.andDividerLine} />
+                <Text style={styles.andDividerText}>AND</Text>
+                <View style={styles.andDividerLine} />
+              </View>
+              <View style={styles.chargeCondition}>
+                <View style={styles.conditionIconCircle}>
+                  <Text style={styles.conditionIcon}>💰</Text>
+                </View>
+                <Text style={styles.conditionText}>Amount below{'\n'}<Text style={styles.conditionBold}>₹200</Text></Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Keep in Mind Section */}
+      <View style={styles.keepInMindCard}>
+        <Text style={styles.keepInMindTitle}>Please keep in mind</Text>
+        
+        <View style={styles.keepInMindGrid}>
+          <View style={styles.keepInMindRow}>
+            <View style={styles.keepInMindItem}>
+              <View style={styles.keepInMindIconContainer}>
+                <Text style={styles.keepInMindEmoji}>🪵🍾</Text>
+                <View style={styles.keepInMindCross}>
+                  <X size={28} color="#dc2626" strokeWidth={3} />
+                </View>
+              </View>
+              <Text style={styles.keepInMindText}>We do not buy{'\n'}Wood & Glass</Text>
+            </View>
+
+            <View style={styles.keepInMindItem}>
+              <View style={styles.keepInMindIconContainer}>
+                <Text style={styles.keepInMindEmoji}>👕👖</Text>
+                <View style={styles.keepInMindCross}>
+                  <X size={28} color="#dc2626" strokeWidth={3} />
+                </View>
+              </View>
+              <Text style={styles.keepInMindText}>We do not buy{'\n'}Clothes</Text>
+            </View>
+          </View>
+
+          <View style={styles.keepInMindRow}>
+            <View style={styles.keepInMindItem}>
+              <View style={styles.keepInMindIconContainer}>
+                <Text style={styles.keepInMindEmoji}>🪑💻</Text>
+                <View style={styles.keepInMindCross}>
+                  <X size={28} color="#dc2626" strokeWidth={3} />
+                </View>
+              </View>
+              <Text style={styles.keepInMindText}>We buy only in{'\n'}scrap rates</Text>
+            </View>
+
+            <View style={styles.keepInMindItem}>
+              <View style={styles.keepInMindIconContainer}>
+                <Text style={styles.keepInMindEmoji}>⚖️📦</Text>
+                <Text style={styles.keepInMindWeight}>20 kg</Text>
+              </View>
+              <Text style={styles.keepInMindText}>Free pickup only{'\n'}above 20 kg</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {selectedImages.length > 0 && (
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>Attached Photos</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.summaryImagesScroll}>
+            {selectedImages.map((uri, index) => (
+              <Image key={index} source={{ uri }} style={styles.summaryImage} />
+            ))}
+          </ScrollView>
+        </View>
+      )}
+    </View>
+  );
+
+  return (
     <View style={styles.container}>
-      <StatusBar backgroundColor="#1e293b" barStyle="light-content" />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Sell Scrap</Text>
         <Text style={styles.stepTitle}>{stepTitles[currentStep - 1]}</Text>
         {renderStepIndicator()}
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollViewContent}
+        keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled={true}
+      >
         {currentStep === 1 && renderStep1()}
         {currentStep === 2 && renderStep2()}
         {currentStep === 3 && renderStep3()}
@@ -967,106 +1309,138 @@ const compressImage = async(uri:string) =>{
                 <Text style={styles.previousButtonText}>Previous</Text>
               </TouchableOpacity>
             )}
-
+            
             <View style={styles.totalSection}>
               <Text style={styles.totalLabel}>Estimated Total</Text>
               <View style={styles.totalAmount}>
                 <IndianRupee size={16} color="#16a34a" />
-                <Text style={styles.totalValue}>{Math.round(getTotalAmount())}</Text>
+                <Text style={styles.totalValue}>{Math.round(totalPayout)}</Text>
               </View>
             </View>
-
-            <TouchableOpacity
-              style={styles.nextButton}
-              onPress={handleNext}
+            
+            <TouchableOpacity 
+              style={styles.nextButton} 
+              onPress={handleNext} 
+              activeOpacity={0.8}
               disabled={submittingOrder}
             >
-              <Text style={styles.nextButtonText}>
-                {submittingOrder
-                  ? 'Processing...'
-                  : currentStep === 4
-                  ? 'Schedule Pickup'
-                  : 'Next'}
-              </Text>
-              <ArrowRight size={20} color="white" />
+              <LinearGradient
+                colors={['#16a34a', '#15803d', '#166534']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ 
+                  flexDirection: 'row', 
+                  alignItems: 'center', 
+                  gap: 6,
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                }}
+              >
+                {submittingOrder ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <>
+                    <Text style={styles.nextButtonText}>
+                      {currentStep === 4 ? 'Schedule' : 'Next'}
+                    </Text>
+                    <ArrowRight size={18} color="white" />
+                  </>
+                )}
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </View>
       )}
+
+      {/* Guidelines Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showGuidelinesModal}
+        onRequestClose={() => setShowGuidelinesModal(false)}
+      >
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Please keep in mind</Text>
+            </View>
+
+            <ScrollView 
+              style={styles.guidelinesScroll} 
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.guidelinesScrollContent}
+              bounces={false}
+            >
+              <View style={styles.guidelinesGrid}>
+                <View style={styles.guidelineCard}>
+                  <View style={styles.guidelineImageContainer}>
+                    <Text style={styles.guidelineEmoji}>🪵🍾</Text>
+                    <View style={styles.crossMark}>
+                      <X size={40} color="#dc2626" strokeWidth={4} />
+                    </View>
+                  </View>
+                  <Text style={styles.guidelineText}>We do not buy Wood & Glass</Text>
+                </View>
+
+                <View style={styles.guidelineCard}>
+                  <View style={styles.guidelineImageContainer}>
+                    <Text style={styles.guidelineEmoji}>👕👖</Text>
+                    <View style={styles.crossMark}>
+                      <X size={40} color="#dc2626" strokeWidth={4} />
+                    </View>
+                  </View>
+                  <Text style={styles.guidelineText}>We do not buy Clothes</Text>
+                </View>
+
+                <View style={styles.guidelineCard}>
+                  <View style={styles.guidelineImageContainer}>
+                    <Text style={styles.guidelineEmoji}>🪑💻</Text>
+                    <View style={styles.crossMark}>
+                      <X size={40} color="#dc2626" strokeWidth={4} />
+                    </View>
+                  </View>
+                  <Text style={styles.guidelineText}>We buy only in scrap rates</Text>
+                </View>
+
+                <View style={styles.guidelineCard}>
+                  <View style={styles.guidelineImageContainer}>
+                    <Text style={styles.guidelineEmoji}>⚖️📦</Text>
+                    <Text style={styles.weightBadge}>20 kg</Text>
+                  </View>
+                  <Text style={styles.guidelineText}>Free pickup only above 20 kg</Text>
+                </View>
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity 
+              style={styles.modalButton}
+              onPress={() => setShowGuidelinesModal(false)}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={['#16a34a', '#15803d']}
+                style={styles.modalButtonGradient}
+              >
+                <Text style={styles.modalButtonText}>Okay, I understand</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
       <Toast />
     </View>
   );
 }
 
+// Styles from the new UI (keeping exactly as provided)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
-  },
-  header: {
-    backgroundColor: '#1e293b',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: 'white',
-    fontFamily: 'Inter-ExtraBold',
-    marginBottom: 8,
-  },
-  stepTitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontFamily: 'Inter-Regular',
-    marginBottom: 20,
-  },
-  stepIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#475569',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stepCircleActive: {
-    backgroundColor: '#16a34a',
-  },
-  stepNumber: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#94a3b8',
-    fontFamily: 'Inter-SemiBold',
-  },
-  stepNumberActive: {
-    color: 'white',
-  },
-  stepLine: {
-    width: 40,
-    height: 2,
-    backgroundColor: '#475569',
-    marginHorizontal: 4,
-  },
-  stepLineActive: {
-    backgroundColor: '#16a34a',
-  },
-  content: {
-    flex: 1,
-  },
-  stepContent: {
-    padding: 20,
-  },
-  stepSubtitle: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontFamily: 'Inter-Regular',
-    marginBottom: 24,
   },
   loadingContainer: {
     paddingVertical: 60,
@@ -1076,126 +1450,212 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     color: '#6b7280',
-    fontFamily: 'Inter-Regular',
   },
-  productsContainer: {
-    maxHeight: 400,
-  },
-  itemCard: {
+  header: {
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  itemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  itemIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#f0fdf4',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  itemIcon: {
-    fontSize: 24,
-  },
-  itemInfo: {
-    flex: 1
-  },
-  itemName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#111827',
-    fontFamily: 'Inter-SemiBold',
-    marginBottom: 4,
-  },
-  itemRate: {
-    fontSize: 13,
-    color: '#16a34a',
-    fontFamily: 'Inter-Medium',
-    marginBottom: 2,
-  },
-  itemDescription: {
-    fontSize: 12,
-    color: '#9ca3af',
-    fontFamily: 'Inter-Regular',
-  },
-  addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#16a34a',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  selectedItems: {
-    marginTop: 24,
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
   },
-  selectedItemsTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '600',
     color: '#111827',
-    fontFamily: 'Inter-Bold',
+    marginBottom: 6,
+  },
+  stepTitle: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginBottom: 12,
+  },
+  stepIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+  },
+  stepCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#e5e7eb',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  stepCircleActive: {
+    backgroundColor: 'transparent',
+  },
+  stepGradient: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stepNumber: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+  stepNumberActive: {
+    color: 'white',
+  },
+  stepLine: {
+    width: 40,
+    height: 2,
+    backgroundColor: '#e5e7eb',
+    marginHorizontal: 8,
+  },
+  stepLineActive: {
+    backgroundColor: '#16a34a',
+  },
+  content: {
+    flex: 1,
+  },
+  scrollViewContent: {
+    flexGrow: 1,
+    paddingBottom: Platform.OS === 'android' ? 100 : 80,
+  },
+  stepContent: {
+    padding: 20,
+  },
+  stepSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 24,
+  },
+  categoriesContainer: {
+    flexGrow: 0,
+    flexShrink: 1,
+    marginBottom: 16,
+  },
+  categorySection: {
+    marginBottom: 24,
+  },
+  categoryHeaderSell: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  categoryTitleSell: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+  },
+  categoryItems: {
+    gap: 8,
+  },
+  itemCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  itemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  itemInfo: {
+    flex: 1,
+  },
+  itemName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  itemRate: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 2,
+    color: '#16a34a',
+  },
+  itemDescription: {
+    fontSize: 11,
+    color: '#6b7280',
+  },
+  addButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#16a34a',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  selectedItems: {
+    marginTop: 24,
+  },
+  selectedItemsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
     marginBottom: 16,
   },
   selectedItemCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    alignItems: 'center',
   },
   selectedItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  selectedItemIcon: {
-    fontSize: 20,
+  selectedItemIconImage: {
+    width: 36,
+    height: 36,
     marginRight: 12,
+    borderRadius: 6,
+  },
+  itemIconImage: {
+    width: 44,
+    height: 44,
+    marginRight: 12,
+    borderRadius: 10,
+  },
+  summaryItemIconImage: {
+    width: 28,
+    height: 28,
+    marginRight: 10,
+    borderRadius: 6,
   },
   selectedItemName: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#111827',
-    fontFamily: 'Inter-SemiBold',
   },
   selectedItemRate: {
     fontSize: 12,
     color: '#16a34a',
-    fontFamily: 'Inter-Medium',
   },
   quantityControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
   quantityButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1204,51 +1664,47 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#111827',
-    fontFamily: 'Inter-SemiBold',
     minWidth: 40,
     textAlign: 'center',
   },
   removeButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#fee2e2',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 4,
   },
   dateSection: {
     marginBottom: 24,
   },
   sectionLabel: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#374151',
-    fontFamily: 'Inter-SemiBold',
+    color: '#111827',
     marginBottom: 12,
   },
   datesScroll: {
-    marginHorizontal: -20,
-    paddingHorizontal: 20,
+    marginHorizontal: -8,
   },
   dateCard: {
     backgroundColor: 'white',
     borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginRight: 12,
+    padding: 16,
+    marginHorizontal: 8,
+    minWidth: 100,
+    alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#e5e7eb',
+    borderColor: 'transparent',
   },
   dateCardSelected: {
     backgroundColor: '#f0fdf4',
     borderColor: '#16a34a',
   },
   dateText: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '500',
     color: '#6b7280',
-    fontFamily: 'Inter-SemiBold',
   },
   dateTextSelected: {
     color: '#16a34a',
@@ -1262,21 +1718,325 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     borderWidth: 2,
-    borderColor: '#e5e7eb',
+    borderColor: 'transparent',
   },
   timeSlotSelected: {
     backgroundColor: '#f0fdf4',
     borderColor: '#16a34a',
   },
   timeSlotText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '500',
     color: '#6b7280',
-    fontFamily: 'Inter-SemiBold',
     textAlign: 'center',
   },
   timeSlotTextSelected: {
     color: '#16a34a',
+  },
+  addressCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  addressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  addressHeaderTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    marginLeft: 8,
+  },
+  addressTabs: {
+    flexDirection: 'row',
+    marginBottom: 24,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    padding: 4,
+  },
+  addressTab: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  addressTabActive: {
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  addressTabText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  addressTabTextActive: {
+    color: '#111827',
+  },
+  addressForm: {
+    gap: 16,
+  },
+  formGroup: {
+    marginBottom: 16,
+  },
+  formRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  formLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  required: {
+    color: '#dc2626',
+  },
+  formInput: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: '#111827',
+  },
+  savedAddresses: {
+    gap: 12,
+  },
+  savedAddressCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+  },
+  savedAddressCardActive: {
+    borderColor: '#16a34a',
+    backgroundColor: '#f0fdf4',
+  },
+  savedAddressInfo: {
+    flex: 1,
+  },
+  savedAddressTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  savedAddressText: {
+    fontSize: 14,
+    color: '#6b7280',
+    lineHeight: 20,
+  },
+  savedAddressRadio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#16a34a',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radioSelected: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#16a34a',
+  },
+  noSavedAddress: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    borderStyle: 'dashed',
+  },
+  noSavedAddressText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  noSavedAddressSubtext: {
+    fontSize: 14,
+    color: '#9ca3af',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  photoButton: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    borderStyle: 'dashed',
+  },
+  photoButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#374151',
+    marginTop: 8,
+  },
+  photoButtonSubtext: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 4,
+  },
+  summaryCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  summaryTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 16,
+  },
+  summaryItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  summaryItemName: {
+    fontSize: 14,
+    color: '#374151',
+    flex: 1,
+    marginLeft: 8,
+    flexWrap: 'wrap',
+  },
+  summaryItemAmount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#16a34a',
+  },
+  summaryDivider: {
+    height: 1,
+    backgroundColor: '#e5e7eb',
+    marginVertical: 16,
+  },
+  summaryTotal: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  summaryTotalLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  summaryTotalAmount: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#16a34a',
+  },
+  summaryDetail: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  summaryDetailText: {
+    fontSize: 14,
+    color: '#374151',
+    marginLeft: 8,
+    flex: 1,
+    lineHeight: 20,
+  },
+  summaryImagesScroll: {
+    marginTop: 12,
+  },
+  summaryImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  footer: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  navigationButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  previousButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 6,
+  },
+  previousButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  totalSection: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 16,
+  },
+  totalLabel: {
+    fontSize: 10,
+    color: '#6b7280',
+    marginBottom: 2,
+    textAlign: 'center',
+  },
+  totalAmount: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  totalValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#16a34a',
+    marginLeft: 4,
+  },
+  nextButton: {
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
+    flexShrink: 1,
+  },
+  nextButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'white',
   },
   contactCard: {
     backgroundColor: 'white',
@@ -1292,40 +2052,16 @@ const styles = StyleSheet.create({
   contactHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   contactHeaderTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '600',
     color: '#111827',
-    fontFamily: 'Inter-Bold',
     marginLeft: 8,
   },
   contactForm: {
     gap: 16,
-  },
-  formGroup: {
-    marginBottom: 16,
-  },
-  formLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    fontFamily: 'Inter-SemiBold',
-    marginBottom: 8,
-  },
-  required: {
-    color: '#dc2626',
-  },
-  formInput: {
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 14,
-    color: '#111827',
-    fontFamily: 'Inter-Regular',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
   },
   formInputError: {
     borderColor: '#dc2626',
@@ -1333,139 +2069,40 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 12,
     color: '#dc2626',
-    fontFamily: 'Inter-Regular',
     marginTop: 4,
+  },
+  errorTextCentered: {
+    fontSize: 14,
+    color: '#dc2626',
+    marginTop: 16,
+    textAlign: 'center',
+    backgroundColor: '#fee2e2',
+    padding: 12,
+    borderRadius: 8,
   },
   mobileInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f9fafb',
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    paddingHorizontal: 14,
-  },
-  mobileIcon: {
-    marginRight: 8,
   },
   mobileInput: {
     flex: 1,
-    padding: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     fontSize: 14,
     color: '#111827',
-    fontFamily: 'Inter-Regular',
   },
-  addressCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  addressHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  addressHeaderTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-    fontFamily: 'Inter-Bold',
-    marginLeft: 8,
-  },
-  addressTabs: {
-    flexDirection: 'row',
-    backgroundColor: '#f3f4f6',
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 20,
-  },
-  addressTab: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  addressTabActive: {
-    backgroundColor: 'white',
-  },
-  addressTabText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6b7280',
-    fontFamily: 'Inter-SemiBold',
-  },
-  addressTabTextActive: {
-    color: '#16a34a',
-  },
-  addressForm: {
-    gap: 16,
-  },
-  formRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  savedAddresses: {
-    gap: 12,
-  },
-  savedAddressCard: {
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-  },
-  savedAddressInfo: {
-    flex: 1,
-  },
-  savedAddressTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#111827',
-    fontFamily: 'Inter-SemiBold',
-    marginBottom: 4,
-  },
-  savedAddressText: {
-    fontSize: 13,
-    color: '#6b7280',
-    fontFamily: 'Inter-Regular',
-    lineHeight: 18,
-  },
-  savedAddressRadio: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#d1d5db',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  radioSelected: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#16a34a',
-  },
-  noAddressText: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontFamily: 'Inter-Regular',
-    textAlign: 'center',
-    paddingVertical: 20,
+  mobileIcon: {
+    marginLeft: 12,
   },
   photoCard: {
     backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
-    marginBottom: 20,
+    marginBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -1475,224 +2112,720 @@ const styles = StyleSheet.create({
   photoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   photoHeaderTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '600',
     color: '#111827',
-    fontFamily: 'Inter-Bold',
     marginLeft: 8,
   },
-  photoButton: {
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
-    padding: 24,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-    borderStyle: 'dashed',
-  },
-  photoButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    fontFamily: 'Inter-SemiBold',
-    marginTop: 8,
-  },
-  photoButtonSubtext: {
-    fontSize: 12,
-    color: '#9ca3af',
-    fontFamily: 'Inter-Regular',
-    marginTop: 4,
-  },
   selectedImagesContainer: {
-    marginTop: 16,
+    marginTop: 20,
   },
   selectedImagesTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#374151',
-    fontFamily: 'Inter-SemiBold',
+    color: '#111827',
     marginBottom: 12,
   },
   imagesScroll: {
-    marginHorizontal: -20,
-    paddingHorizontal: 20,
+    marginHorizontal: -8,
   },
   imageContainer: {
+    marginHorizontal: 8,
     position: 'relative',
-    marginRight: 12,
   },
   selectedImage: {
     width: 80,
     height: 80,
-    borderRadius: 12,
+    borderRadius: 8,
   },
   removeImageButton: {
     position: 'absolute',
     top: -8,
     right: -8,
+    backgroundColor: '#dc2626',
+    borderRadius: 12,
     width: 24,
     height: 24,
-    borderRadius: 12,
-    backgroundColor: '#dc2626',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  summaryCard: {
+   referralCard: {
     backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    borderWidth: 2,
+    borderColor: '#dcfce7',
+    shadowColor: '#16a34a',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  summaryItemIconImage: {
-    width: 28,
-    height: 28,
-    marginRight: 10,
-    borderRadius: 6,
-  },
-  summaryTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-    fontFamily: 'Inter-Bold',
-    marginBottom: 16,
-  },
-  summaryItem: {
+    shadowRadius: 6,
+    elevation: 3,
+  },  
+  referralHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    marginBottom: 8,
   },
-  summaryItemName: {
-    fontSize: 14,
-    color: '#374151',
-    fontFamily: 'Inter-Regular',
-    flex: 1,
+    referralHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  summaryItemAmount: {
+    referralIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#dcfce7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+    referralTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    fontFamily: 'Inter-SemiBold',
+  },
+    referralBalance: {
     fontSize: 14,
+    color: '#16a34a',
+    fontFamily: 'Inter-Medium',
+    marginTop: 2,
+  },  referralToggle: {
+    width: 52,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#e5e7eb',
+    padding: 3,
+    justifyContent: 'center',
+  },
+  referralToggleActive: {
+    backgroundColor: '#16a34a',
+  },
+  referralToggleCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'white',
+  },
+  referralToggleCircleActive: {
+    alignSelf: 'flex-end',
+  },
+    referralDiscountInfo: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#f0fdf4',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+    referralDiscountText: {
+    fontSize: 15,
     fontWeight: '600',
     color: '#16a34a',
     fontFamily: 'Inter-SemiBold',
+    marginBottom: 4,
   },
-  summaryDivider: {
-    height: 1,
-    backgroundColor: '#e5e7eb',
-    marginVertical: 12,
+    referralDiscountSubtext: {
+    fontSize: 13,
+    color: '#15803d',
+    fontFamily: 'Inter-Regular',
   },
-  summaryTotal: {
+  lockedBadge: {
+    width: 52,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#fef3c7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  lockedBadgeText: {
+    fontSize: 16,
+  },
+  referralLockedInfo: {
+    marginTop: 16,
+    padding: 14,
+    backgroundColor: '#fffbeb',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  referralLockedIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#fef3c7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  referralLockedTextContainer: {
+    flex: 1,
+  },
+  referralLockedTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#92400e',
+    marginBottom: 4,
+  },
+  referralLockedSubtext: {
+    fontSize: 13,
+    color: '#b45309',
+    lineHeight: 18,
+  },
+    finalAmountCard: {
+    backgroundColor: '#f0fdf4',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: '#16a34a',
+  },
+  finalAmountRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 8,
   },
-  summaryTotalLabel: {
-    fontSize: 16,
+  finalAmountLabel: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontFamily: 'Inter-Medium',
+  },
+  finalAmountValue: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontFamily: 'Inter-SemiBold',
+  },
+  finalAmountLabelDiscount: {
+    fontSize: 14,
+    color: '#16a34a',
+    fontFamily: 'Inter-Medium',
+  },
+  finalAmountValueDiscount: {
+    fontSize: 14,
+    color: '#16a34a',
+    fontFamily: 'Inter-SemiBold',
+  },
+  finalAmountLabelBonus: {
+    fontSize: 14,
+    color: '#16a34a',
+    fontFamily: 'Inter-Medium',
+  },
+  finalAmountValueBonus: {
+    fontSize: 14,
+    color: '#16a34a',
+    fontFamily: 'Inter-SemiBold',
+  },
+  finalAmountDivider: {
+    height: 1,
+    backgroundColor: '#16a34a',
+    marginVertical: 12,
+    opacity: 0.3,
+  },
+  finalAmountLabelFinal: {
+    fontSize: 18,
     fontWeight: '700',
     color: '#111827',
-    fontFamily: 'Inter-Bold',
+    fontFamily: 'Inter-SemiBold',
   },
-  summaryTotalAmount: {
+  finalAmountValueFinal: {
     fontSize: 20,
     fontWeight: '800',
     color: '#16a34a',
-    fontFamily: 'Inter-ExtraBold',
+    fontFamily: 'Inter-SemiBold',
   },
-  stepHeader: {
+  finalAmountNote: {
+    fontSize: 12,
+    color: '#15803d',
+    fontFamily: 'Inter-Medium',
+    textAlign: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#bbf7d0',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 32,
+    padding: 20,
   },
-  summaryDetail: {
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 24,
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: height * 0.80,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalHeader: {
+    padding: 24,
+    paddingBottom: 16,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  guidelinesScroll: {
+    flexGrow: 0,
+    flexShrink: 1,
+  },
+  guidelinesScrollContent: {
+    paddingBottom: 16,
+  },
+  guidelinesGrid: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  guidelineCard: {
+    width: '48%',
+    backgroundColor: '#fef9f0',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    minHeight: 160,
+  },
+  guidelineImageContainer: {
+    width: '100%',
+    height: 100,
+    backgroundColor: '#fef3c7',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 12,
+    position: 'relative',
   },
-  summaryDetailText: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontFamily: 'Inter-Regular',
-    marginLeft: 8,
-    flex: 1,
+  guidelineEmoji: {
+    fontSize: 48,
   },
-  summaryAddressContainer: {
-    marginLeft: 8,
-    flex: 1,
+  crossMark: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginTop: -20,
+    marginLeft: -20,
   },
-  summaryAddressTitle: {
+  weightBadge: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    backgroundColor: 'white',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  guidelineText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#111827',
-    fontFamily: 'Inter-SemiBold',
-    marginBottom: 4,
+    textAlign: 'center',
+    lineHeight: 18,
   },
-  footer: {
-    backgroundColor: 'white',
+  modalButton: {
+    margin: 20,
+    marginTop: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  modalButtonGradient: {
     paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  navigationButtons: {
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+  },
+  pickupDetailsCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+    overflow: 'hidden',
+  },
+  pickupDetailsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#f0fdf4',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#dcfce7',
+  },
+  pickupDetailsIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#dcfce7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pickupDetailsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  pickupDetailsContent: {
+    padding: 20,
+  },
+  pickupDetailRow: {
+    gap: 12,
+  },
+  pickupDetailLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  pickupDetailLabelText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  pickupDetailValue: {
+    gap: 8,
+  },
+  pickupDetailValueText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  pickupTimeBadge: {
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#16a34a',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  pickupTimeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#16a34a',
+  },
+  pickupDetailDivider: {
+    height: 1,
+    backgroundColor: '#e5e7eb',
+    marginVertical: 16,
+  },
+  addressTitleBadge: {
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    marginBottom: 6,
+  },
+  addressTitleText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#2563eb',
+  },
+  pickupAddressText: {
+    fontSize: 15,
+    color: '#374151',
+    lineHeight: 22,
+  },
+  notesTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  notesInput: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    padding: 12,
+    fontSize: 14,
+    color: '#111827',
+    minHeight: 100,
+    maxHeight: 150,
+  },
+  notesHint: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  pickupChargesCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+    overflow: 'hidden',
+  },
+  pickupChargesHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#f0fdf4',
+    borderBottomWidth: 1,
+    borderBottomColor: '#dcfce7',
   },
-  previousButton: {
+  pickupChargesTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    gap: 10,
+  },
+  pickupChargesIconWrapper: {
+    width: 40,
+    height: 40,
     borderRadius: 12,
+    backgroundColor: '#dcfce7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pickupChargesTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  infoIconContainer: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
     backgroundColor: '#f3f4f6',
   },
-  previousButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6b7280',
-    fontFamily: 'Inter-SemiBold',
-    marginLeft: 4,
+  chargeOptionsContainer: {
+    padding: 16,
+    gap: 12,
   },
-  totalSection: {
+  freeChargeCard: {
+    backgroundColor: '#f0fdf4',
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#16a34a',
+    overflow: 'hidden',
+  },
+  paidChargeCard: {
+    backgroundColor: '#fef9f0',
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#f59e0b',
+    overflow: 'hidden',
+  },
+  chargeCardHeader: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     alignItems: 'center',
   },
-  totalLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontFamily: 'Inter-Regular',
-    marginBottom: 4,
+  freeTagLarge: {
+    backgroundColor: '#16a34a',
+    paddingHorizontal: 24,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: '#16a34a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  totalAmount: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  totalValue: {
+  freeTagLargeText: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#16a34a',
-    fontFamily: 'Inter-ExtraBold',
-    marginLeft: 2,
+    color: 'white',
+    letterSpacing: 1,
   },
-  nextButton: {
+  paidTagLarge: {
+    backgroundColor: '#f59e0b',
+    paddingHorizontal: 24,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: '#f59e0b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  paidTagLargeText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: 'white',
+    letterSpacing: 1,
+  },
+  chargeConditionsContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    gap: 12,
+  },
+  chargeCondition: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#16a34a',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
+    gap: 12,
+    backgroundColor: 'white',
+    padding: 12,
+    borderRadius: 10,
   },
-  nextButtonText: {
+  conditionIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#fef3c7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  conditionIcon: {
+    fontSize: 24,
+  },
+  conditionText: {
+    fontSize: 14,
+    color: '#6b7280',
+    lineHeight: 20,
+    flex: 1,
+  },
+  conditionBold: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  orDividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginVertical: 4,
+  },
+  orDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#16a34a',
+    opacity: 0.3,
+  },
+  orDividerText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#16a34a',
+    paddingHorizontal: 8,
+  },
+  andDividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginVertical: 4,
+  },
+  andDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#f59e0b',
+    opacity: 0.3,
+  },
+  andDividerText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#f59e0b',
+    paddingHorizontal: 8,
+  },
+  keepInMindCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  keepInMindTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 16,
+  },
+  keepInMindGrid: {
+    gap: 12,
+  },
+  keepInMindRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  keepInMindItem: {
+    flex: 1,
+    backgroundColor: '#fef9f0',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    minHeight: 140,
+    marginHorizontal: 6,
+  },
+  keepInMindIconContainer: {
+    width: '100%',
+    height: 80,
+    backgroundColor: '#fef3c7',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+    position: 'relative',
+  },
+  keepInMindEmoji: {
+    fontSize: 36,
+  },
+  keepInMindCross: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginTop: -16,
+    marginLeft: -16,
+  },
+  keepInMindWeight: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    backgroundColor: 'white',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
     fontSize: 14,
     fontWeight: '700',
-    color: 'white',
-    fontFamily: 'Inter-Bold',
-    marginRight: 4,
+    color: '#111827',
+  },
+  keepInMindText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#111827',
+    textAlign: 'center',
+    lineHeight: 16,
   },
 });

@@ -1,297 +1,654 @@
-import { View, Text, TextInput, TouchableOpacity, Alert, ScrollView ,ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
-import React, { useState } from 'react';
-
-import { Mail, Lock, Eye, EyeOff, ArrowRight, Chrome } from 'lucide-react-native';
-import { useRouter, Link } from 'expo-router';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  Dimensions,
+  Animated,
+  Image,
+  ScrollView,
+  ActivityIndicator,
+} from 'react-native';
+import {
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  ArrowRight,
+  Sparkles,
+  Shield,
+  Zap,
+  Chrome,
+} from 'lucide-react-native';
+import { Link, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import {StyleSheet} from 'react-native'
-import { StatusBar } from 'expo-status-bar';
-import { AuthService } from '../../api/apiService';
 import ScrapizLogo from '../../components/ScrapizLogo';
+import { AuthService } from '../../api/apiService';
 import Toast from 'react-native-toast-message';
+import { useGoogleAuth } from '../../hooks/useGoogleAuth';
+import { useLocalization } from '../../context/LocalizationContext';
+
+const { width, height } = Dimensions.get('window');
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { t } = useLocalization();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
-  const validateForm = () =>{
-    const newErrors: { email?: string; password?: string } = {};
-    if(!email.trim()){
-      newErrors.email = "Email is required"
-    }else if (!/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = 'Please enter a valid email';
-    }
-    if(!password.trim()){
-      newErrors.password = 'Password is required';
-    }else if (password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters'; 
-    }
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0;
-  }
+  // Google Auth Hook
+  const { signInWithGoogle, isLoading: isGoogleLoading, error: googleError, authSuccess } = useGoogleAuth();
 
-  const handleLogin = async () => {
-    if(!validateForm()) return
-    setIsLoading(true);
-    try {
-      await AuthService.login({ email, password });
+  // Refs for input navigation
+  const passwordInputRef = useRef<TextInput>(null);
+
+  // Animations
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 50,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [fadeAnim, slideAnim]);
+
+  // Handle Google auth success
+  useEffect(() => {
+    if (authSuccess) {
       Toast.show({
         type: 'success',
-        text1: 'Success',
-        text2: 'Login successful!',
+        text1: t('common.success'),
+        text2: t('notifications.languageChanged'),
       });
+      router.replace('/(tabs)/home');
+    }
+  }, [authSuccess, t]);
+
+  const validateForm = () => {
+    const newErrors: { email?: string; password?: string } = {};
+    
+    // Improved email validation regex
+    const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password.trim();
+    
+    if (!trimmedEmail) {
+      newErrors.email = t('auth.errors.emailRequired');
+    } else if (!emailRegex.test(trimmedEmail)) {
+      newErrors.email = t('auth.errors.invalidEmail');
+    }
+    
+    if (!trimmedPassword) {
+      newErrors.password = t('auth.errors.passwordRequired');
+    } else if (trimmedPassword.length < 6) {
+      newErrors.password = t('auth.errors.passwordMinLength');
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleLogin = async () => {
+    // Prevent multiple submissions
+    if (isLoading) return;
+    
+    if (!validateForm()) return;
+    
+    setIsLoading(true);
+    
+    try {
+      // Trim inputs before sending
+      const trimmedEmail = email.trim();
+      const trimmedPassword = password.trim();
+      
+      // Call API service
+      await AuthService.login({ email: trimmedEmail, password: trimmedPassword });
+      
+      Toast.show({
+        type: 'success',
+        text1: t('common.success'),
+        text2: t('notifications.languageChanged'),
+      });
+      
       router.replace('/(tabs)/home');
     } catch (error: any) {
       Toast.show({
         type: 'error',
-        text1: 'Error',
-        text2: error.message,
+        text1: t('common.error'),
+        text2: error.message || t('notifications.languageChangeFailed'),
       });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
-  const handleGoogleLogin = async()=>{
-     Alert.alert('Social Login', 'Google login flow is initiated (API call not included in AuthService).');
-  }
 
-   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <ScrapizLogo size={56} />
-          <Text style={styles.welcomeText}>Welcome back! 👋</Text>
-          <Text style={styles.subtitleText}>
-            Sign in to continue selling your scrap and earning rewards
-          </Text>
-        </View>
+  const handleGoogleLogin = async () => {
+    try {
+      await signInWithGoogle();
+      // Navigation will be handled by useEffect when authSuccess changes
+    } catch (error) {
+      console.error('Google login error:', error);
+    }
+  };
 
-        {/* Login Form */}
-        <View style={styles.formContainer}>
-          <View style={styles.inputContainer}>
-            <View style={styles.inputWrapper}>
-              <Mail size={20} color="#6b7280" style={styles.inputIcon} />
-              <TextInput
-                style={[styles.input, errors.email && styles.inputError]}
-                placeholder="Enter your email"
-                placeholderTextColor="#9ca3af"
-                value={email}
-                onChangeText={(text) => {
-                  setEmail(text);
-                  if (errors.email) { setErrors(prev => ({ ...prev, email: undefined })); }
-                }}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoComplete="email"
-                editable={!isLoading}
-              />
-            </View>
-            {errors.email && (<Text style={styles.errorText}>{errors.email}</Text>)}
+  // Show Google error toast
+  useEffect(() => {
+    if (googleError) {
+      Toast.show({
+        type: 'error',
+        text1: t('common.error'),
+        text2: googleError,
+      });
+    }
+  }, [googleError, t]);
+
+  const isAnyLoading = isLoading || isGoogleLoading;
+
+  return (
+    <View className='flex-1 bg-white'>
+      <View className='flex-1'>
+        {/* Green Gradient Header */}
+        <LinearGradient
+          colors={['#16a34a', '#15803d', '#14532d']}
+          style={styles.greenHeader}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          {/* Texture Pattern */}
+          <View 
+          style={styles.texturePattern}>
+            {Array.from({ length: 80 }).map((_, i) => (
+              <View key={i} className='w-3 h-3 rounded-[1.5px] bg-white m-3' />
+            ))}
           </View>
+          
+          {/* Decorative Circles */}
+          <Animated.View 
+            style={[
+              styles.bgCircle1,
+              {
+                zIndex:1,
+                opacity: fadeAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 0.15]
+                })
+              }
+            ]}
+          />
+          <Animated.View 
+            style={[
+              styles.bgCircle2,
+              {zIndex:1,
+                opacity: fadeAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 0.1]
+                })
+              }
+            ]}
+          />
+          
+          {/* Header Content in Green Section */}
+          <Animated.View 
+            style={[
+              styles.headerInGreen,
+              {zIndex:10,
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            <View style={styles.logoContainer}>
+              <ScrapizLogo size={56} />
+              <View style={styles.badge}>
+                <Sparkles size={12} color="#ffffff" />
+                <Text style={styles.badgeText}>{t('auth.trustedBy')}</Text>
+              </View>
+            </View>
+            
+            <Text style={styles.welcomeText}>{t('auth.welcomeBack')}</Text>
+            <Text style={styles.subtitleText}>
+              {t('auth.welcomeSubtitle')}
+            </Text>
+          </Animated.View>
+        </LinearGradient>
 
-          <View style={styles.inputContainer}>
-            <View style={styles.inputWrapper}>
-              <Lock size={20} color="#6b7280" style={styles.inputIcon} />
-              <TextInput
-                style={[styles.input, errors.password && styles.inputError]}
-                placeholder="Enter your password"
-                placeholderTextColor="#9ca3af"
-                value={password}
-                onChangeText={(text) => {
-                  setPassword(text);
-                  if (errors.password) { setErrors(prev => ({ ...prev, password: undefined })); }
-                }}
-                secureTextEntry={!showPassword}
-                autoComplete="password"
-                editable={!isLoading}
-              />
+        <KeyboardAvoidingView 
+          className='flex-1'
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <ScrollView 
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Login Form */}
+            <Animated.View 
+              style={[
+                styles.formContainer,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }],
+                },
+              ]}
+            >
+              <View className='mb-[14px]'>
+                <View className='flex-row items-center bg-gray-50 rounded-2xl border-[1.5px] border-gray-200 px-4 py-1 h-[58px] shadow-sm shadow-black/5'>
+                  <View className='w-[38px] h-[38px] rounded-[19px] bg-green-100 justify-center items-center mr-3'>
+                    <Mail size={20} color="#10b981" />
+                  </View>
+                  <TextInput
+                    style={[styles.input, errors.email && styles.inputError]}
+                    placeholder={t('auth.enterEmail')}
+                    placeholderTextColor="#9ca3af"
+                    value={email}
+                    onChangeText={(text) => {
+                      setEmail(text.toLowerCase());
+                      if (errors.email) {
+                        setErrors(prev => ({ ...prev, email: undefined }));
+                      }
+                    }}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    returnKeyType="next"
+                    onSubmitEditing={() => passwordInputRef.current?.focus()}
+                    blurOnSubmit={false}
+                    editable={!isAnyLoading}
+                  />
+                </View>
+                {errors.email && (
+                  <View className='mt-1.5 ml-1'>
+                    <Text className='text-[13px] text-red-700 font-semibold'>⚠️ {errors.email}</Text>
+                  </View>
+                )}
+              </View>
+
+              <View className='mb-[14px]'>
+                <View className='flex-row items-center bg-gray-50 rounded-2xl border-[1.5px] border-gray-200 px-4 py-1 h-[58px] shadow-sm shadow-black/5'>
+                  <View className='w-[38px] h-[38px] rounded-[19px] bg-green-100 justify-center items-center mr-3'>
+                    <Lock size={20} color="#10b981" />
+                  </View>
+                  <TextInput
+                    ref={passwordInputRef}
+                    style={[styles.input, errors.password && styles.inputError]}
+                    placeholder={t('auth.enterPassword')}
+                    placeholderTextColor="#9ca3af"
+                    value={password}
+                    onChangeText={(text) => {
+                      setPassword(text);
+                      if (errors.password) {
+                        setErrors(prev => ({ ...prev, password: undefined }));
+                      }
+                    }}
+                    secureTextEntry={!showPassword}
+                    autoComplete="password"
+                    returnKeyType="done"
+                    onSubmitEditing={handleLogin}
+                    editable={!isAnyLoading}
+                  />
+                  <TouchableOpacity
+                    className='p-2'
+                    onPress={() => setShowPassword(!showPassword)}
+                    disabled={isAnyLoading}
+                  >
+                    {showPassword ? (
+                      <EyeOff size={22} color="#9ca3af" />
+                    ) : (
+                      <Eye size={22} color="#9ca3af" />
+                    )}
+                  </TouchableOpacity>
+                </View>
+                {errors.password && (
+                  <View className='mt-1.5 ml-1'>
+                    <Text className='text-[13px] text-red-700 font-semibold'>⚠️ {errors.password}</Text>
+                  </View>
+                )}
+              </View>
+
+              <Link href="/(auth)/forgot-password" asChild>
+                <TouchableOpacity className='self-end mb-5' disabled={isAnyLoading}>
+                  <Text className='text-sm text-green-600 font-bold'>{t('auth.forgotPasswordLink')}</Text>
+                </TouchableOpacity>
+              </Link>
+
               <TouchableOpacity
-                style={styles.eyeIcon}
-                onPress={() => setShowPassword(!showPassword)}
-                disabled={isLoading}
+                style={[styles.loginButton, isAnyLoading && styles.loginButtonDisabled]}
+                onPress={handleLogin}
+                disabled={isAnyLoading}
               >
-                {showPassword ? (<EyeOff size={20} color="#6b7280" />) : (<Eye size={20} color="#6b7280" />)}
+                <LinearGradient
+                  colors={['#16a34a', '#15803d', '#14532d']}
+                  className='flex-1 flex-row items-center justify-center gap-2.5'
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="white" size="small" />
+                  ) : (
+                    <>
+                      <Text className='text-[17px] font-extrabold text-white tracking-[0.3px]'>{t('auth.signIn')}</Text>
+                      <ArrowRight size={22} color="white" />
+                    </>
+                  )}
+                </LinearGradient>
               </TouchableOpacity>
-            </View>
-            {errors.password && (<Text style={styles.errorText}>{errors.password}</Text>)}
-          </View>
 
-          <Link href="/(auth)/forgot-password" asChild>
-            <TouchableOpacity style={styles.forgotPassword}>
-              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-            </TouchableOpacity>
-          </Link>
+              <View className='flex-row items-center mb-4'>
+                <View className='flex-1 h-px bg-gray-200' />
+                <Text className='text-[13px] text-gray-400 font-semibold px-[14px]'>{t('auth.orContinueWith')}</Text>
+                <View className='flex-1 h-px bg-gray-200' />
+              </View>
 
-          <TouchableOpacity
-            style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
-            onPress={handleLogin}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-                <ActivityIndicator color="white" />
-            ) : (
-              <>
-                <Text style={styles.loginButtonText}>Sign In</Text>
-                <ArrowRight size={20} color="white" />
-              </>
-            )}
-          </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.googleButton, isAnyLoading && styles.googleButtonDisabled]}
+                onPress={handleGoogleLogin}
+                disabled={isAnyLoading}
+              >
+                {isGoogleLoading ? (
+                  <ActivityIndicator color="#6b7280" size="small" />
+                ) : (
+                  <>
+                    <Image source={require('../../../assets/images/Gooogle Favicon.png')}
+                    className='w-6 h-6 object-contain'/>
+                    <Text className='text-[15px] font-bold text-gray-800'>{t('auth.continueWithGoogle')}</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </Animated.View>
 
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or continue with</Text>
-            <View style={styles.dividerLine} />
-          </View>
+            {/* Footer */}
+            <Animated.View 
+              style={[
+                styles.footer,
+                { opacity: fadeAnim }
+              ]}
+            >
+              <Text className='text-[15px] text-gray-500 font-medium'>{t('auth.dontHaveAccount')}</Text>
+              <Link href="/(auth)/register" asChild>
+                <TouchableOpacity disabled={isAnyLoading}>
+                  <Text className='text-[15px] text-green-600 font-extrabold'>{t('auth.signUpLink')}</Text>
+                </TouchableOpacity>
+              </Link>
+            </Animated.View>
 
-          <TouchableOpacity
-            style={[styles.googleButton, isLoading && styles.googleButtonDisabled]}
-            onPress={handleGoogleLogin}
-            disabled={isLoading}
-          >
-            <Chrome size={20} color="#4285f4" />
-            <Text style={styles.googleButtonText}>Continue with Google</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Don't have an account? </Text>
-          <Link href="/(auth)/register" asChild>
-            <TouchableOpacity disabled={isLoading}>
-              <Text style={styles.footerLink}>Sign Up</Text>
-            </TouchableOpacity>
-          </Link>
-        </View>
-      </ScrollView>
+            {/* Trust Indicators */}
+            <Animated.View 
+              style={[
+                styles.trustIndicators,
+                { opacity: fadeAnim }
+              ]}
+            >
+              <View className='flex-row items-center gap-1 flex-1 justify-center'>
+                <Shield size={18} color="#10b981" />
+                <Text className='text-[11px] text-green-800 font-bold flex-shrink'>{t('auth.secure')}</Text>
+              </View>
+              <View className='w-px h-4 bg-green-200' />
+              <View className='flex-row items-center gap-1 flex-1 justify-center'>
+                <Zap size={18} color="#f59e0b" />
+                <Text className='text-[11px] text-green-800 font-bold flex-shrink'>{t('auth.fastPayout')}</Text>
+              </View>
+              <View className='w-px h-4 bg-green-200' />
+              <View className='flex-row items-center gap-1 flex-1 justify-center'>
+                <Sparkles size={18} color="#8b5cf6" />
+                <Text className='text-[11px] text-green-800 font-bold flex-shrink'>{t('auth.bestRates')}</Text>
+              </View>
+            </Animated.View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
       <Toast />
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
+  },
+  backgroundWrapper: {
+    flex: 1,
+  },
+  greenHeader: {
+    position: 'absolute',
+    width: '100%',
+    height: height * 0.36,
+    top: 0,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    overflow: 'hidden',
+  },
+  texturePattern: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    opacity: 0.15,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    zIndex:0
+  },
+  textureDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: '#ffffff',
+    margin: 12,
+  },
+  bgCircle1: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    top: -100,
+    right: -80,
+    zIndex: 1,
+  },
+  bgCircle2: {
+    position: 'absolute',
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    bottom: -60,
+    left: -60,
+    zIndex: 1,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  googleIcon: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain',
   },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 40,
+    paddingTop: height * 0.36 + 20,
+    paddingBottom: 30,
+    justifyContent: 'space-between',
   },
-  header: {
+  headerInGreen: {
+    position: 'absolute',
+    top: 70,
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    marginBottom: 40,
+    paddingHorizontal: 20,
+    zIndex: 10,
+    elevation: 10,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+    width: '100%',
+    zIndex: 11,
+    elevation: 11
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 24,
+    gap: 7,
+    marginTop: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
+  },
+  badgeText: {
+    fontSize: 12,
+    color: '#ffffff',
+    fontWeight: '700',
+    letterSpacing: 0.6,
   },
   welcomeText: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#111827',
-    fontFamily: 'Inter-SemiBold',
-    marginBottom: 8,
-    marginTop: 24,
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#ffffff',
+    marginBottom: 5,
+    marginTop: 0,
+    textAlign: 'center',
+    letterSpacing: -0.6,
   },
   subtitleText: {
-    fontSize: 16,
-    color: '#6b7280',
-    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#ffffff',
     textAlign: 'center',
-    lineHeight: 24,
-    maxWidth: 300,
+    lineHeight: 20,
+    maxWidth: 290,
+    fontWeight: '500',
+    opacity: 0.95,
   },
   formContainer: {
-    flex: 1,
-    marginBottom: 32,
+    marginBottom: 20,
   },
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: 14,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: '#f9fafb',
     borderRadius: 16,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#e5e7eb',
     paddingHorizontal: 16,
-    height: 56,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    paddingVertical: 4,
+    height: 58,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
-  inputIcon: {
+  iconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#dcfce7',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
   },
   input: {
     flex: 1,
-    fontSize: 16,
-    color: '#111827',
-    fontFamily: 'Inter-Regular',
+    fontSize: 15,
+    color: '#1f2937',
+    fontWeight: '500',
   },
   inputError: {
     borderColor: '#ef4444',
+    borderWidth: 2,
   },
   eyeIcon: {
-    padding: 4,
+    padding: 8,
   },
-  errorText: {
-    fontSize: 12,
-    color: '#ef4444',
-    fontFamily: 'Inter-Regular',
+  errorContainer: {
     marginTop: 6,
     marginLeft: 4,
   },
+  errorText: {
+    fontSize: 13,
+    color: '#dc2626',
+    fontWeight: '600',
+  },
   forgotPassword: {
     alignSelf: 'flex-end',
-    marginBottom: 32,
+    marginBottom: 20,
   },
   forgotPasswordText: {
     fontSize: 14,
     color: '#16a34a',
-    fontFamily: 'Inter-Medium',
+    fontWeight: '700',
   },
   loginButton: {
-    backgroundColor: '#16a34a',
     borderRadius: 16,
     height: 56,
+    overflow: 'hidden',
+    marginBottom: 18,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#16a34a',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+  },
+  loginButtonGradient: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    shadowColor: '#16a34a',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-    marginBottom: 24,
+    gap: 10,
   },
   loginButtonDisabled: {
-    opacity: 0.7,
+    opacity: 0.6,
   },
   loginButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white',
-    fontFamily: 'Inter-SemiBold',
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: 0.3,
   },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   dividerLine: {
     flex: 1,
@@ -299,49 +656,86 @@ const styles = StyleSheet.create({
     backgroundColor: '#e5e7eb',
   },
   dividerText: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontFamily: 'Inter-Regular',
-    paddingHorizontal: 16,
+    fontSize: 13,
+    color: '#9ca3af',
+    fontWeight: '600',
+    paddingHorizontal: 14,
   },
   googleButton: {
-    backgroundColor: 'white',
+    backgroundColor: '#ffffff',
     borderRadius: 16,
     height: 56,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    marginBottom: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   googleButtonDisabled: {
-    opacity: 0.7,
+    opacity: 0.6,
   },
   googleButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#374151',
-    fontFamily: 'Inter-Medium',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1f2937',
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 12,
   },
   footerText: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#6b7280',
-    fontFamily: 'Inter-Regular',
+    fontWeight: '500',
   },
   footerLink: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#16a34a',
-    fontFamily: 'Inter-SemiBold',
+    fontWeight: '800',
+  },
+  trustIndicators: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    backgroundColor: '#f0fdf4',
+    borderRadius: 14,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  trustItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  trustText: {
+    fontSize: 11,
+    color: '#166534',
+    fontWeight: '700',
+    flexShrink: 1,
+  },
+  trustDivider: {
+    width: 1,
+    height: 16,
+    backgroundColor: '#bbf7d0',
   },
 });

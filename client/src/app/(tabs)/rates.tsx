@@ -8,6 +8,8 @@ import {
   StatusBar,
   Image,
   ActivityIndicator,
+  Dimensions,
+  RefreshControl,
 } from 'react-native';
 import {
   TrendingUp,
@@ -19,35 +21,27 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
 import { AuthService, CategorySummary, ProductSummary } from '../../api/apiService';
 
+const { width } = Dimensions.get('window');
+
 const getImageForProduct = (productName: string) => {
   const name = productName.toLowerCase();
-  
-  // Paper products
   if (name.includes('newspaper')) return require('../../../assets/images/Scrap_Rates_Photos/Newspaper.jpg');
   if (name.includes('cardboard') || name.includes('corrugated')) return require('../../../assets/images/Scrap_Rates_Photos/Cardboard.jpg');
   if (name.includes('book') || name.includes('paper')) return require('../../../assets/images/Scrap_Rates_Photos/Book.jpg');
-
-  // Plastic products
-
   if (name.includes('plastic')) return require('../../../assets/images/Scrap_Rates_Photos/Plastics.jpg');
-
-  // Metal products
   if (name.includes('iron') || name.includes('steel')) return require('../../../assets/images/Scrap_Rates_Photos/Iron.jpg');
   if (name.includes('aluminum') || name.includes('aluminium')) return require('../../../assets/images/Scrap_Rates_Photos/Aluminium.jpg');
   if (name.includes('copper')) return require('../../../assets/images/Scrap_Rates_Photos/Copper.jpg');
   if (name.includes('brass')) return require('../../../assets/images/Scrap_Rates_Photos/Brass.jpg');
-  if (name.includes('brass')) return require('../../../assets/images/Scrap_Rates_Photos/Tin.jpg');
-
-  // Electronics
+  if (name.includes('tin')) return require('../../../assets/images/Scrap_Rates_Photos/Tin.jpg');
   if (name.includes('refrigerator')) return require('../../../assets/images/Scrap_Rates_Photos/fridge.jpg');
   if (name.includes('battery')) return require('../../../assets/images/Scrap_Rates_Photos/Battery.jpg');
-  if(name.includes('front load machine')) return require('../../../assets/images/Scrap_Rates_Photos/FrontLoadMachine.jpg');
+  if (name.includes('front load machine')) return require('../../../assets/images/Scrap_Rates_Photos/FrontLoadMachine.jpg');
   if (name.includes('tv') || name.includes('television')) return require('../../../assets/images/Scrap_Rates_Photos/TV.jpg');
   if (name.includes('laptops')) return require('../../../assets/images/Scrap_Rates_Photos/Laptops.jpg');
   if (name.includes('windowac')) return require('../../../assets/images/Scrap_Rates_Photos/WindowAC.jpg');
   if (name.includes('printer')) return require('../../../assets/images/Scrap_Rates_Photos/Printer.jpg');
   if (name.includes('microwave')) return require('../../../assets/images/Scrap_Rates_Photos/Microwave.jpg');
-  // Glass products 
   if (name.includes('glass')) return require('../../../assets/images/Scrap_Rates_Photos/glass.jpg');
 
   return null;
@@ -55,26 +49,28 @@ const getImageForProduct = (productName: string) => {
 
 const getCategoryIcon = (categoryName: string) => {
   const name = categoryName.toLowerCase();
-  if (name.includes('paper') || name.includes('cardboard')) return require('../../../assets/images/icons/box.png');
-  if (name.includes('plastic')) return require('../../../assets/images/icons/bottle-plastic.png');
-  if (name.includes('metal') || name.includes('iron') || name.includes('steel')) return require('../../../assets/images/icons/steel.png');
-  if (name.includes('electronic') || name.includes('e-waste')) return require('../../../assets/images/icons/laptop.png');
-  if (name.includes('glass')) return require('../../../assets/images/icons/glass.png');
+  if (name.includes('paper') || name.includes('cardboard')) return '📄';
+  if (name.includes('plastic')) return '🧴';
+  if (name.includes('metal') || name.includes('iron') || name.includes('steel')) return '🔧';
+  if (name.includes('electronic') || name.includes('e-waste')) return '📱';
+  if (name.includes('glass')) return '🍾';
   return '♻️';
 };
 
-export default function RatesScreen() {
+
+export default function RatesScreen(){
   const router = useRouter();
   const [categories, setCategories] = useState<CategorySummary[]>([]);
   const [products, setProducts] = useState<ProductSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  useEffect(()=>{
     loadData();
-  }, []);
+  },[])
 
-  const loadData = async () => {
+    const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -85,62 +81,54 @@ export default function RatesScreen() {
       setCategories(cats);
       setProducts(prods);
     } catch (e: any) {
-      setError(e.message || 'Failed to load rates');
+      const errorMsg = e.message || 'Failed to load rates';
+      setError(errorMsg);
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: e.message || 'Failed to load rates',
+        text2: errorMsg,
       });
     } finally {
       setLoading(false);
     }
   };
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
+
+  const getCategoryColor = (name: string) => {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes('paper')) return '#16a34a';
+    if (lowerName.includes('plastic')) return '#16a34a';
+    if (lowerName.includes('metal')) return '#16a34a';
+    if (lowerName.includes('electronic')) return '#16a34a';
+    if (lowerName.includes('glass')) return '#16a34a';
+    return '#16a34a';
+  };
+
   const renderCategorySection = (category: CategorySummary) => {
     const categoryProducts = products.filter((p) => p.category === category.id);
-    
     if (categoryProducts.length === 0) return null;
-
-    // Get category color based on name
-    const getCategoryColor = (name: string) => {
-      const lowerName = name.toLowerCase();
-      if (lowerName.includes('paper')) return '#10b981';
-      if (lowerName.includes('plastic')) return '#3b82f6';
-      if (lowerName.includes('metal')) return '#f59e0b';
-      if (lowerName.includes('electronic')) return '#8b5cf6';
-      if (lowerName.includes('glass')) return '#06b6d4';
-      return '#6b7280';
-    };
-
-    const getCategoryBgColor = (name: string) => {
-      const lowerName = name.toLowerCase();
-      if (lowerName.includes('paper')) return '#d1fae5';
-      if (lowerName.includes('plastic')) return '#dbeafe';
-      if (lowerName.includes('metal')) return '#fef3c7';
-      if (lowerName.includes('electronic')) return '#ede9fe';
-      if (lowerName.includes('glass')) return '#cffafe';
-      return '#f3f4f6';
-    };
-
-    const categoryColor = getCategoryColor(category.name);
-    const categoryBgColor = getCategoryBgColor(category.name);
     const categoryIcon = getCategoryIcon(category.name);
 
-    return (
+    return(
       <View key={category.id} style={styles.categorySection}>
-        <View style={[styles.categoryHeader, { backgroundColor: categoryBgColor }]}>
-          <Text style={styles.categoryIcon}>{categoryIcon}</Text>
-          <Text style={[styles.categoryTitle, { color: categoryColor }]}>
-            {category.name}
-          </Text>
-        </View>
+        <LinearGradient
+          colors={['#16a34a', '#15803d']}
+          style={styles.categoryHeader}
+        >
+          <Text style={styles.categoryTitle}>{category.name}</Text>
+        </LinearGradient>
 
         <View style={styles.itemsGrid}>
           {categoryProducts.map((item) => {
             const productImage = getImageForProduct(item.name);
             return (
               <View key={item.id} style={styles.rateItem}>
-                <View style={[styles.itemIcon, !productImage && { backgroundColor: categoryColor }]}>
+                <View style={styles.itemIcon}>
                   {productImage ? (
                     <Image source={productImage} style={styles.itemImage} />
                   ) : (
@@ -148,7 +136,7 @@ export default function RatesScreen() {
                   )}
                 </View>
                 <Text style={styles.itemName}>{item.name}</Text>
-                <Text style={[styles.itemRate, { color: categoryColor }]}>
+                <Text style={styles.itemRate}>
                   ₹{item.min_rate}-{item.max_rate}
                 </Text>
                 <Text style={styles.itemUnit}>Per {item.unit}</Text>
@@ -160,19 +148,55 @@ export default function RatesScreen() {
           })}
         </View>
       </View>
-    );
-  };
-
-  if (loading) {
+    )
+  }
+if (loading && categories.length === 0) {
     return (
-      <View style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color="#16a34a" />
-        <Text style={styles.loadingText}>Loading rates...</Text>
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" />
+        <LinearGradient colors={['#16a34a', '#15803d']} style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <ArrowLeft size={24} color="white" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Scrap Rates</Text>
+          <View style={styles.headerRight}>
+            <TrendingUp size={24} color="white" />
+          </View>
+        </LinearGradient>
+        <View style={[styles.content, styles.centerContent]}>
+          <ActivityIndicator size="large" color="#16a34a" />
+          <Text style={styles.loadingText}>Loading rates...</Text>
+        </View>
       </View>
     );
   }
 
-  return (
+if (error && categories.length === 0) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" />
+        <LinearGradient colors={['#16a34a', '#15803d']} style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <ArrowLeft size={24} color="white" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Scrap Rates</Text>
+          <View style={styles.headerRight}>
+            <TrendingUp size={24} color="white" />
+          </View>
+        </LinearGradient>
+        <View style={[styles.content, styles.centerContent]}>
+          <AlertCircle size={64} color="#dc2626" />
+          <Text style={styles.errorTitle}>Failed to Load Rates</Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={loadData}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  return(
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       
@@ -187,7 +211,13 @@ export default function RatesScreen() {
         </View>
       </LinearGradient>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#16a34a']} />
+        }
+      >
         {/* Disclaimer */}
         <View style={styles.disclaimerCard}>
           <View style={styles.disclaimerHeader}>
@@ -239,17 +269,7 @@ export default function RatesScreen() {
                   {products.length} products available
                 </Text>
               </View>
-              <View style={styles.trendItem}>
-                <View style={[styles.trendIndicator, { backgroundColor: '#f59e0b' }]} />
-                <Text style={styles.trendText}>
-                  Average rate: ₹
-                  {Math.round(
-                    products.reduce((sum, p) => sum + (p.max_rate + p.min_rate) / 2, 0) /
-                      products.length
-                  )}
-                  /kg
-                </Text>
-              </View>
+              
               <View style={styles.trendItem}>
                 <View style={[styles.trendIndicator, { backgroundColor: '#3b82f6' }]} />
                 <Text style={styles.trendText}>
@@ -268,7 +288,7 @@ export default function RatesScreen() {
           </Text>
           <TouchableOpacity
             style={styles.contactButton}
-            onPress={() => router.push('/(tabs)/sell')}
+            onPress={() => router.push('/(tabs)/sell' as any)}
           >
             <Text style={styles.contactButtonText}>Schedule Pickup</Text>
           </TouchableOpacity>
@@ -276,8 +296,9 @@ export default function RatesScreen() {
       </ScrollView>
       <Toast />
     </View>
-  );
+  )
 }
+
 
 const styles = StyleSheet.create({
   container: {
@@ -293,6 +314,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6b7280',
     fontFamily: 'Inter-Regular',
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 24,
+    paddingHorizontal: 24,
+  },
+  retryButton: {
+    backgroundColor: '#16a34a',
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
   },
   header: {
     paddingTop: 60,
@@ -387,29 +433,25 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  categoryIcon: {
-    fontSize: 24,
   },
   categoryTitle: {
     fontSize: 18,
     fontWeight: '600',
     fontFamily: 'Inter-SemiBold',
+    color: 'white',
   },
   itemsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'space-between',
     gap: 12,
   },
   rateItem: {
     backgroundColor: 'white',
     borderRadius: 16,
     padding: 16,
-    width: '48%',
+    width: (width - 52) / 2,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -447,6 +489,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: 'Inter-SemiBold',
     marginBottom: 2,
+    color: '#16a34a',
   },
   itemUnit: {
     fontSize: 11,
@@ -549,3 +592,4 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
   },
 });
+

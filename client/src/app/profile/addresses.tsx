@@ -1,27 +1,66 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
-  ScrollView,
   TouchableOpacity,
-  Alert,
-  ActivityIndicator,
+  ScrollView,
   Modal,
+  Alert,
   TextInput,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  // Removed unused StyleSheet import
 } from 'react-native';
-import { ArrowLeft, MapPin, Plus, Edit, Trash2, Home, Building, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { AuthService, AddressSummary, CreateAddressRequest, UpdateAddressRequest } from 
-'../../api/apiService';
-import { set } from 'zod';
-import { addressSchema } from '@/src/zod';
+import Toast from 'react-native-toast-message';
+import {
+  ArrowLeft,
+  Plus,
+  Home,
+  Building,
+  MapPin,
+  Edit,
+  Trash2,
+  X,
+  Navigation,
+} from 'lucide-react-native'; // Assuming lucide-react-native
+import clsx from 'clsx'; // For conditional class names
 
+// --- Contexts and Services ---
+import { useLocation, SavedLocation } from '../../context/LocationContext';
+import { AuthService } from '../../api/apiService'; // Assumed path
 
-type AddressFormData ={
-      name: string;
+// --- Placeholder Types (add your actual types) ---
+type AddressSummary = {
+  id: number;
+  name: string;
+  phone_number: string;
+  room_number: string;
+  street: string;
+  area: string;
+  city: string;
+  state: string;
+  country: string;
+  pincode: number;
+  delivery_suggestion?: string;
+};
+
+type CreateAddressRequest = {
+  name: string;
+  phone_number: string;
+  room_number: string;
+  street: string;
+  area: string;
+  city: string;
+  state: string;
+  country: string;
+  pincode: number;
+  delivery_suggestion?: string;
+};
+
+type AddressFormData = {
+  name: string;
   phone_number: string;
   room_number: string;
   street: string;
@@ -31,10 +70,10 @@ type AddressFormData ={
   country: string;
   pincode: string;
   delivery_suggestion: string;
-}
+};
 
 const emptyFormData: AddressFormData = {
-      name: '',
+  name: '',
   phone_number: '',
   room_number: '',
   street: '',
@@ -44,170 +83,352 @@ const emptyFormData: AddressFormData = {
   country: 'India',
   pincode: '',
   delivery_suggestion: '',
-}
+};
 
-export default function AddressesScreen(){
-    const router = useRouter();
-    const [addresses, setAddresses] = useState<AddressSummary[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [deletingId, setDeletingId] = useState<number | null>(null);
-    const [open, setOpen] = useState(false);
-    const [editMode, setEditMode] = useState(false);
-    const [editingId, setEditingId] = useState<number | null>(null);
-    const [formData, setFormData] = useState<AddressFormData>(emptyFormData);
-    const [saving, setSaving]= useState(false);
+export default function AddressesScreen() {
+  const router = useRouter();
+  const [addresses, setAddresses] = useState<AddressSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const { saveLocation, removeLocation, getCurrentLocation, currentLocation, isLoading: locationLoading } = useLocation();
 
-    useEffect(()=>{
-      loadAddresses();
-    },[])
-    const loadAddresses = async () =>{
-        try {
-            setLoading(true);
-            setError(null);
-            const addressdata = await AuthService.getAddresses();
-            setAddresses(addressdata);
-        } catch (error) {
-            setError('Failed to load addresses. Please try again.');
-            console.error('Error fetching addresses:', error);
-        }finally{
-            setLoading(false);
-        }
-    }
-    const handleDeleteAddress = (id: number) =>{
-        Alert.alert(
-            'Delete Address',
-            'Are you sure you want to delete this address?',
-            [
-                {
-                    text: 'Cancel',
-                    style: 'cancel',
-                },
-                {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: async () => {
-                    try {
-                        setDeletingId(id);
-                        await AuthService.deleteAddress(id);
-                        setAddresses((prev) => prev.filter((addr) => addr.id !== id));
-                        Alert.alert('Success', 'Address deleted successfully.');
-                    } catch (error) {
-                        Alert.alert('Error', 'Failed to delete address. Please try again.');
-                        console.error('Error deleting address:', error);
-                    }finally{
-                        setDeletingId(null);
-                    }
-                }
-                },
-                
-            ]
-        )
-    }
-  
-    const EditAddress = (id: number) =>{
-        const address = addresses.find((addr) => addr.id === id);
-        if (address) {
-            setFormData({
-                name: address.name,
-                phone_number: address.phone_number,
-                room_number: address.room_number,
-                street: address.street,
-                area: address.area,
-                city: address.city,
-                state: address.state,
-                country: address.country,
-                pincode: address.pincode,
-                delivery_suggestion: address.delivery_suggestion,
-            });
-            setEditingId(id);
-            setOpen(true);
-        }
-    }
+  const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [formData, setFormData] = useState<AddressFormData>(emptyFormData);
+  const [saving, setSaving] = useState(false);
+  const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
+  const [addressType, setAddressType] = useState<'home' | 'office' | 'other'>('other');
 
-    const handleClose = () =>{
-        setOpen(false);
-        // setEditMode(false);
-        setEditingId(null);
-        setFormData(emptyFormData);
-    }
+  // --- Input Refs ---
+  const phoneInputRef = useRef<TextInput>(null);
+  const roomInputRef = useRef<TextInput>(null);
+  const streetInputRef = useRef<TextInput>(null);
+  const areaInputRef = useRef<TextInput>(null);
+  const cityInputRef = useRef<TextInput>(null);
+  const stateInputRef = useRef<TextInput>(null);
+  const pincodeInputRef = useRef<TextInput>(null);
+  const deliveryInputRef = useRef<TextInput>(null); // Added for last field
 
-    const validatedForm = addressSchema.safeParse(formData);
-    const handleSave = async () =>{
-        if (!validatedForm.success) {
-            const firstError = validatedForm.error.errors[0];
-            Alert.alert('Validation Error', firstError.message);
-            return;
-        }
-        try {
-            setSaving(true);
-            const rawPayload = {
-              ...validatedForm.data,
-              pincode: parseInt(validatedForm.data.pincode, 10),
+  useEffect(() => {
+    loadAddresses();
+  }, []);
+
+  const loadAddresses = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const addressdata = await AuthService.getAddresses();
+      setAddresses(addressdata);
+    } catch (error) {
+      setError('Failed to load addresses. Please try again.');
+      console.error('Error fetching addresses:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteAddress = (id: number) => {
+    Alert.alert(
+      'Delete Address',
+      'Are you sure you want to delete this address?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setDeletingId(id);
+              await AuthService.deleteAddress(id);
+              
+              setAddresses((prev) => prev.filter((addr) => addr.id !== id));
+              // Also remove from context
+              removeLocation(id.toString());
+              
+              Toast.show({
+                type: 'success',
+                text1: 'Success',
+                text2: 'Address deleted successfully.',
+              });
+            } catch (error: any) {
+              console.error('Error deleting address:', error);
+              
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: error.message || 'Failed to delete address. Please try again.',
+              });
+            } finally {
+              setDeletingId(null);
             }
-            const payload: CreateAddressRequest = {
-                name: rawPayload.title,
-                phone_number: rawPayload.phone_number,
-                room_number: rawPayload.room_number,
-                street: rawPayload.addressLine,
-                area: rawPayload.area,
-                city: rawPayload.city,
-                state: rawPayload.state,
-                country: rawPayload.country,
-                pincode: rawPayload.pincode,
-                delivery_suggestion: rawPayload.delivery_suggestion,
+          },
+        },
+      ]
+    );
+  };
 
-            }
-            if (editingId !== null) {
-                const updated = await AuthService.updateAddress(editingId, payload);
-                setAddresses(addresses.map(addr =>
-                    addr.id === updated.id ? updated : addr
-                ));
-                Alert.alert('Success', 'Address updated successfully.');
-            }else{
-                const newAddress = await AuthService.createAddress(payload);
-                setAddresses([newAddress, ...addresses]);
-                Alert.alert('Success', 'Address added successfully.');
-            }
-            setOpen(false);
-            setEditingId(null);
-        } catch (e) {
-            console.error('Error saving address:', e || 'API call returned nothing.');
-             Alert.alert('Error', (e as any)?.message || 'Failed to save address. Please check connection/inputs.');
-        }finally{
-            setSaving(false);
-        }
+  const handleOpenEditModal = (address: AddressSummary) => {
+    if (!address) return;
+    
+    setEditingId(address.id);
+    setFormData({
+      name: address.name,
+      phone_number: address.phone_number,
+      room_number: address.room_number,
+      street: address.street,
+      area: address.area,
+      city: address.city,
+      state: address.state,
+      country: address.country,
+      pincode: address.pincode.toString(),
+      delivery_suggestion: address.delivery_suggestion || '',
+    });
+
+    const lowerName = address.name.toLowerCase();
+    if (lowerName.includes('home') || lowerName.includes('house')) {
+      setAddressType('home');
+    } else if (lowerName.includes('office') || lowerName.includes('work')) {
+      setAddressType('office');
+    } else {
+      setAddressType('other');
+    }
+    
+    setFormErrors({});
+    setOpen(true); // Open the modal
+  };
+
+  const handleOpenAddModal = () => {
+    setEditingId(null);
+    setFormData(emptyFormData);
+    setFormErrors({});
+    setAddressType('other');
+    setOpen(true);
+  };
+
+  const validateForm = () => {
+    const errors: { [key: string]: string } = {};
+
+    // Name validation (max 50 chars)
+    if (!formData.name || !formData.name.trim()) {
+      errors.name = 'Address name is required';
+    } else if (formData.name.length > 50) {
+      errors.name = 'Name must be 50 characters or less';
     }
 
-    const handleAddress = () =>{
-      setEditingId(null);
-      setFormData(emptyFormData);
-      setOpen(true);
+    // Phone number validation (max 13 chars, Indian format)
+    if (!formData.phone_number || !formData.phone_number.trim()) {
+      errors.phone_number = 'Phone number is required';
+    } else {
+      const cleanPhone = formData.phone_number.replace(/[\s\-()]/g, '');
+      if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+        errors.phone_number = 'Enter a valid 10-digit Indian mobile number';
+      } else if (formData.phone_number.length > 13) {
+        errors.phone_number = 'Phone number must be 13 characters or less';
+      }
     }
 
-    const getAddressIcon = (name: string) =>{
-        const lowerName = name.toLowerCase();
-        if (lowerName.includes('home') || lowerName.includes('house')) {
-        return <Home size={20} color="#16a34a" />;
-        }
-        if (lowerName.includes('office') || lowerName.includes('work')) {
+    // Room number validation (max 50 chars)
+    if (!formData.room_number || !formData.room_number.trim()) {
+      errors.room_number = 'House/Flat number is required';
+    } else if (formData.room_number.length > 50) {
+      errors.room_number = 'Room number must be 50 characters or less';
+    }
+
+    // Street validation (max 50 chars)
+    if (!formData.street || !formData.street.trim()) {
+      errors.street = 'Street is required';
+    } else if (formData.street.length > 50) {
+      errors.street = 'Street must be 50 characters or less';
+    }
+
+    // Area validation (max 50 chars)
+    if (!formData.area || !formData.area.trim()) {
+      errors.area = 'Area/Locality is required';
+    } else if (formData.area.length > 50) {
+      errors.area = 'Area must be 50 characters or less';
+    }
+
+    // City validation (max 50 chars)
+    if (!formData.city || !formData.city.trim()) {
+      errors.city = 'City is required';
+    } else if (formData.city.length > 50) {
+      errors.city = 'City must be 50 characters or less';
+    }
+
+    // State validation (max 50 chars)
+    if (!formData.state || !formData.state.trim()) {
+      errors.state = 'State is required';
+    } else if (formData.state.length > 50) {
+      errors.state = 'State must be 50 characters or less';
+    }
+
+    // Country validation (max 50 chars)
+    if (!formData.country || !formData.country.trim()) {
+      errors.country = 'Country is required';
+    } else if (formData.country.length > 50) {
+      errors.country = 'Country must be 50 characters or less';
+    }
+
+    // Pincode validation (must be a valid integer, 6 digits for India)
+    if (!formData.pincode || !formData.pincode.trim()) {
+      errors.pincode = 'Pincode is required';
+    } else {
+      const pincodeNum = parseInt(formData.pincode, 10);
+      if (isNaN(pincodeNum)) {
+        errors.pincode = 'Pincode must be a number';
+      } else if (formData.pincode.length !== 6) {
+        errors.pincode = 'Pincode must be 6 digits';
+      } else if (pincodeNum < 100000 || pincodeNum > 999999) {
+        errors.pincode = 'Enter a valid 6-digit pincode';
+      }
+    }
+
+    // Delivery suggestion validation (max 500 chars, optional)
+    if (formData.delivery_suggestion && formData.delivery_suggestion.length > 500) {
+      errors.delivery_suggestion = 'Delivery instructions must be 500 characters or less';
+    }
+
+    // If there are errors, show toast with first error
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      const firstError = Object.values(errors)[0];
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: firstError,
+      });
+      return false;
+    }
+
+    setFormErrors({});
+    return true;
+  };
+
+  const handleClose = () => {
+    setOpen(false);
+    setEditingId(null);
+    setFormData(emptyFormData);
+    setFormErrors({}); // Clear errors on close
+  };
+
+  const handleSave = async () => {
+    if (!validateForm()) {
+      return; // Toast is already shown in validateForm
+    }
+
+    try {
+      setSaving(true);
+      const payload: CreateAddressRequest = {
+        name: formData.name,
+        phone_number: formData.phone_number,
+        room_number: formData.room_number,
+        street: formData.street,
+        area: formData.area,
+        city: formData.city,
+        state: formData.state,
+        country: formData.country,
+        pincode: parseInt(formData.pincode, 10),
+        delivery_suggestion: formData.delivery_suggestion || '',
+      };
+
+      if (editingId !== null) {
+        const updated = await AuthService.updateAddress(editingId, payload);
+        setAddresses(addresses.map((addr) => (addr.id === updated.id ? updated : addr)));
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Address updated successfully',
+        });
+      } else {
+        const newAddress = await AuthService.createAddress(payload);
+        setAddresses([newAddress, ...addresses]);
+
+        // Also save to Location Context for quick access
+        const savedLoc: SavedLocation = {
+          id: newAddress.id.toString(),
+          type: addressType,
+          label: newAddress.name,
+          latitude: 0, // Note: You'll need to geocode this address if you need lat/lng
+          longitude: 0,
+          address: `${newAddress.room_number}, ${newAddress.street}`,
+          city: newAddress.city,
+          state: newAddress.state,
+          pincode: newAddress.pincode.toString(),
+          area: newAddress.area,
+        };
+        saveLocation(savedLoc);
+
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Address added successfully',
+        });
+      }
+      handleClose();
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.message || 'Failed to save address',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUseCurrentLocation = async () => {
+    try {
+      await getCurrentLocation();
+      if (currentLocation) {
+        setFormData({
+          ...formData,
+          area: currentLocation.area || '',
+          city: currentLocation.city || '',
+          state: currentLocation.state || '',
+          pincode: currentLocation.pincode || '',
+          street: currentLocation.street || '',
+          room_number: formData.room_number || '', // Keep existing fields
+          name: formData.name || '',
+          phone_number: formData.phone_number || '',
+        });
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Location details filled',
+        });
+      }
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to get current location',
+      });
+    }
+  };
+
+  const getAddressIcon = (name: string) => {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes('home') || lowerName.includes('house')) {
+      return <Home size={20} color="#16a34a" />;
+    }
+    if (lowerName.includes('office') || lowerName.includes('work')) {
       return <Building size={20} color="#3b82f6" />;
-        }
-        return <MapPin size={20} color="#6b7280" />;
     }
+    return <MapPin size={20} color="#6b7280" />;
+  };
 
-    const formatAddress = (addr: AddressSummary) =>{
-        const parts = [
-            addr.room_number,
-            addr.street,
-            addr.area,
-            addr.city,
-            addr.pincode
-        ].filter(Boolean);
-        return parts.join(', ');
-    }
+  const formatAddress = (addr: AddressSummary) => {
+    const parts = [addr.room_number, addr.street, addr.area, addr.city, addr.pincode].filter(
+      Boolean
+    );
+    return parts.join(', ');
+  };
 
-    const getDefaultAddress = (): number | null => {
+  const getDefaultAddress = (): number | null => {
     return addresses.length > 0 ? addresses[0].id : null;
   };
 
@@ -215,84 +436,89 @@ export default function AddressesScreen(){
     return getDefaultAddress() === id;
   };
 
+  // --- LOADING STATE ---
   if (loading) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+      <View className='flex-1 bg-slate-50'>
+        <View className='bg-white pt-[60px] px-5 pb-5 flex-row items-center justify-between shadow-lg shadow-black/10'>
+          <TouchableOpacity className='w-10 h-10 rounded-full bg-gray-100 justify-center items-center' onPress={() => router.back()}>
             <ArrowLeft size={24} color="#111827" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Addresses</Text>
-          <View style={styles.addButton} />
+          <Text className='text-xl font-semibold text-gray-900 font-inter-semibold'>Addresses</Text>
+          <View className='w-10 h-10' />
         </View>
-        <View style={styles.loadingContainer}>
+        <View className='flex-1 justify-center items-center'>
           <ActivityIndicator size="large" color="#16a34a" />
-          <Text style={styles.loadingText}>Loading addresses...</Text>
+          <Text className='mt-3 text-base text-gray-500 font-inter-regular'>Loading addresses...</Text>
         </View>
       </View>
     );
   }
+
+  // --- MAIN RENDER ---
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+    <View className='flex-1 bg-slate-50'>
+      <View className='bg-white pt-[60px] px-5 pb-5 flex-row items-center justify-between shadow-lg shadow-black/10'>
+        <TouchableOpacity className='w-10 h-10 rounded-full bg-gray-100 justify-center items-center' onPress={() => router.back()}>
           <ArrowLeft size={24} color="#111827" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Addresses</Text>
-        <TouchableOpacity style={styles.addButton} onPress={handleAddress}>
+        <Text className='text-xl font-semibold text-gray-900 font-inter-semibold'>Addresses</Text>
+        <TouchableOpacity className='w-10 h-10 rounded-full bg-green-50 justify-center items-center' onPress={handleOpenAddModal}>
           <Plus size={20} color="#16a34a" />
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <TouchableOpacity style={styles.addAddressCard} onPress={handleAddress}>
-          <View style={styles.addAddressIcon}>
+      <ScrollView className="flex-1 p-5" showsVerticalScrollIndicator={false}>
+        <TouchableOpacity className='bg-white rounded-2xl p-5 flex-row items-center mb-6 border-2 border-gray-200 border-dashed' onPress={handleOpenAddModal}>
+          <View className='w-12 h-12 rounded-full bg-green-50 justify-center items-center mr-4'>
             <Plus size={24} color="#16a34a" />
           </View>
-          <View style={styles.addAddressContent}>
-            <Text style={styles.addAddressTitle}>Add New Address</Text>
-            <Text style={styles.addAddressSubtitle}>Add a new pickup location</Text>
+          <View className='flex-1'>
+            <Text className='text-base font-semibold text-gray-900 font-inter-semibold mb-1'>Add New Address</Text>
+            <Text className="text-sm text-gray-500 font-inter-regular">Add a new pickup location</Text>
           </View>
         </TouchableOpacity>
 
         {error && (
-          <View style={styles.errorCard}>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={loadAddresses}>
-              <Text style={styles.retryButtonText}>Retry</Text>
+          <View className='bg-red-50 rounded-2xl p-5 flex-row items-center justify-between mb-4'>
+            <Text className='text-red-700 font-semibold flex-1'>{error}</Text>
+            <TouchableOpacity className='bg-red-100 p-2 rounded-lg ml-2' onPress={loadAddresses}>
+              <Text className='text-red-700 font-semibold text-sm'>Retry</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {addresses.length === 0 && !error ? (
-          <View style={styles.emptyState}>
+          <View className='items-center p-10 my-5'>
             <MapPin size={48} color="#d1d5db" />
-            <Text style={styles.emptyStateTitle}>No addresses yet</Text>
-            <Text style={styles.emptyStateText}>Add your first pickup address to get started</Text>
+            <Text className='text-lg font-semibold text-gray-700 mt-4 mb-2'>No addresses yet</Text>
+            <Text className='text-sm text-gray-500 text-center leading-5'>
+              Add your first pickup address to get started
+            </Text>
           </View>
         ) : (
-          <View style={styles.addressesList}>
+          <View className='mb-6'>
             {addresses.map((address) => (
-              <View key={address.id} style={styles.addressCard}>
-                <View style={styles.addressHeader}>
-                  <View style={styles.addressTitleRow}>
+              <View key={address.id} className='bg-white rounded-2xl p-5 mb-4 shadow-md shadow-black/10'>
+                <View className='flex-row justify-between items-start mb-3'>
+                  <View className='flex-row items-center flex-1'>
                     {getAddressIcon(address.name)}
-                    <Text style={styles.addressTitle}>{address.name}</Text>
+                    <Text className='text-base font-semibold text-gray-900 ml-2'>{address.name}</Text>
                     {isDefaultAddress(address.id) && (
-                      <View style={styles.defaultBadge}>
-                        <Text style={styles.defaultBadgeText}>Default</Text>
+                      <View className='bg-green-100 rounded-xl px-2 py-1 ml-3'>
+                        <Text className='text-[10px] font-semibold text-green-600'>Default</Text>
                       </View>
                     )}
                   </View>
-                  <View style={styles.addressActions}>
-                    <TouchableOpacity 
-                      style={styles.actionButton}
-                      onPress={() => EditAddress(address)}
+                  <View className='flex-row gap-2'>
+                    <TouchableOpacity
+                      className='w-8 h-8 rounded-full bg-gray-100 justify-center items-center'
+                      onPress={() => handleOpenEditModal(address)}
                     >
                       <Edit size={16} color="#6b7280" />
                     </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={styles.actionButton}
+                    <TouchableOpacity
+                      className='w-8 h-8 rounded-full bg-gray-100 justify-center items-center'
                       onPress={() => handleDeleteAddress(address.id)}
                       disabled={deletingId === address.id}
                     >
@@ -304,26 +530,26 @@ export default function AddressesScreen(){
                     </TouchableOpacity>
                   </View>
                 </View>
-                
-                <Text style={styles.addressText}>{formatAddress(address)}</Text>
-                
+
+                <Text className='text-sm text-gray-500 leading-5 mb-3'>{formatAddress(address)}</Text>
+
                 {address.phone_number && (
-                  <Text style={styles.addressPhone}>📞 {address.phone_number}</Text>
+                  <Text className='text-sm text-gray-700 font-medium mb-3'>📞 {address.phone_number}</Text>
                 )}
-                
+
                 {address.delivery_suggestion && (
-                  <Text style={styles.addressNote}>Note: {address.delivery_suggestion}</Text>
+                  <Text className='text-sm text-blue-600 italic'>Note: {address.delivery_suggestion}</Text>
                 )}
               </View>
             ))}
           </View>
         )}
 
-        <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>About Addresses</Text>
-          <Text style={styles.infoText}>
+        <View className='bg-green-50 rounded-2xl p-5 border border-green-200'>
+          <Text className='text-base font-semibold text-green-600 mb-2'>About Addresses</Text>
+          <Text className='text-sm text-green-800 leading-5'>
             • You can save multiple pickup addresses for convenience{'\n'}
-            • Set a default address for faster checkout{'\n'}
+            • The first address in the list is your default address{'\n'}
             • Edit or delete addresses anytime{'\n'}
             • All addresses are securely stored
           </Text>
@@ -334,460 +560,345 @@ export default function AddressesScreen(){
       <Modal
         visible={open}
         animationType="slide"
-        transparent={false}
-        onRequestClose={handleClose }
+        transparent={false} // Full screen modal
+        onRequestClose={handleClose}
       >
-        <KeyboardAvoidingView 
-          style={styles.modalContainer}
+        <KeyboardAvoidingView
+          className='flex-1 bg-white'
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={handleClose }>
+          <View className='flex-row justify-between items-center px-5 py-4 border-b border-gray-100 pt-[55px]'>
+            <TouchableOpacity onPress={handleClose} className="p-2">
               <X size={24} color="#111827" />
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>
-              {editMode ? 'Edit Address' : 'Add New Address'}
+            <Text className='text-xl font-bold text-gray-900'>
+              {editingId ? 'Edit Address' : 'Add New Address'}
             </Text>
-            <View style={{ width: 24 }} />
+            <View className="w-10" />
           </View>
 
-          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Address Name *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., Home, Office"
-                value={formData.name}
-                onChangeText={(text) => setFormData({ ...formData, name: text })}
-              />
+          <ScrollView 
+            className='flex-1' 
+            contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 }}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Address Type Selection */}
+            <View className='mb-5'>
+              <Text className='text-sm font-semibold text-gray-700 mb-2.5'>Address Type</Text>
+              <View className='flex-row gap-3'>
+                <TouchableOpacity
+                  className={clsx(
+                    'flex-1 flex-row items-center justify-center p-3 bg-gray-50 rounded-xl border border-gray-200 gap-1.5',
+                    addressType === 'home' && 'bg-green-50 border-green-600'
+                  )}
+                  onPress={() => setAddressType('home')}
+                >
+                  <Home size={18} color={addressType === 'home' ? '#16a34a' : '#6b7280'} />
+                  <Text
+                    className={clsx(
+                      'text-sm text-gray-500 font-medium',
+                      addressType === 'home' && 'text-green-600 font-semibold'
+                    )}
+                  >
+                    Home
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  className={clsx(
+                    'flex-1 flex-row items-center justify-center p-3 bg-gray-50 rounded-xl border border-gray-200 gap-1.5',
+                    addressType === 'office' && 'bg-green-50 border-green-600'
+                  )}
+                  onPress={() => setAddressType('office')}
+                >
+                  <Building size={18} color={addressType === 'office' ? '#16a34a' : '#6b7280'} />
+                  <Text
+                    className={clsx(
+                      'text-sm text-gray-500 font-medium',
+                      addressType === 'office' && 'text-green-600 font-semibold'
+                    )}
+                  >
+                    Office
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  className={clsx(
+                    'flex-1 flex-row items-center justify-center p-3 bg-gray-50 rounded-xl border border-gray-200 gap-1.5',
+                    addressType === 'other' && 'bg-green-50 border-green-600'
+                  )}
+                  onPress={() => setAddressType('other')}
+                >
+                  <MapPin size={18} color={addressType === 'other' ? '#16a34a' : '#6b7280'} />
+                  <Text
+                    className={clsx(
+                      'text-sm text-gray-500 font-medium',
+                      addressType === 'other' && 'text-green-600 font-semibold'
+                    )}
+                  >
+                    Other
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Phone Number *</Text>
+            {/* Use Current Location Button */}
+            <TouchableOpacity
+              className='flex-row items-center justify-center gap-2 p-4 bg-blue-50 border border-blue-200 rounded-xl mb-5'
+              onPress={handleUseCurrentLocation}
+              disabled={locationLoading}
+            >
+              {locationLoading ? (
+                <ActivityIndicator size="small" color="#16a34a" />
+              ) : (
+                <Navigation size={18} color="#16a34a" />
+              )}
+              <Text className='text-green-600 font-semibold'>Use Current Location</Text>
+            </TouchableOpacity>
+
+            {/* Form Fields */}
+            <View className='mb-4'>
+              <Text className='text-sm font-semibold text-gray-700 mb-2.5'>Address Name *</Text>
               <TextInput
-                style={styles.input}
+                className={clsx(
+                  'bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900',
+                  formErrors.name && 'border-red-500 bg-red-50'
+                )}
+                placeholder="e.g., Home, Office"
+                value={formData.name}
+                onChangeText={(text) => {
+                  setFormData({ ...formData, name: text });
+                  if (formErrors.name) {
+                    setFormErrors((prev) => ({ ...prev, name: '' }));
+                  }
+                }}
+                returnKeyType="next"
+                onSubmitEditing={() => phoneInputRef.current?.focus()}
+                blurOnSubmit={false}
+              />
+              {formErrors.name && <Text className='text-xs text-red-500 mt-1 ml-1'>{formErrors.name}</Text>}
+            </View>
+
+            <View className='mb-4'>
+              <Text className='text-sm font-semibold text-gray-700 mb-2.5'>Phone Number *</Text>
+              <TextInput
+                ref={phoneInputRef}
+                className={clsx(
+                  'bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900',
+                  formErrors.phone_number && 'border-red-500 bg-red-50'
+                )}
                 placeholder="Enter phone number"
                 keyboardType="phone-pad"
                 value={formData.phone_number}
-                onChangeText={(text) => setFormData({ ...formData, phone_number: text })}
+                onChangeText={(text) => {
+                  setFormData({ ...formData, phone_number: text });
+                  if (formErrors.phone_number) {
+                    setFormErrors((prev) => ({ ...prev, phone_number: '' }));
+                  }
+                }}
+                returnKeyType="next"
+                onSubmitEditing={() => roomInputRef.current?.focus()}
+                blurOnSubmit={false}
               />
+              {formErrors.phone_number && (
+                <Text className='text-xs text-red-500 mt-1 ml-1'>{formErrors.phone_number}</Text>
+              )}
             </View>
 
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>House/Flat Number *</Text>
+            <View className='mb-4'>
+              <Text className='text-sm font-semibold text-gray-700 mb-2.5'>House/Flat Number *</Text>
               <TextInput
-                style={styles.input}
+                ref={roomInputRef}
+                className={clsx(
+                  'bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900',
+                  formErrors.room_number && 'border-red-500 bg-red-50'
+                )}
                 placeholder="e.g., Flat 101"
                 value={formData.room_number}
-                onChangeText={(text) => setFormData({ ...formData, room_number: text })}
+                onChangeText={(text) => {
+                  setFormData({ ...formData, room_number: text });
+                  if (formErrors.room_number) {
+                    setFormErrors((prev) => ({ ...prev, room_number: '' }));
+                  }
+                }}
+                returnKeyType="next"
+                onSubmitEditing={() => streetInputRef.current?.focus()}
+                blurOnSubmit={false}
               />
+              {formErrors.room_number && (
+                <Text className='text-xs text-red-500 mt-1 ml-1'>{formErrors.room_number}</Text>
+              )}
             </View>
 
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Street *</Text>
+            <View className='mb-4'>
+              <Text className='text-sm font-semibold text-gray-700 mb-2.5'>Street *</Text>
               <TextInput
-                style={styles.input}
+                ref={streetInputRef}
+                className={clsx(
+                  'bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900',
+                  formErrors.street && 'border-red-500 bg-red-50'
+                )}
                 placeholder="Enter street name"
                 value={formData.street}
-                onChangeText={(text) => setFormData({ ...formData, street: text })}
+                onChangeText={(text) => {
+                  setFormData({ ...formData, street: text });
+                  if (formErrors.street) {
+                    setFormErrors((prev) => ({ ...prev, street: '' }));
+                  }
+                }}
+                returnKeyType="next"
+                onSubmitEditing={() => areaInputRef.current?.focus()}
+                blurOnSubmit={false}
               />
+              {formErrors.street && <Text className='text-xs text-red-500 mt-1 ml-1'>{formErrors.street}</Text>}
             </View>
 
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Area/Locality *</Text>
+            <View className='mb-4'>
+              <Text className='text-sm font-semibold text-gray-700 mb-2.5'>Area/Locality *</Text>
               <TextInput
-                style={styles.input}
+                ref={areaInputRef}
+                className={clsx(
+                  'bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900',
+                  formErrors.area && 'border-red-500 bg-red-50'
+                )}
                 placeholder="Enter area"
                 value={formData.area}
-                onChangeText={(text) => setFormData({ ...formData, area: text })}
+                onChangeText={(text) => {
+                  setFormData({ ...formData, area: text });
+                  if (formErrors.area) {
+                    setFormErrors((prev) => ({ ...prev, area: '' }));
+                  }
+                }}
+                returnKeyType="next"
+                onSubmitEditing={() => cityInputRef.current?.focus()}
+                blurOnSubmit={false}
               />
+              {formErrors.area && <Text className='text-xs text-red-500 mt-1 ml-1'>{formErrors.area}</Text>}
             </View>
 
-            <View style={styles.formRow}>
-              <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                <Text style={styles.label}>City *</Text>
+            <View className='flex-row gap-4 mb-4'>
+              <View className='flex-1'>
+                <Text className='text-sm font-semibold text-gray-700 mb-2.5'>City *</Text>
                 <TextInput
-                  style={styles.input}
+                  ref={cityInputRef}
+                  className={clsx(
+                    'bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900',
+                    formErrors.city && 'border-red-500 bg-red-50'
+                  )}
                   placeholder="Enter city"
                   value={formData.city}
-                  onChangeText={(text) => setFormData({ ...formData, city: text })}
+                  onChangeText={(text) => {
+                    setFormData({ ...formData, city: text });
+                    if (formErrors.city) {
+                      setFormErrors((prev) => ({ ...prev, city: '' }));
+                    }
+                  }}
+                  returnKeyType="next"
+                  onSubmitEditing={() => stateInputRef.current?.focus()}
+                  blurOnSubmit={false}
                 />
+                {formErrors.city && <Text className='text-xs text-red-500 mt-1 ml-1'>{formErrors.city}</Text>}
               </View>
 
-              <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-                <Text style={styles.label}>State *</Text>
+              <View className='flex-1'>
+                <Text className='text-sm font-semibold text-gray-700 mb-2.5'>State *</Text>
                 <TextInput
-                  style={styles.input}
+                  ref={stateInputRef}
+                  className={clsx(
+                    'bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900',
+                    formErrors.state && 'border-red-500 bg-red-50'
+                  )}
                   placeholder="Enter state"
                   value={formData.state}
-                  onChangeText={(text) => setFormData({ ...formData, state: text })}
+                  onChangeText={(text) => {
+                    setFormData({ ...formData, state: text });
+                    if (formErrors.state) {
+                      setFormErrors((prev) => ({ ...prev, state: '' }));
+                    }
+                  }}
+                  returnKeyType="next"
+                  onSubmitEditing={() => pincodeInputRef.current?.focus()}
+                  blurOnSubmit={false}
                 />
+                {formErrors.state && <Text className='text-xs text-red-500 mt-1 ml-1'>{formErrors.state}</Text>}
               </View>
             </View>
 
-            <View style={styles.formRow}>
-              <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                <Text style={styles.label}>Pincode *</Text>
+            <View className='flex-row gap-4 mb-4'>
+              <View className='flex-1'>
+                <Text className='text-sm font-semibold text-gray-700 mb-2.5'>Pincode *</Text>
                 <TextInput
-                  style={styles.input}
+                  ref={pincodeInputRef}
+                  className={clsx(
+                    'bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900',
+                    formErrors.pincode && 'border-red-500 bg-red-50'
+                  )}
                   placeholder="Enter pincode"
                   keyboardType="number-pad"
                   value={formData.pincode}
-                  onChangeText={(text) => setFormData({ ...formData, pincode: text })}
+                  onChangeText={(text) => {
+                    const cleaned = text.replace(/[^0-9]/g, '');
+                    setFormData({ ...formData, pincode: cleaned });
+                    if (formErrors.pincode) {
+                      setFormErrors((prev) => ({ ...prev, pincode: '' }));
+                    }
+                  }}
+                  maxLength={6}
+                  returnKeyType="next"
+                  onSubmitEditing={() => deliveryInputRef.current?.focus()}
+                  blurOnSubmit={false}
                 />
+                {formErrors.pincode && <Text className='text-xs text-red-500 mt-1 ml-1'>{formErrors.pincode}</Text>}
               </View>
 
-              <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-                <Text style={styles.label}>Country *</Text>
+              <View className='flex-1'>
+                <Text className='text-sm font-semibold text-gray-700 mb-2.5'>Country *</Text>
                 <TextInput
-                  style={styles.input}
+                  className='bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900'
                   placeholder="Enter country"
                   value={formData.country}
                   onChangeText={(text) => setFormData({ ...formData, country: text })}
+                  returnKeyType="done"
                 />
               </View>
             </View>
 
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Delivery Instructions (Optional)</Text>
+            <View className='mb-5'>
+              <Text className='text-sm font-semibold text-gray-700 mb-2.5'>Delivery Instructions (Optional)</Text>
               <TextInput
-                style={[styles.input, styles.textArea]}
+                ref={deliveryInputRef}
+                className='bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900 h-24 pt-4'
                 placeholder="e.g., Ring bell twice, near gate"
                 multiline
                 numberOfLines={3}
                 value={formData.delivery_suggestion}
-                onChangeText={(text) => setFormData({ ...formData, delivery_suggestion: text })}
+                onChangeText={(text) =>
+                  setFormData({ ...formData, delivery_suggestion: text })
+                }
               />
             </View>
 
-            <TouchableOpacity 
-              style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+            <TouchableOpacity
+              className={clsx(
+                'bg-green-600 rounded-xl p-4 items-center mt-6 shadow-lg shadow-green-600/30',
+                saving && 'opacity-50'
+              )}
               onPress={handleSave}
               disabled={saving}
             >
               {saving ? (
                 <ActivityIndicator size="small" color="white" />
               ) : (
-                <Text style={styles.saveButtonText}>
-                  {editMode ? 'Update Address' : 'Save Address'}
+                <Text className='text-base font-semibold text-white'>
+                  {editingId ? 'Update Address' : 'Save Address'}
                 </Text>
               )}
             </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
+      <Toast />
     </View>
-  )
-
-
+  );
 }
-
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#6b7280',
-    fontFamily: 'Inter-Regular',
-  },
-  header: {
-    backgroundColor: 'white',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#111827',
-    fontFamily: 'Inter-SemiBold',
-  },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f0fdf4',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  addAddressCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-    borderStyle: 'dashed',
-  },
-  addAddressIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#f0fdf4',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  addAddressContent: {
-    flex: 1,
-  },
-  addAddressTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    fontFamily: 'Inter-SemiBold',
-    marginBottom: 4,
-  },
-  addAddressSubtitle: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontFamily: 'Inter-Regular',
-  },
-  errorCard: {
-    backgroundColor: '#fef2f2',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#fecaca',
-    alignItems: 'center',
-  },
-  errorText: {
-    fontSize: 14,
-    color: '#dc2626',
-    fontFamily: 'Inter-Regular',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  retryButton: {
-    backgroundColor: '#dc2626',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    fontFamily: 'Inter-SemiBold',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyStateText: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontFamily: 'Inter-Regular',
-    textAlign: 'center',
-  },
-  addressesList: {
-    marginBottom: 24,
-  },
-  addressCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  addressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  addressTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  addressTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    fontFamily: 'Inter-SemiBold',
-    marginLeft: 8,
-  },
-  defaultBadge: {
-    backgroundColor: '#dcfce7',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginLeft: 12,
-  },
-  defaultBadgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#16a34a',
-    fontFamily: 'Inter-SemiBold',
-  },
-  addressActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f3f4f6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addressText: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontFamily: 'Inter-Regular',
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  addressPhone: {
-    fontSize: 13,
-    color: '#374151',
-    fontFamily: 'Inter-Medium',
-    marginBottom: 8,
-  },
-  addressNote: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontFamily: 'Inter-Regular',
-    fontStyle: 'italic',
-    backgroundColor: '#f9fafb',
-    padding: 8,
-    borderRadius: 8,
-    marginTop: 4,
-  },
-  infoCard: {
-    backgroundColor: '#f0fdf4',
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#bbf7d0',
-  },
-  infoTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#16a34a',
-    fontFamily: 'Inter-SemiBold',
-    marginBottom: 8,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#166534',
-    fontFamily: 'Inter-Regular',
-    lineHeight: 20,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'white',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#111827',
-    fontFamily: 'Inter-SemiBold',
-  },
-  modalContent: {
-    flex: 1,
-    padding: 20,
-  },
-  formGroup: {
-    marginBottom: 20,
-  },
-  formRow: {
-    flexDirection: 'row',
-    marginHorizontal: -8,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-    fontFamily: 'Inter-Medium',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#111827',
-    fontFamily: 'Inter-Regular',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  saveButton: {
-    backgroundColor: '#16a34a',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 40,
-  },
-  saveButtonDisabled: {
-    opacity: 0.6,
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white',
-    fontFamily: 'Inter-SemiBold',
-  },
-});
 

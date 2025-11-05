@@ -5,11 +5,11 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export const services = [
-  { id: 'demolition', title: 'Demolition Service', description: 'Building and structure demolition', icon: Hammer, color: '#dc2626', bgColor: '#fef2f2' },
-  { id: 'dismantling', title: 'Dismantling', description: 'Equipment and machinery dismantling', icon: Wrench, color: '#ea580c', bgColor: '#fff7ed' },
-  { id: 'paper-shredding', title: 'Paper Shredding', description: 'Secure document shredding', icon: FileText, color: '#0891b2', bgColor: '#f0f9ff' },
-  { id: 'society-tieup', title: 'Society Tie-up', description: 'Scrap collection for societies', icon: Building, color: '#7c3aed', bgColor: '#f5f3ff' },
-  { id: 'junk-removal', title: 'Junk Removal', description: 'Household and office junk removal', icon: Trash2, color: '#059669', bgColor: '#f0fdf4' },
+  { id: 'demolition', title: 'Demolition Service', description: 'Building and structure demolition', icon: Hammer, color: '#16a34a', bgColor: '#f0fdf4' },
+  { id: 'dismantling', title: 'Dismantling', description: 'Equipment and machinery dismantling', icon: Wrench, color: '#16a34a', bgColor: '#f0fdf4' },
+  { id: 'paper-shredding', title: 'Paper Shredding', description: 'Secure document shredding', icon: FileText, color: '#16a34a', bgColor: '#f0fdf4' },
+  { id: 'society-tieup', title: 'Society Tie-up', description: 'Scrap collection for societies', icon: Building, color: '#16a34a', bgColor: '#f0fdf4' },
+  { id: 'junk-removal', title: 'Junk Removal', description: 'Household and office junk removal', icon: Trash2, color: '#16a34a', bgColor: '#f0fdf4' },
 ];
 
 export default function ServicesScreen() {
@@ -32,21 +32,28 @@ export default function ServicesScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.servicesList}>
           {services.map((service) => (
-            <TouchableOpacity 
-              key={service.id} 
-              style={[styles.serviceCard, { backgroundColor: service.color }]}
-              onPress={() => handleServiceSelect(service)}
-              activeOpacity={0.8}
+            <LinearGradient
+              key={service.id}
+              colors={['#16a34a', '#15803d', '#166534']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.serviceCard}
             >
-              <View style={[styles.serviceIcon, { backgroundColor: 'white' }]}>
-                <service.icon size={22} color={service.color} />
-              </View>
-              <View style={styles.serviceTextContainer}>
-                <Text style={styles.serviceTitle}>{service.title}</Text>
-                <Text style={styles.serviceDescription}>{service.description}</Text>
-              </View>
-              <ChevronRight size={20} color="#f1f5f9" />
-            </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.serviceCardTouchable}
+                onPress={() => handleServiceSelect(service)}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.serviceIcon, { backgroundColor: 'white' }]}>
+                  <service.icon size={24} color={service.color} strokeWidth={2.5} />
+                </View>
+                <View style={styles.serviceTextContainer}>
+                  <Text style={styles.serviceTitle}>{service.title}</Text>
+                  <Text style={styles.serviceDescription}>{service.description}</Text>
+                </View>
+                <ChevronRight size={22} color="rgba(255, 255, 255, 0.9)" strokeWidth={2.5} />
+              </TouchableOpacity>
+            </LinearGradient>
           ))}
         </View>
 
@@ -99,24 +106,32 @@ const styles = StyleSheet.create({
     marginBottom: 24 
   },
   serviceCard: { 
+    borderRadius: 16,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+    overflow: 'hidden',
+  },
+  serviceCardTouchable: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    padding: 18,
+  },
+  serviceIcon: { 
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 2
-  },
-  serviceIcon: { 
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16
+    shadowRadius: 4,
+    elevation: 3,
   },
   serviceTextContainer: {
     flex: 1,

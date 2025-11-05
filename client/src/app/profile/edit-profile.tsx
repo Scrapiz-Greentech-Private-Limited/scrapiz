@@ -8,24 +8,37 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
-import { ArrowLeft, User, Mail, Phone, MapPin, Save } from 'lucide-react-native';
+import { ArrowLeft, User, Mail, Phone, MapPin, Save, Camera, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { AuthService, UserProfile } from '../../api/apiService';
+import * as ImagePicker from 'expo-image-picker';
+import { useLocalization } from '../../context/LocalizationContext';
 
 
 export default function EditProfileScreen(){
     const router = useRouter();
+    const { t } = useLocalization();
     const [user , setUser] = useState<UserProfile | null>(null);
     const [formData, setFormData] = useState({
     fullName: '',
     email: '',
     phone: '',
     address: '',
+    profileImage: '',
+    })
+    const [originalData, setOriginalData] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    address: '',
+    profileImage: '',
     })
     const [isLoading, setIsLoading] = useState(false);
     const [isFetching , setIsFetching] = useState(true);
+    const [imageError, setImageError] = useState(false);
 
     useEffect(()=>{
         loadUserData();
@@ -39,46 +52,144 @@ export default function EditProfileScreen(){
             const addressString = primaryAddress
         ? `${primaryAddress.room_number}, ${primaryAddress.street}, ${primaryAddress.area}, ${primaryAddress.city} - ${primaryAddress.pincode}`
         : '';
-        setFormData({
+        const data = {
             fullName:userData.name || '',
             email:userData.email || '',
             phone:primaryAddress?.phone_number || '',
             address:addressString || '',
-        })
+            profileImage: userData.profile_image || '',
+        };
+        setFormData(data);
+        setOriginalData(data);
         } catch (error) {
             Toast.show({
                 type: 'error',
-                text1: 'Error fetching user data',
+                text1: t('toasts.error.fetchUserData'),
                 text2: (error as Error).message,
             });
         } finally {
             setIsFetching(false);
         }
     }
+    
+    const handlePickImage = async () => {
+        try {
+            // Request permissions
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            
+            if (status !== 'granted') {
+                Alert.alert(
+                    t('alerts.titles.permissionRequired'),
+                    t('alerts.permissions.cameraRollRequired'),
+                    [{ text: t('alerts.buttons.ok') }]
+                );
+                return;
+            }
+            
+            // Launch image picker
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+            });
+            
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                setFormData(prev => ({ ...prev, profileImage: result.assets[0].uri }));
+                setImageError(false);
+            }
+        } catch (error) {
+            Alert.alert(t('alerts.titles.error'), t('toasts.error.imagePickerFailed'));
+            console.error('Image picker error:', error);
+        }
+    };
+    
+    const handleRemoveImage = () => {
+        Alert.alert(
+            t('alerts.titles.removeProfilePicture'),
+            t('alerts.confirmations.removeProfilePicture'),
+            [
+                { text: t('alerts.buttons.cancel'), style: 'cancel' },
+                {
+                    text: t('alerts.buttons.remove'),
+                    style: 'destructive',
+                    onPress: () => {
+                        setFormData(prev => ({ ...prev, profileImage: '' }));
+                        setImageError(false);
+                    },
+                },
+            ]
+        );
+    };
     const handleSave = async() =>{
         if (!formData.fullName.trim()) {
-        Alert.alert('Validation Error', 'Please enter your full name');
+        Alert.alert(t('alerts.titles.validationError'), t('alerts.validation.enterFullName'));
         return;
     }
+    
     setIsLoading(true);
     try {
-        await AuthService.updateUserName(formData.fullName.trim());
-        Toast.show({
-            type: 'success',
-            text1: 'Profile updated successfully',
-            text2: '',
-        });
-        setTimeout(() => {}, 1000)
-        router.back();
-    } catch (error) {
+        const updateData: any = {};
+        
+        // Check if name changed
+        if (formData.fullName.trim() !== originalData.fullName) {
+            updateData.name = formData.fullName.trim();
+        }
+        
+        // Check if profile image changed
+        if (formData.profileImage !== originalData.profileImage) {
+            if (formData.profileImage === '') {
+                // Remove image
+                updateData.profile_image = null;
+            } else if (formData.profileImage.startsWith('file://') || formData.profileImage.startsWith('content://')) {
+                // New image upload
+                updateData.profile_image = formData.profileImage;
+            }
+        }
+        
+        // Only call API if there are changes
+        if (Object.keys(updateData).length > 0) {
+            const updatedUser = await AuthService.updateUserProfile(updateData);
+            
+            // Update local state with response
+            const updatedFormData = {
+                ...formData,
+                fullName: updatedUser.name || formData.fullName,
+                profileImage: updatedUser.profile_image || '',
+            };
+            setFormData(updatedFormData);
+            setOriginalData(updatedFormData);
+            
+            Toast.show({
+                type: 'success',
+                text1: t('toasts.success.profileUpdated'),
+                text2: '',
+            });
+            
+            setTimeout(() => {
+                router.back();
+            }, 1000);
+        } else {
+            Toast.show({
+                type: 'info',
+                text1: t('toasts.info.noChanges'),
+                text2: '',
+            });
+        }
+    } catch (error: any) {
         Toast.show({
              type: 'error',
-             text1: 'Error',
-            text2: error.message || 'Failed to update profile',
+             text1: t('alerts.titles.error'),
+            text2: error.message || t('toasts.error.updateProfile'),
         })
     }finally{
         setIsLoading(false);
     }
+    };
+    
+    const hasChanges = () => {
+        return formData.fullName !== originalData.fullName || 
+               formData.profileImage !== originalData.profileImage;
     };
 
     if(isFetching){
@@ -108,16 +219,40 @@ export default function EditProfileScreen(){
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.avatarSection}>
           <View style={styles.avatarContainer}>
-            <Text style={styles.avatarText}>
-              {formData.fullName
-                .split(' ')
-                .map((n) => n[0])
-                .join('')
-                .toUpperCase() || 'U'}
-            </Text>
+            {formData.profileImage && !imageError ? (
+              <>
+                <Image
+                  source={{ uri: formData.profileImage }}
+                  style={styles.avatarImage}
+                  onError={() => setImageError(true)}
+                />
+                <TouchableOpacity
+                  style={styles.removeImageButton}
+                  onPress={handleRemoveImage}
+                  disabled={isLoading}
+                >
+                  <X size={16} color="white" />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <Text style={styles.avatarText}>
+                {formData.fullName
+                  .split(' ')
+                  .map((n) => n[0])
+                  .join('')
+                  .toUpperCase() || 'U'}
+              </Text>
+            )}
           </View>
-          <TouchableOpacity style={styles.changePhotoButton}>
-            <Text style={styles.changePhotoText}>Change Photo</Text>
+          <TouchableOpacity 
+            style={styles.changePhotoButton}
+            onPress={handlePickImage}
+            disabled={isLoading}
+          >
+            <Camera size={16} color="#16a34a" style={{ marginRight: 6 }} />
+            <Text style={styles.changePhotoText}>
+              {formData.profileImage ? 'Change Photo' : 'Add Photo'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -149,37 +284,6 @@ export default function EditProfileScreen(){
               />
             </View>
             <Text style={styles.inputHint}>Email cannot be changed</Text>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Phone Number</Text>
-            <View style={[styles.inputWrapper, styles.inputWrapperDisabled]}>
-              <Phone size={20} color="#9ca3af" style={styles.inputIcon} />
-              <TextInput
-                style={[styles.input, styles.inputDisabled]}
-                value={formData.phone}
-                placeholder="Enter your phone number"
-                keyboardType="phone-pad"
-                editable={false}
-              />
-            </View>
-            <Text style={styles.inputHint}>Update phone in address settings</Text>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Address</Text>
-            <View style={[styles.inputWrapper, styles.inputWrapperDisabled]}>
-              <MapPin size={20} color="#9ca3af" style={styles.inputIcon} />
-              <TextInput
-                style={[styles.input, styles.textArea, styles.inputDisabled]}
-                value={formData.address}
-                placeholder="Enter your address"
-                multiline
-                numberOfLines={3}
-                editable={false}
-              />
-            </View>
-            <Text style={styles.inputHint}>Manage addresses in address settings</Text>
           </View>
         </View>
 
@@ -268,6 +372,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+    position: 'relative',
+  },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
   },
   avatarText: {
     fontSize: 36,
@@ -275,9 +385,24 @@ const styles = StyleSheet.create({
     color: 'white',
     fontFamily: 'Inter-SemiBold',
   },
+  removeImageButton: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#ef4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
+  },
   changePhotoButton: {
     paddingVertical: 8,
     paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   changePhotoText: {
     fontSize: 14,

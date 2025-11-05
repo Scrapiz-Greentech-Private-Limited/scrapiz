@@ -5,9 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/scrapiz.jpg",
-    "scheme": [
-      "scrapiz"
-    ],
+    "scheme": "com.scrapiz.app",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
@@ -30,14 +28,8 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.AMD_RECORD_AUDIO",
-        "android.permission.DETECT_SCREEN_CAPTURE",
-        "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.READ_MEDIA_IMAGES",
-        "android.permission.READ_MEDIA_AUDIO",
-        "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.READ_MEDIA_VIDEO"
       ],
       "package": "com.scrapiz.app",
       "versionCode": 1
@@ -68,15 +60,18 @@
             "./assets/fonts/YoungSerif-Regular.ttf"
           ]
         }
-      ]
+      ],
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://192.168.1.104:8000/api",
-        "EXPO_PUBLIC_FRONTEND_SECRET": "Scrapiz#0nn$(tab!z"
+        "EXPO_PUBLIC_API_URL": "http://13.204.50.150/api",
+        "EXPO_PUBLIC_FRONTEND_SECRET": "Scrapiz#0nn$(tab!z",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "765250017313-94tside5h04tidg35gahkevddopjr74l.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "765250017313-m05cng47dvaisjc3gnoo2fkvifsv5q30.apps.googleusercontent.com"
       },
       "router": {},
       "eas": {

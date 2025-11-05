@@ -12,17 +12,24 @@ export const API_CONFIG = {
   BASE_URL: 'http://13.204.50.150/api',
   ENDPOINTS: {
     // Authentication endpoints
-    REGISTER: '/authentication/register',
-    LOGIN: '/authentication/login',
-    LOGOUT: '/authentication/logout',
-    VERIFY_OTP: '/authentication/register', // PUT request
-    RESEND_OTP: '/authentication/resendotp',
-    PASSWORD_RESET_REQUEST: '/authentication/password-reset-request',
-    PASSWORD_RESET: '/authentication/password-reset',
-    USER: '/authentication/user',
+    REGISTER: '/authentication/register/',
+    LOGIN: '/authentication/login/',
+    LOGOUT: '/authentication/logout/',
+    VERIFY_OTP: '/authentication/register/', // PUT request
+    RESEND_OTP: '/authentication/resendotp/',
+    PASSWORD_RESET_REQUEST: '/authentication/password-reset-request/',
+    PASSWORD_RESET: '/authentication/password-reset/',
+    USER: '/authentication/user/',
+    GOOGLE_LOGIN: '/authentication/google-login/',
     USER_ADDRESSES: '/user/address/',
     USER_NOTIFICATION_SETTINGS: '/user/notification-settings/',
-  SERVICE_BOOKINGS: '/services/bookings/',
+    SERVICE_BOOKINGS: '/services/bookings/',
+    
+    // Referral endpoints
+    REFERRED_USERS: '/authentication/referrals/users/',
+    REFERRAL_TRANSACTIONS: '/authentication/referrals/transactions/',
+    REDEEM_REFERRAL_BALANCE: '/authentication/referrals/redeem/',
+    
     // Inventory
     INVENTORY_CATEGORIES: '/inventory/categories/',
     INVENTORY_PRODUCTS: '/inventory/products/',
@@ -48,6 +55,7 @@ export interface RegisterRequest {
   name: string;
   password: string;
   confirm_password: string;
+  promo_code?: string; // Optional referral/promo code
 }
 
 export interface LoginRequest {
@@ -63,6 +71,7 @@ export interface PasswordResetRequest {
   email: string;
   otp: string;
   new_password: string;
+  confirm_password: string;
 }
 
 export interface NotificationSettings {
@@ -95,4 +104,17 @@ export interface ServiceBooking {
   status: string;
   created_at: string;
   notes?: string | null;
+}
+
+export interface GoogleLoginRequest {
+  id_token: string;
+}
+
+export interface GoogleLoginResponse extends ApiResponse {
+  jwt?: string;
+  user?: {
+    id: number;
+    email: string;
+    name: string;
+  };
 }

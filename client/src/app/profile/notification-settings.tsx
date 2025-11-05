@@ -13,6 +13,7 @@ import Toast from 'react-native-toast-message';
 import { ArrowLeft, Bell, Truck, IndianRupee, MessageCircle, Zap, AlertCircle } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { AuthService, NotificationSettings } from '../../api/apiService';
+import { useLocalization } from '../../context/LocalizationContext';
 
 
 interface NotificationItemConfig {
@@ -161,6 +162,7 @@ const SavingIndicatorComponent: React.FC = () => (
 
 export default function NotificationSystem(){
     const router = useRouter();
+    const { t } = useLocalization();
     const [settings, setSettings] = useState<NotificationSettings | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving , setSaving] = useState(false);
@@ -181,16 +183,16 @@ export default function NotificationSystem(){
             const data = await AuthService.getNotificationSettings();
             setSettings(data);
         } catch (error) {
-            setError("Failed to load notification settings");
+            setError(t('toasts.error.loadSettings'));
             Toast.show({
                 type: 'error',
-                text1: 'Error',
-                text2: 'Failed to load notification settings',
+                text1: t('alerts.titles.error'),
+                text2: t('toasts.error.loadSettings'),
             });
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [t]);
 
     const updateSetting = useCallback(async(key: keyof NotificationSettings, value: boolean) => {
       if(!settings) return;
@@ -201,25 +203,25 @@ export default function NotificationSystem(){
         setSaving(true);
         setError(null);
         await AuthService.updateNotificationSettings(newSettings);
-        setSuccessMessage("Settings updated successfully");
+        setSuccessMessage(t('toasts.success.settingsUpdated'));
         Toast.show({
           type: 'success',
-          text1: 'Success',
-          text2: 'Settings updated successfully',
+          text1: t('alerts.titles.success'),
+          text2: t('toasts.success.settingsUpdated'),
         });
       } catch (error) {
         console.error("Update failed", error);
         setSettings(previousSettings);
-        setError("Failed to update settings");
+        setError(t('toasts.error.updateSettings'));
         Toast.show({
           type: 'error',
-          text1: 'Error',
-          text2: 'Failed to update settings',
+          text1: t('alerts.titles.error'),
+          text2: t('toasts.error.updateSettings'),
         });
       }finally{
         setSaving(false);
       }
-    },[settings])
+    },[settings, t])
     const handleToggle = useCallback(async(value: boolean)=>{
       if(!settings) return;
       const newSettings: Partial<NotificationSettings> = {

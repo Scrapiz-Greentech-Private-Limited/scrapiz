@@ -1,10 +1,18 @@
-import { View, Text, TextInput, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  Alert, 
+  ScrollView,
+  KeyboardAvoidingView,
+  ActivityIndicator,
+  StyleSheet, 
+  Platform 
+} from 'react-native';
 import React, { useState } from 'react';
-import {StyleSheet, Platform} from 'react-native'
-
-import { LinearGradient } from 'expo-linear-gradient';
-import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
+import { ArrowLeft, Mail, Lock, ArrowRight } from 'lucide-react-native';
 import { AuthService } from '../../api/apiService';
 import Toast from 'react-native-toast-message';
 
@@ -12,19 +20,20 @@ export default function ForgotPasswordScreen() {
   const router = useRouter();
   const [step, setStep] = useState<'email' | 'otp' | 'newPassword'>('email');
   const [email, setEmail] = useState('');
-
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSendResetEmail = async () => {
     if (!email) {
-      Alert.alert('Error', 'Please enter your email');
+      setError('Please enter your email');
       return;
     }
 
-    setLoading(true);
+    setIsLoading(true);
+    setError('');
     try {
       await AuthService.passwordResetRequest(email);
       Toast.show({
@@ -34,60 +43,63 @@ export default function ForgotPasswordScreen() {
       });
       setStep('otp');
     } catch (error: any) {
+      setError(error.message || 'Failed to send reset email');
       Toast.show({
         type: 'error',
         text1: 'Error',
         text2: error.message,
       });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   const handleVerifyOtp = async () => {
     if (!otp) {
-      Alert.alert('Error', 'Please enter the OTP');
+      setError('Please enter the OTP');
       return;
     }
 
-    setLoading(true);
+    setIsLoading(true);
+    setError('');
     try {
-      // For this step, we'll just move to the next step
-      // In a real implementation, you might want to verify the OTP first
       setStep('newPassword');
     } catch (error: any) {
+      setError(error.message || 'Failed to verify OTP');
       Toast.show({
         type: 'error',
         text1: 'Error',
         text2: error.message,
       });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   const handleResetPassword = async () => {
     if (!newPassword || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
+      setError('Please fill in all fields');
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      setError('Passwords do not match');
       return;
     }
 
     if (newPassword.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      setError('Password must be at least 6 characters');
       return;
     }
 
-    setLoading(true);
+    setIsLoading(true);
+    setError('');
     try {
       await AuthService.passwordReset({
         email,
         otp,
         new_password: newPassword,
+        confirm_password: confirmPassword,
       });
       Toast.show({
         type: 'success',
@@ -96,18 +108,20 @@ export default function ForgotPasswordScreen() {
       });
       router.replace('/(auth)/login');
     } catch (error: any) {
+      setError(error.message || 'Failed to reset password');
       Toast.show({
         type: 'error',
         text1: 'Error',
         text2: error.message,
       });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   const handleResendOtp = async () => {
-    setLoading(true);
+    setIsLoading(true);
+    setError('');
     try {
       await AuthService.passwordResetRequest(email);
       Toast.show({
@@ -116,13 +130,14 @@ export default function ForgotPasswordScreen() {
         text2: 'OTP resent successfully!',
       });
     } catch (error: any) {
+      setError(error.message || 'Failed to resend OTP');
       Toast.show({
         type: 'error',
         text1: 'Error',
         text2: error.message,
       });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -139,9 +154,9 @@ export default function ForgotPasswordScreen() {
     }
   };
 
-  const handleBackToLogin = ()=>{
-    router.replace('/(auth)/login')
-  }
+  const handleBackToLogin = () => {
+    router.replace('/(auth)/login');
+  };
 
   const getStepDescription = () => {
     switch (step) {
@@ -156,8 +171,7 @@ export default function ForgotPasswordScreen() {
     }
   };
 
-  if(step === 'success'){
-    return (
+  return (
     <KeyboardAvoidingView 
       style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -173,9 +187,8 @@ export default function ForgotPasswordScreen() {
         </TouchableOpacity>
 
         <View style={styles.header}>
-          <ScrapizLogo size={56} />
-          <Text style={styles.title}>{getStepTitle()}</Text>
-          <Text style={styles.subtitle}>
+          <Text style={styles.welcomeText}>{getStepTitle()}</Text>
+          <Text style={styles.subtitleText}>
             {getStepDescription()}
           </Text>
         </View>
@@ -188,7 +201,7 @@ export default function ForgotPasswordScreen() {
                 <View style={styles.inputWrapper}>
                   <Mail size={20} color="#6b7280" style={styles.inputIcon} />
                   <TextInput
-                    style={[styles.input, error && styles.inputError]}
+                    style={styles.input}
                     placeholder="Enter your email address"
                     placeholderTextColor="#9ca3af"
                     value={email}
@@ -224,18 +237,18 @@ export default function ForgotPasswordScreen() {
               <View style={styles.inputContainer}>
                 <View style={[styles.inputWrapper, {justifyContent: 'center'}]}>
                   <TextInput
-                    style={[styles.input, styles.otpInput, error && styles.inputError]}
-                    placeholder="0000"
+                    style={[styles.input, styles.otpInput]}
+                    placeholder="000000"
                     placeholderTextColor="#9ca3af"
                     value={otp}
                     onChangeText={(text) => { setOtp(text); setError(''); }}
                     keyboardType="number-pad"
-                    maxLength={4}
+                    maxLength={6}
                     editable={!isLoading}
                   />
                 </View>
                 {error ? (<Text style={styles.errorText}>{error}</Text>) : (
-                    <Text style={styles.instructionTextSmall}>A 4-digit code was sent to {email}</Text>
+                    <Text style={styles.instructionTextSmall}>A 6-digit code was sent to {email}</Text>
                 )}
               </View>
 
@@ -271,12 +284,13 @@ export default function ForgotPasswordScreen() {
                 <View style={styles.inputWrapper}>
                   <Lock size={20} color="#6b7280" style={styles.inputIcon} />
                   <TextInput
-                    style={[styles.input, errors.password && styles.inputError]}
+                    style={styles.input}
                     placeholder="New Password (min 6 characters)"
                     placeholderTextColor="#9ca3af"
                     value={newPassword}
                     onChangeText={(text) => { setNewPassword(text); setError(''); }}
                     secureTextEntry
+                    editable={!isLoading}
                   />
                 </View>
                 {error && (<Text style={styles.errorText}>{error}</Text>)}
@@ -286,12 +300,13 @@ export default function ForgotPasswordScreen() {
                 <View style={styles.inputWrapper}>
                   <Lock size={20} color="#6b7280" style={styles.inputIcon} />
                   <TextInput
-                    style={[styles.input, errors.confirmPassword && styles.inputError]}
+                    style={styles.input}
                     placeholder="Confirm New Password"
                     placeholderTextColor="#9ca3af"
                     value={confirmPassword}
                     onChangeText={(text) => { setConfirmPassword(text); setError(''); }}
                     secureTextEntry
+                    editable={!isLoading}
                   />
                 </View>
                 {error && (<Text style={styles.errorText}>{error}</Text>)}
@@ -322,19 +337,16 @@ export default function ForgotPasswordScreen() {
         </View>
 
         {/* Footer */}
-        {step !== 'success' && (
-            <View style={styles.footer}>
-                <Text style={styles.footerText}>Remember your password? </Text>
-                <TouchableOpacity onPress={handleBackToLogin}>
-                    <Text style={styles.footerLink}>Sign In</Text>
-                </TouchableOpacity>
-            </View>
-        )}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Remember your password? </Text>
+          <TouchableOpacity onPress={handleBackToLogin}>
+            <Text style={styles.footerLink}>Sign In</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
       <Toast />
     </KeyboardAvoidingView>
   );
-  }
 }
 
 const styles = StyleSheet.create({
@@ -411,6 +423,64 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     marginTop: 6,
     marginLeft: 4,
+  },
+  otpInput: {
+    textAlign: 'center',
+    fontSize: 24,
+    fontWeight: '600',
+    letterSpacing: 8,
+  },
+  instructionTextSmall: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontFamily: 'Inter-Regular',
+    marginTop: 6,
+    marginLeft: 4,
+    textAlign: 'center',
+  },
+  resetButton: {
+    backgroundColor: '#16a34a',
+    borderRadius: 16,
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    shadowColor: '#16a34a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  resetButtonDisabled: {
+    opacity: 0.7,
+  },
+  resetButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+    fontFamily: 'Inter-SemiBold',
+  },
+  linkGroup: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 16,
+  },
+  linkText: {
+    fontSize: 14,
+    color: '#16a34a',
+    fontFamily: 'Inter-SemiBold',
+  },
+  backIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
   },
   registerButton: {
     backgroundColor: '#16a34a',

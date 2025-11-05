@@ -75,15 +75,20 @@ class AddressAPIView(AuthenticatedAPIView):
 
     # ✅ Delete apna hi address
     def delete(self, request, pk):
-        user = self.authenticate_user(request)
-
         try:
-            address = AddressModel.objects.get(pk=pk, user=user)
-        except AddressModel.DoesNotExist:
-            return Response({"error": "Address not found"}, status=status.HTTP_404_NOT_FOUND)
+            user = self.authenticate_user(request)
 
-        address.delete()
-        return Response({"message": "Address deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+            try:
+                address = AddressModel.objects.get(pk=pk, user=user)
+            except AddressModel.DoesNotExist:
+                return Response({"error": "Address not found"}, status=status.HTTP_404_NOT_FOUND)
+
+            address.delete()
+            # Return 204 No Content (standard for successful DELETE with no body)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            print(f"Error deleting address: {str(e)}")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class NotificationPreferenceAPIView(AuthenticatedAPIView):

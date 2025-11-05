@@ -1,66 +1,121 @@
 import { View, Text, Image, StyleSheet } from 'react-native';
 import React, { useEffect, useState } from 'react';
-import { router } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+
 import { AuthService } from '../api/apiService';
+import { useLocation } from '../context/LocationContext';
+import { useLocalization } from '../context/LocalizationContext';
+import SplashScreen from '../components/SplashScreen';
 
-export default function SplashScreen() {
-  const [isChecking, setIsChecking] = useState(true);
 
-  useEffect(() => {
-    checkAuthAndRedirect();
+export default function IndexScreen(){
+  const router = useRouter();
+  const {currentLocation, locationSet, serviceAvailable, checkServiceAvailability} = useLocation();
+  const {isLanguageSet, isLoading: isLanguageLoading} = useLocalization();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthCheckDone, setIsAuthCheckDone] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+
+   useEffect(() => {
+    let isActive = true;
+    const runInitialChecks = async () => {
+      try {
+        const authStatus = await AuthService.isAuthenticated();
+        if (isActive) setIsAuthenticated(authStatus);
+      } catch (error) {
+        console.error("Auth check failed", error);
+        if (isActive) setIsAuthenticated(false);
+      } finally {
+        if (isActive) setIsAuthCheckDone(true);
+      }
+    };
+    runInitialChecks();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
-  const checkAuthAndRedirect = async () => {
-    try {
-      // Check if user is already authenticated
-      const isAuthenticated = await AuthService.isAuthenticated();
-      
-      setTimeout(() => {
-        if (isAuthenticated) {
-          // User has valid token, go directly to home
-          router.replace('/(tabs)/home');
-        } else {
-          // No valid token, go to login
-          router.replace('/(auth)/login');
-        }
-        setIsChecking(false);
-      }, 2000); // Keep splash for 2 seconds for better UX
-    } catch (error) {
-      console.error('Auth check error:', error);
-      // On error, default to login screen
-      setTimeout(() => {
-        router.replace('/(auth)/login');
-        setIsChecking(false);
-      }, 2000);
-    }
+  const handleSplashFinish = () => {
+    setShowSplash(false);
   };
+  useEffect(()=>{
+    // Wait for splash screen, auth check, and language initialization to complete
+    if (showSplash || !isAuthCheckDone || isLanguageLoading) return;
+    
+    console.log('🚀 Navigation Debug:', {
+      isLanguageSet,
+      locationSet,
+      hasCurrentLocation: !!currentLocation,
+      serviceAvailable,
+      isAuthenticated: isAuthenticated,
+    });
+    
+    let routeToNavigate = ""
+    
+    /**
+     * Navigation Flow Priority:
+     * Priority 0: Language Selection (NEW - highest priority)
+     *   - First-time users must select language before anything else
+     *   - Returning users skip this step (language already set)
+     * 
+     * Priority 1: Location Permission
+     *   - Users need to set their location for service availability
+     * 
+     * Priority 2: Service Availability
+     *   - Check if service is available in user's location
+     * 
+     * Priority 3: Authentication
+     *   - Authenticated users go to home
+     *   - Non-authenticated users go to login
+     */
+    
+    // Priority 0: Check language selection first
+    if (!isLanguageSet) {
+      console.log('➡️ Navigating to: language-selection (no language set)');
+      routeToNavigate = '/(auth)/language-selection';
+    }
+    // Priority 1: Check location
+    else if (!locationSet || !currentLocation){
+      console.log('➡️ Navigating to: location-permission (no location set)');
+      routeToNavigate = '/(auth)/location-permission';
+    }
+    // Priority 2: Check if location is serviceable
+    else if (!serviceAvailable) {
+      console.log('➡️ Navigating to: service-unavailable');
+      routeToNavigate = '/(auth)/service-unavailable';
+    }
+    // Priority 3: Check authentication
+    else {
+      if (isAuthenticated) {
+        console.log('➡️ Navigating to: tabs/home (authenticated)');
+        routeToNavigate = '/(tabs)/home'; 
+      } else {
+        console.log('➡️ Navigating to: login (not authenticated)');
+        routeToNavigate = '/(auth)/login';
+      }
+    }
+    
+    if(routeToNavigate) router.replace(routeToNavigate)
+  },[
+  showSplash,
+  isAuthCheckDone,
+  isLanguageLoading,
+  isLanguageSet,
+  locationSet,
+  currentLocation,
+  serviceAvailable,
+  isAuthenticated,
+  router
+]);
 
-  return (
-    <LinearGradient colors={['#2C3E50', '#34495E']} style={{ flex: 1 }}>
-      <StatusBar style="light" />
-      <View className="flex-1 items-center justify-center">
-        <View className="items-center space-y-6">
-          {/* Logo */}
-          <View className="w-24 h-24 rounded-full items-center justify-center shadow-lg" style={{ backgroundColor: '#27AE60' }}>
-           <Image source={require('../../assets/images/scrapiz.jpg')} className="w-24 h-24 rounded-full" />
-          </View>
-          
-          {/* App Name */}
-          <Text className="text-4xl font-bold text-white">Scrapiz</Text>
-          
-          {/* Tagline */}
-          <Text className="text-lg text-white/80 text-center px-8">
-            Your Dukaan Wala
-          </Text>
-        </View>
-        
-        {/* Loading indicator */}
-        <View className="absolute bottom-20">
-          <View className="w-8 h-8 border-2 border-white/30 rounded-full animate-spin" style={{ borderTopColor: '#27AE60' }} />
-        </View>
-      </View>
-    </LinearGradient>
-  );
+if(showSplash) return <SplashScreen onFinish={handleSplashFinish} />;
+
+return (
+    <View className='flex-1 bg-slate-50'>
+      <StatusBar style="auto" />
+    </View>
+)
 }
+

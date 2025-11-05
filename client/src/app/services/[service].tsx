@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { ArrowLeft, Calendar, Clock, Shield, CheckCircle, Star } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import {services } from '../(tabs)/services';
+import { services } from '../(tabs)/services';
 
 const { width } = Dimensions.get('window');
 
@@ -98,7 +98,14 @@ export default function ServiceDetailsScreen() {
   const { service: serviceId } = useLocalSearchParams<{ service?: string }>();
   const router = useRouter();
 
-  const service = services.find(s => s.id === serviceId) || services[0];
+  const service = services.find(s => s.id === serviceId);
+  
+  // If service not found, redirect back
+  if (!service) {
+    router.back();
+    return null;
+  }
+  
   const details = serviceDetails[service.id] || { included: [], howItWorks: [] };
 
 
@@ -110,55 +117,52 @@ export default function ServiceDetailsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView className='flex-1 bg-slate-50'>
       <StatusBar barStyle="dark-content" />
       
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+      <View  className='flex-row items-center px-4 py-3 bg-white border-b border-gray-200'>
+        <TouchableOpacity className='bg-gray-100 p-2 rounded-[20px]' onPress={() => router.back()}>
           <ArrowLeft size={24} color="#111827" />
         </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <Text style={styles.title}>{service.title}</Text>
-        </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.contentContainer}>
+        <View className='p-16'>
 
-            <View style={[styles.heroCard, { backgroundColor: service.bgColor }]}>
-                <View style={[styles.heroIcon, { backgroundColor: service.color }]}>
+            <View style={ {backgroundColor: service.bgColor} } className='rounded-xl p-5 items-center mb-6 '>
+                <View style={{ backgroundColor: service.color }} className='w-18 h-18 rounded-full justify-center items-center mb-4'>
                     <service.icon size={40} color="white" />
                 </View>
-                <Text style={[styles.heroTitle, { color: service.color }]}>{service.title}</Text>
-                <Text style={styles.heroDescription}>{service.description}</Text>
-                <View style={styles.tagsContainer}>
-                    <View style={styles.tag}><Shield size={14} color="#475569" /><Text style={styles.tagText}>Insured</Text></View>
-                    <View style={styles.tag}><Clock size={14} color="#475569" /><Text style={styles.tagText}>Fast</Text></View>
-                    <View style={styles.tag}><Star size={14} color="#475569" /><Text style={styles.tagText}>4.8 ★</Text></View>
+                <Text style={{ color: service.color }} className='text-2xl font-bold font-inter-bold mb-2'>{service.title}</Text>
+                <Text className='text-[15px] text-slate-600 font-inter-regular text-center mb-4'>{service.description}</Text>
+                <View className='flex-row gap-[10px] '>
+                    <View className='flex-row items-center '><Shield size={14} color="#475569" /><Text className='text-sm font-inter-medium text-slate-600'>Insured</Text></View>
+                    <View className='flex-row items-center '><Clock size={14} color="#475569" /><Text className='text-sm font-inter-medium text-slate-600'>Fast</Text></View>
+                    <View className='flex-row items-center '><Star size={14} color="#475569" /><Text className='text-sm font-inter-medium text-slate-600'>4.8 ★</Text></View>
                 </View>
             </View>
 
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>What's Included</Text>
-                <View style={styles.card}>
+            <View className='mb-6'>
+                <Text className='text-lg font-semibold font-inter-semibold text-gray-900'>What's Included</Text>
+                <View className='bg-white rounded-2xl p-4 '>
                     {details.included.map((item: string, index: number) => (
-                    <View key={index} style={styles.listItem}>
+                    <View key={index} className='flex-row items-start gap-3 py-2.5'>
                         <CheckCircle size={18} color="#16a34a" />
-                        <Text style={styles.listItemText}>{item}</Text>
+                        <Text className='flex-1 text-[15px] font-inter-regular text-gray-700 leading-relaxed'>{item}</Text>
                     </View>
                     ))}
                 </View>
             </View>
 
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>How It Works</Text>
-                <View style={styles.card}>
+            <View className='mb-6'>
+                <Text className='text-lg font-semibold font-inter-semibold text-gray-700 mb-3'>How It Works</Text>
+                <View className='bg-white rounded-2xl'>
                     {details.howItWorks.map((item: string, index: number) => (
-                    <View key={index} style={styles.stepItem}>
-                        <View style={[styles.stepNumber, { backgroundColor: service.color }]}>
-                            <Text style={styles.stepNumberText}>{index + 1}</Text>
+                    <View key={index} className='flex-row items-start gap-4 py-2.5'>
+                        <View style={ { backgroundColor: service.color }} className='w-7 h-7 rounded-full justify-center items-center -mt-[2px] '>
+                            <Text className='text-white font-bold font-inter-bold text-[15px]'>{index + 1}</Text>
                         </View>
-                        <Text style={styles.stepText}>{item}</Text>
+                        <Text className='flex-1 text-[15px] font-inter-regular text-gray-700 leading-relaxed'>{item}</Text>
                     </View>
                     ))}
                 </View>
@@ -166,169 +170,16 @@ export default function ServiceDetailsScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View className='p-4 bg-white/90 border-t  border-gray-200'>
         <TouchableOpacity 
-          style={[styles.bookButton, { backgroundColor: service.color }]} 
+          style={ { backgroundColor: service.color }} 
+          className='flex-row justify-center items-center p-4 rounded-2xl gap-3'
           onPress={handleBookNow}
         >
           <Calendar size={22} color="white" />
-          <Text style={styles.bookButtonText}>Book This Service</Text>
+          <Text className='text-white text-lg font-semibold font-inter-semibold'>Book This Service</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  backButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
-  },
-  headerContent: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
-    color: '#111827',
-  },
-  contentContainer: {
-      padding: 16,
-  },
-  heroCard: {
-      borderRadius: 16,
-      padding: 20,
-      alignItems: 'center',
-      marginBottom: 24,
-  },
-  heroIcon: {
-      width: 72,
-      height: 72,
-      borderRadius: 36,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: 16,
-  },
-  heroTitle: {
-      fontSize: 24,
-      fontWeight: 'bold',
-      fontFamily: 'Inter-Bold',
-      marginBottom: 8,
-  },
-  heroDescription: {
-      fontSize: 15,
-      color: '#475569',
-      fontFamily: 'Inter-Regular',
-      textAlign: 'center',
-      marginBottom: 16,
-  },
-  tagsContainer: {
-      flexDirection: 'row',
-      gap: 10,
-  },
-  tag: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: 'rgba(0,0,0,0.05)',
-      borderRadius: 16,
-      paddingVertical: 6,
-      paddingHorizontal: 12,
-      gap: 6,
-  },
-  tagText: {
-      fontSize: 13,
-      fontFamily: 'Inter-Medium',
-      color: '#475569',
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
-    color: '#111827',
-    marginBottom: 12,
-  },
-  card: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
-  },
-  listItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    paddingVertical: 10,
-  },
-  listItemText: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: 'Inter-Regular',
-    color: '#374151',
-    lineHeight: 22,
-  },
-  stepItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 16,
-    paddingVertical: 10,
-  },
-  stepNumber: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginTop: -2,
-  },
-  stepNumberText: {
-      color: 'white',
-      fontWeight: 'bold',
-      fontFamily: 'Inter-Bold',
-      fontSize: 15,
-  },
-  stepText: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: 'Inter-Regular',
-    color: '#374151',
-    lineHeight: 22,
-  },
-  footer: {
-    padding: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-  },
-  bookButton: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
-    gap: 12,
-  },
-  bookButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
-  },
-});

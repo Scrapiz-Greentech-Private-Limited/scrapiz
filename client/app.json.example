@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "scrapiz",
+    "slug": "scrapiz",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "scrapiz",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.scrapiz"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.yourcompany.scrapiz"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "env": {
+        "EXPO_PUBLIC_FRONTEND_SECRET": "your-frontend-secret",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "your-google-client-id.apps.googleusercontent.com"
+      }
+    }
+  }
+}

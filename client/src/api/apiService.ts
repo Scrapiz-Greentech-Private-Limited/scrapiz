@@ -1,8 +1,11 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_CONFIG, ApiResponse, RegisterRequest, LoginRequest, VerifyOtpRequest, PasswordResetRequest, NotificationSettings, ServiceBookingPayload, ServiceBooking } from './config';
+import { ReferredUser, ReferralTransaction } from '../types/referral';
+import { DeletionFeedback } from '../types/account';
 
 export type { NotificationSettings, ServiceBookingPayload, ServiceBooking } from './config';
+export type { DeletionFeedback } from '../types/account';
 
 // User types
 export interface ProductSummary {
@@ -35,6 +38,8 @@ export interface OrderSummary {
   status: any;
   address: number;
   orders: OrderItemSummary[];
+  estimated_order_value?: number;
+  redeemed_referral_bonus?: number;
 }
 
 export interface AddressSummary {
@@ -75,6 +80,22 @@ export interface UserProfile {
   is_staff: boolean;
   orders: OrderSummary[];
   addresses: AddressSummary[];
+  referral_code?: string; // User's unique referral code to share
+  referred_balance?: string; // Accumulated referral earnings
+  has_completed_first_order?: boolean; // Whether user has completed their first order
+  profile_image?: string; // URL to user's profile image
+}
+
+// Waitlist types
+export interface WaitlistRequest {
+  email?: string;
+  phone_number?: string;
+  city: string;
+}
+
+export interface WaitlistResponse {
+  message: string;
+  city: string;
 }
 
 // Create axios instance
@@ -199,6 +220,21 @@ export class AuthService {
     }
   }
 
+  // Google OAuth login
+  static async googleLogin(idToken: string): Promise<ApiResponse> {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.GOOGLE_LOGIN, {
+        id_token: idToken,
+      });
+      if (response.data.jwt) {
+        await AsyncStorage.setItem('authToken', response.data.jwt);
+      }
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Google login failed');
+    }
+  }
+
   // Logout user
   static async logout(): Promise<ApiResponse> {
     try {
@@ -271,6 +307,60 @@ export class AuthService {
     }
   }
 
+  // Update user profile (name and/or profile image)
+  static async updateUserProfile(data: { 
+    name?: string; 
+    profile_image?: string | null; 
+  }): Promise<UserProfile> {
+    try {
+      const formData = new FormData();
+      
+      // Add name if provided
+      if (data.name !== undefined) {
+        formData.append('name', data.name);
+      }
+      
+      // Handle profile_image
+      if (data.profile_image !== undefined) {
+        if (data.profile_image === null || data.profile_image === '') {
+          // Empty string means remove the image
+          formData.append('profile_image', '');
+        } else if (data.profile_image.startsWith('file://') || data.profile_image.startsWith('content://')) {
+          // Local file URI - upload new image
+          const filename = data.profile_image.split('/').pop() || 'profile.jpg';
+          const match = /\.(\w+)$/.exec(filename);
+          const type = match ? `image/${match[1]}` : 'image/jpeg';
+          
+          formData.append('profile_image', {
+            uri: data.profile_image,
+            name: filename,
+            type,
+          } as any);
+        }
+        // If it's an S3 URL, don't include it (no change)
+      }
+
+      const token = await AsyncStorage.getItem('authToken');
+      const frontendKey = API_CONFIG.HEADERS['x-auth-app'] as string;
+
+      const response = await apiClient.patch(
+        API_CONFIG.ENDPOINTS.USER,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'x-auth-app': frontendKey,
+            Authorization: token || '',
+          },
+        }
+      );
+      
+      return response.data as UserProfile;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to update profile');
+    }
+  }
+
   // Delete current user
   static async deleteUser(): Promise<ApiResponse> {
     try {
@@ -278,6 +368,27 @@ export class AuthService {
       return response.data as ApiResponse;
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Failed to delete user');
+    }
+  }
+
+  // Delete current user with feedback
+  static async deleteUserWithFeedback(
+    feedback: DeletionFeedback
+  ): Promise<ApiResponse> {
+    try {
+      const response = await apiClient.delete(API_CONFIG.ENDPOINTS.USER, {
+        data: {
+          reason: feedback.reason,
+          comments: feedback.comments || ''
+        }
+      });
+      
+      // Clear local auth token on successful deletion
+      await AsyncStorage.removeItem('authToken');
+      
+      return response.data as ApiResponse;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to delete account');
     }
   }
 
@@ -327,9 +438,18 @@ export class AuthService {
   static async deleteAddress(id: number): Promise<ApiResponse> {
     try {
       const response = await apiClient.delete(`${API_CONFIG.ENDPOINTS.USER_ADDRESSES}${id}/`);
+      
+      // 204 No Content is the standard response for successful DELETE
+      // It may not have a response body
+      if (response.status === 204) {
+        return { message: 'Address deleted successfully' };
+      }
+      
+      // 200 OK with a message body
       return response.data as ApiResponse;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to delete address');
+      console.error('Delete address error:', error);
+      throw new Error(error.response?.data?.error || error.message || 'Failed to delete address');
     }
   }
 
@@ -364,13 +484,15 @@ export class AuthService {
   static async createOrder(
     items: Array<{ product_id: number; quantity: number }>,
     address_id?: number,
-    imageUris?: string[]
+    imageUris?: string[],
+    estimatedOrderValue?: number
   ): Promise<any> {
     try {
       console.log('createOrder called with:');
       console.log('- items:', items);
       console.log('- address_id:', address_id);
       console.log('- imageUris:', imageUris);
+      console.log('- estimatedOrderValue:', estimatedOrderValue);
       
       const formData = new FormData();
       
@@ -380,6 +502,11 @@ export class AuthService {
       // Add address_id if provided
       if (address_id) {
         formData.append('address_id', address_id.toString());
+      }
+
+      // Add estimated_order_value if provided
+      if (estimatedOrderValue !== undefined) {
+        formData.append('estimated_order_value', estimatedOrderValue.toString());
       }
 
       // Add images if provided
@@ -475,6 +602,56 @@ export class AuthService {
       return response.data as ServiceBooking[];
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Failed to fetch bookings');
+    }
+  }
+
+  // Get list of users referred by current user
+  static async getReferredUsers(): Promise<ReferredUser[]> {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.REFERRED_USERS);
+      return response.data.referrals as ReferredUser[];
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch referred users');
+    }
+  }
+
+  // Get referral transaction history
+  static async getReferralTransactions(): Promise<ReferralTransaction[]> {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.REFERRAL_TRANSACTIONS);
+      return response.data.transactions as ReferralTransaction[];
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch referral transactions');
+    }
+  }
+
+  // Redeem referral balance on order
+  static async redeemReferralBalance(orderId: number, amount: number): Promise<ApiResponse> {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.REDEEM_REFERRAL_BALANCE, {
+        order_id: orderId,
+        amount: amount
+      });
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to redeem referral balance');
+    }
+  }
+}
+
+// Waitlist API Service
+export class WaitlistService {
+  // Submit waitlist entry
+  static async submitWaitlist(data: WaitlistRequest): Promise<WaitlistResponse> {
+    try {
+      const response = await apiClient.post('/waitlist/', data, {
+        headers: {
+          'x-auth-app': API_CONFIG.HEADERS['x-auth-app'] as string,
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to submit waitlist entry');
     }
   }
 }
