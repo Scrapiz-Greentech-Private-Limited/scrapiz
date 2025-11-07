@@ -1,10 +1,13 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {StyleSheet} from 'react-native'
-import { AuthService } from '../api/apiService';
+import { useRouter, useSegments } from 'expo-router';
+import { AuthService, setGlobalSessionExpiredHandler, setCurrentRouteGetter } from '../api/apiService';
+import SessionExpiredDialog from '../components/SessionExpiredDialog';
 
 interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
+  showSessionExpired: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   register: (email: string, name: string, password: string, confirmPassword: string) => Promise<void>;
@@ -12,6 +15,7 @@ interface AuthContextType {
   setAuthenticatedState: (authenticated: boolean) => void;
   refreshAuthStatus: () => Promise<void>;
   clearAuthState: () => Promise<void>;
+  handleSessionExpired: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,9 +31,29 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [showSessionExpired, setShowSessionExpired] = useState(false);
+  const router = useRouter();
+  const segments = useSegments();
+  const currentRouteRef = useRef<string>('');
+
+  // Track current route
+  useEffect(() => {
+    const route = '/' + segments.join('/');
+    currentRouteRef.current = route;
+  }, [segments]);
 
   useEffect(() => {
     checkAuthStatus();
+    
+    // Register current route getter
+    setCurrentRouteGetter(() => currentRouteRef.current);
+    
+    // Register global session expired handler
+    setGlobalSessionExpiredHandler((shouldShow: boolean) => {
+      if (shouldShow) {
+        handleSessionExpired();
+      }
+    });
   }, []);
 
   const checkAuthStatus = async () => {
@@ -105,9 +129,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const handleSessionExpired = () => {
+    // Prevent showing dialog during initial load
+    if (isLoading) return;
+    
+    setShowSessionExpired(true);
+    setIsAuthenticated(false);
+  };
+
   const value = {
     isAuthenticated,
     isLoading,
+    showSessionExpired,
     login,
     logout,
     register,
@@ -115,11 +148,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAuthenticatedState,
     refreshAuthStatus,
     clearAuthState,
+    handleSessionExpired,
+  };
+
+  const handleRedirectToLogin = () => {
+    setShowSessionExpired(false);
+    router.replace('/(auth)/login');
   };
 
   return (
     <AuthContext.Provider value={value}>
       {children}
+      <SessionExpiredDialog 
+        visible={showSessionExpired} 
+        onRedirect={handleRedirectToLogin}
+      />
     </AuthContext.Provider>
   );
 };

@@ -9,7 +9,7 @@ const FRONTEND_KEY =
 
 console.log("frontend key is ",FRONTEND_KEY)
 export const API_CONFIG = {
-  BASE_URL: 'http://13.204.50.150/api',
+  BASE_URL: 'https://api.scrapiz.in/api',
   ENDPOINTS: {
     // Authentication endpoints
     REGISTER: '/authentication/register/',

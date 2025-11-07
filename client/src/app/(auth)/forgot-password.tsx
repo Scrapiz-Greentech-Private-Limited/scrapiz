@@ -8,13 +8,15 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
   StyleSheet, 
-  Platform 
+  Platform, 
+  Image
 } from 'react-native';
 import React, { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Mail, Lock, ArrowRight } from 'lucide-react-native';
 import { AuthService } from '../../api/apiService';
 import Toast from 'react-native-toast-message';
+import ScrapizLogo from '@/src/components/ScrapizLogo';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
@@ -161,7 +163,7 @@ export default function ForgotPasswordScreen() {
   const getStepDescription = () => {
     switch (step) {
       case 'email':
-        return 'Enter your email to receive a reset code';
+        return `No worries! Enter your email address and we'll send you a link to reset your password`;
       case 'otp':
         return 'Enter the OTP sent to your email';
       case 'newPassword':
@@ -187,6 +189,7 @@ export default function ForgotPasswordScreen() {
         </TouchableOpacity>
 
         <View style={styles.header}>
+          <ScrapizLogo width={240}/>
           <Text style={styles.welcomeText}>{getStepTitle()}</Text>
           <Text style={styles.subtitleText}>
             {getStepDescription()}

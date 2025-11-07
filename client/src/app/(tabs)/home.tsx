@@ -54,7 +54,25 @@ const serviceGradients = {
   'junk-removal': ['#16a34a', '#15803d'] as const,
 } as const;
 
+// Add this helper component
+const ServiceIcon = ({ iconName, color }: { iconName: string, color: string }) => {
+  const iconProps = { size: 22, color: color };
 
+  switch (iconName) {
+    case 'Hammer':
+      return <Hammer {...iconProps} />;
+    case 'Wrench':
+      return <Wrench {...iconProps} />;
+    case 'FileText':
+      return <FileText {...iconProps} />;
+    case 'Building':
+      return <Building {...iconProps} />;
+    case 'Trash2':
+      return <Trash2 {...iconProps} />;
+    default:
+      return null;
+  }
+};
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -68,43 +86,44 @@ export default function HomeScreen() {
   const { t } = useLocalization();
   const adScrollRef = useRef<ScrollView | null>(null);
   const [adIndex, setAdIndex] = useState(0);
-  const services = useMemo(() => [
-    { 
-      id: 'demolition', 
-      title: t('home.demolitionService'), // Used i18n key
-      description: t('home.demolitionDescription'), // Used i18n key
-      icon: Hammer, 
-      color: '#dc2626',
-    },
-    { 
-      id: 'dismantling', 
-      title: t('home.dismantling'), // Used i18n key
-      description: t('home.dismantlingDescription'), // Used i18n key
-      icon: Wrench, 
-      color: '#ea580c',
-    },
-    { 
-      id: 'paper-shredding', 
-      title: t('home.paperShredding'), // Used i18n key
-      description: t('home.paperShreddingDescription'), // Used i18n key
-      icon: FileText, 
-      color: '#0891b2',
-    },
-    { 
-      id: 'society-tieup', 
-      title: t('home.societyTieup'), // Used i18n key
-      description: t('home.societyTieupDescription'), // Used i18n key
-      icon: Building, 
-      color: '#7c3aed',
-    },
-    { 
-      id: 'junk-removal', 
-      title: t('home.junkRemoval'), // Used i18n key
-      description: t('home.junkRemovalDescription'), // Used i18n key
-      icon: Trash2, 
-      color: '#059669',
-    },
-  ], [t]);
+
+const services = useMemo(() => [
+  { 
+    id: 'demolition', 
+    title: t('home.demolitionService'), 
+    description: t('home.demolitionDescription'), 
+    icon: 'Hammer', // <-- Change this to a string
+    color: '#16a34a',
+  },
+  { 
+    id: 'dismantling', 
+    title: t('home.dismantling'),
+    description: t('home.dismantlingDescription'), 
+    icon: 'Wrench', // <-- Change this to a string
+    color: '#16a34a',
+  },
+  { 
+    id: 'paper-shredding', 
+    title: t('home.paperShredding'),
+    description: t('home.paperShreddingDescription'), 
+    icon: 'FileText', // <-- Change this to a string
+    color: '#16a34a',
+  },
+  { 
+    id: 'society-tieup', 
+    title: t('home.societyTieup'),
+    description: t('home.societyTieupDescription'), 
+    icon: 'Building', // <-- Change this to a string
+    color: '#16a34a',
+  },
+  { 
+    id: 'junk-removal', 
+    title: t('home.junkRemoval'),
+    description: t('home.junkRemovalDescription'), 
+    icon: 'Trash2', // <-- Change this to a string
+    color: '#16a34a', // <-- Also fix the white color here
+  },
+], [t]);
 
   const tips = useMemo(() => [
     t('home.tip1'),
@@ -274,7 +293,7 @@ export default function HomeScreen() {
                   <AreaChart size={22} color="#16a34a" strokeWidth={2.5} />
                 </View>
                 <Text style={[styles.actionTitle, { color: 'white' }]}>{t('home.viewRates')}</Text>
-                <Text style={[styles.actionSubtitle, { color: '#dcfce7' }]}>{t('home.todaysPrices')}</Text>
+                <Text style={[styles.actionSubtitle, { color: 'white' }]}>{t('home.todaysPrices')}</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -351,7 +370,7 @@ export default function HomeScreen() {
                   onPress={() => handleNavigate(`/services/${service.id}`)}
                 >
                   <View style={[styles.serviceIconContainer, { backgroundColor: 'white' }]}>
-                    <service.icon size={22} color={service.color} />
+                    <ServiceIcon iconName={service.icon} color={service.color} />
                   </View>
                   <View className='flex-1'>
                     <Text style={[styles.serviceTitle, { color: 'white' }]}>

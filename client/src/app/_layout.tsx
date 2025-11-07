@@ -3,7 +3,7 @@ import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from "react";
-import { ActivityIndicator, StyleSheet } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import '@/global.css';
 import React from "react";
 import Toast from 'react-native-toast-message';
@@ -12,12 +12,11 @@ import { LocationProvider } from "../context/LocationContext";
 import { ProfileProvider } from "../context/ProfileContext";
 import { ReferralProvider } from "../context/ReferralContext";
 import { LocalizationProvider, useLocalization } from "../context/LocalizationContext";
-import { View } from "lucide-react-native";
-import { useFrameworkReady } from "../hooks/useFrameworkReady";
+
 import '../localization/i18n';
 
 SplashScreen.preventAutoHideAsync();
-useFrameworkReady();
+
 
 /**
  * AppContent component

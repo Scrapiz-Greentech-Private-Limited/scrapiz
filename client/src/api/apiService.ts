@@ -126,6 +126,42 @@ apiClient.interceptors.request.use(
   }
 );
 
+// Global session expired handler (will be set by AuthProvider)
+let globalSessionExpiredHandler: ((shouldShow: boolean) => void) | null = null;
+let currentRouteGetter: (() => string | null) | null = null;
+let lastSessionExpiredTrigger = 0;
+const SESSION_EXPIRED_DEBOUNCE = 2000; // 2 seconds debounce
+
+export const setGlobalSessionExpiredHandler = (handler: (shouldShow: boolean) => void) => {
+  globalSessionExpiredHandler = handler;
+};
+
+export const setCurrentRouteGetter = (getter: () => string | null) => {
+  currentRouteGetter = getter;
+};
+
+// Check if current route should show session expired dialog
+const shouldShowSessionExpired = (currentRoute: string | null): boolean => {
+  if (!currentRoute) return false;
+  
+  // Don't show on auth pages, splash screen, or initial loading
+  const excludedRoutes = [
+    '/(auth)',
+    '/login',
+    '/register',
+    '/forgot-password',
+    '/language-selection',
+    '/location-permission',
+    '/service-unavailable',
+    '/oauthredirect',
+    '/',
+    '/index',
+  ];
+  
+  // Check if current route matches any excluded route
+  return !excludedRoutes.some(route => currentRoute.includes(route));
+};
+
 // Response interceptor for error handling
 apiClient.interceptors.response.use(
   (response) => response,
@@ -135,8 +171,24 @@ apiClient.interceptors.response.use(
     console.error('API Error:', data || error.message);
 
     if (status === 401 || status === 403) {
-      // Clear token on auth errors so app can redirect to login
+      // Clear token on auth errors
       try { await AsyncStorage.removeItem('authToken'); } catch {}
+      
+      // Debounce to prevent multiple rapid triggers
+      const now = Date.now();
+      if (now - lastSessionExpiredTrigger < SESSION_EXPIRED_DEBOUNCE) {
+        return Promise.reject(error);
+      }
+      lastSessionExpiredTrigger = now;
+      
+      // Get current route and check if we should show dialog
+      const currentRoute = currentRouteGetter ? currentRouteGetter() : null;
+      const shouldShow = shouldShowSessionExpired(currentRoute);
+      
+      // Trigger session expired dialog only on protected routes
+      if (globalSessionExpiredHandler && shouldShow) {
+        globalSessionExpiredHandler(shouldShow);
+      }
     }
     return Promise.reject(error);
   }

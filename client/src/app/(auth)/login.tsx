@@ -163,8 +163,8 @@ export default function LoginScreen() {
   const isAnyLoading = isLoading || isGoogleLoading;
 
   return (
-    <View className='flex-1 bg-white'>
-      <View className='flex-1'>
+    <View style={styles.container}>
+      <View style={styles.backgroundWrapper}>
         {/* Green Gradient Header */}
         <LinearGradient
           colors={['#16a34a', '#15803d', '#14532d']}
@@ -176,7 +176,7 @@ export default function LoginScreen() {
           <View 
           style={styles.texturePattern}>
             {Array.from({ length: 80 }).map((_, i) => (
-              <View key={i} className='w-3 h-3 rounded-[1.5px] bg-white m-3' />
+              <View key={i} style={styles.textureDot} />
             ))}
           </View>
           
@@ -216,7 +216,7 @@ export default function LoginScreen() {
             ]}
           >
             <View style={styles.logoContainer}>
-              <ScrapizLogo size={56} />
+              <Image source={require('../../../assets/images/LogowithoutS.png')} style={styles.logoImage} resizeMode='contain'/>
               <View style={styles.badge}>
                 <Sparkles size={12} color="#ffffff" />
                 <Text style={styles.badgeText}>{t('auth.trustedBy')}</Text>
@@ -225,7 +225,7 @@ export default function LoginScreen() {
             
             <Text style={styles.welcomeText}>{t('auth.welcomeBack')}</Text>
             <Text style={styles.subtitleText}>
-              {t('auth.welcomeSubtitle')}
+            "Sign in to turn your scrap into instant cash 💰"
             </Text>
           </Animated.View>
         </LinearGradient>
@@ -249,9 +249,9 @@ export default function LoginScreen() {
                 },
               ]}
             >
-              <View className='mb-[14px]'>
-                <View className='flex-row items-center bg-gray-50 rounded-2xl border-[1.5px] border-gray-200 px-4 py-1 h-[58px] shadow-sm shadow-black/5'>
-                  <View className='w-[38px] h-[38px] rounded-[19px] bg-green-100 justify-center items-center mr-3'>
+              <View style={styles.inputContainer}>
+                <View style={styles.inputWrapper}>
+                  <View style={styles.iconCircle}>
                     <Mail size={20} color="#10b981" />
                   </View>
                   <TextInput
@@ -276,14 +276,14 @@ export default function LoginScreen() {
                 </View>
                 {errors.email && (
                   <View className='mt-1.5 ml-1'>
-                    <Text className='text-[13px] text-red-700 font-semibold'>⚠️ {errors.email}</Text>
+                   <Text style={styles.errorText}>⚠️ {errors.email}</Text>
                   </View>
                 )}
               </View>
 
-              <View className='mb-[14px]'>
-                <View className='flex-row items-center bg-gray-50 rounded-2xl border-[1.5px] border-gray-200 px-4 py-1 h-[58px] shadow-sm shadow-black/5'>
-                  <View className='w-[38px] h-[38px] rounded-[19px] bg-green-100 justify-center items-center mr-3'>
+               <View style={styles.inputContainer}>
+                <View style={styles.inputWrapper}>
+                  <View style={styles.iconCircle}>
                     <Lock size={20} color="#10b981" />
                   </View>
                   <TextInput
@@ -317,15 +317,15 @@ export default function LoginScreen() {
                   </TouchableOpacity>
                 </View>
                 {errors.password && (
-                  <View className='mt-1.5 ml-1'>
-                    <Text className='text-[13px] text-red-700 font-semibold'>⚠️ {errors.password}</Text>
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>⚠️ {errors.password}</Text>
                   </View>
                 )}
               </View>
 
               <Link href="/(auth)/forgot-password" asChild>
-                <TouchableOpacity className='self-end mb-5' disabled={isAnyLoading}>
-                  <Text className='text-sm text-green-600 font-bold'>{t('auth.forgotPasswordLink')}</Text>
+                <TouchableOpacity style={styles.forgotPassword} disabled={isAnyLoading}>
+                  <Text style={styles.forgotPasswordText}>{t('auth.forgotPasswordLink')}</Text>
                 </TouchableOpacity>
               </Link>
 
@@ -336,7 +336,7 @@ export default function LoginScreen() {
               >
                 <LinearGradient
                   colors={['#16a34a', '#15803d', '#14532d']}
-                  className='flex-1 flex-row items-center justify-center gap-2.5'
+                   style={styles.loginButtonGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                 >
@@ -344,17 +344,17 @@ export default function LoginScreen() {
                     <ActivityIndicator color="white" size="small" />
                   ) : (
                     <>
-                      <Text className='text-[17px] font-extrabold text-white tracking-[0.3px]'>{t('auth.signIn')}</Text>
+                      <Text style={styles.loginButtonText}>{t('auth.signIn')}</Text>
                       <ArrowRight size={22} color="white" />
                     </>
                   )}
                 </LinearGradient>
               </TouchableOpacity>
 
-              <View className='flex-row items-center mb-4'>
-                <View className='flex-1 h-px bg-gray-200' />
-                <Text className='text-[13px] text-gray-400 font-semibold px-[14px]'>{t('auth.orContinueWith')}</Text>
-                <View className='flex-1 h-px bg-gray-200' />
+              <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>{t('auth.orContinueWith')}</Text>
+                <View style={styles.dividerLine} />
               </View>
 
               <TouchableOpacity
@@ -381,10 +381,10 @@ export default function LoginScreen() {
                 { opacity: fadeAnim }
               ]}
             >
-              <Text className='text-[15px] text-gray-500 font-medium'>{t('auth.dontHaveAccount')}</Text>
+              <Text style={styles.footerText}>{t('auth.dontHaveAccount')}</Text>
               <Link href="/(auth)/register" asChild>
                 <TouchableOpacity disabled={isAnyLoading}>
-                  <Text className='text-[15px] text-green-600 font-extrabold'>{t('auth.signUpLink')}</Text>
+                  <Text style={styles.footerLink}>{t('auth.signUpLink')}</Text>
                 </TouchableOpacity>
               </Link>
             </Animated.View>
@@ -396,19 +396,19 @@ export default function LoginScreen() {
                 { opacity: fadeAnim }
               ]}
             >
-              <View className='flex-row items-center gap-1 flex-1 justify-center'>
+              <View style={styles.trustItem}>
                 <Shield size={18} color="#10b981" />
-                <Text className='text-[11px] text-green-800 font-bold flex-shrink'>{t('auth.secure')}</Text>
+                <Text style={styles.trustText}>{t('auth.secure')}</Text>
               </View>
-              <View className='w-px h-4 bg-green-200' />
-              <View className='flex-row items-center gap-1 flex-1 justify-center'>
+              <View style={styles.trustDivider} />
+              <View style={styles.trustItem}>
                 <Zap size={18} color="#f59e0b" />
-                <Text className='text-[11px] text-green-800 font-bold flex-shrink'>{t('auth.fastPayout')}</Text>
+                <Text style={styles.trustText}>{t('auth.fastPayout')}</Text>
               </View>
-              <View className='w-px h-4 bg-green-200' />
-              <View className='flex-row items-center gap-1 flex-1 justify-center'>
+              <View style={styles.trustDivider} />
+              <View style={styles.trustItem}>
                 <Sparkles size={18} color="#8b5cf6" />
-                <Text className='text-[11px] text-green-800 font-bold flex-shrink'>{t('auth.bestRates')}</Text>
+                <Text style={styles.trustText}>{t('auth.bestRates')}</Text>
               </View>
             </Animated.View>
           </ScrollView>
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
   greenHeader: {
     position: 'absolute',
     width: '100%',
-    height: height * 0.36,
+    height: height * 0.40,
     top: 0,
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
@@ -445,7 +445,6 @@ const styles = StyleSheet.create({
     opacity: 0.15,
     paddingHorizontal: 20,
     paddingVertical: 20,
-    zIndex:0
   },
   textureDot: {
     width: 3,
@@ -462,7 +461,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     top: -100,
     right: -80,
-    zIndex: 1,
   },
   bgCircle2: {
     position: 'absolute',
@@ -472,77 +470,78 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     bottom: -60,
     left: -60,
-    zIndex: 1,
   },
   keyboardView: {
     flex: 1,
   },
-  googleIcon: {
-    width: 24,
-    height: 24,
-    resizeMode: 'contain',
-  },
   scrollContent: {
-    flexGrow: 1,
+    flex: 1,
     paddingHorizontal: 24,
-    paddingTop: height * 0.36 + 20,
+    paddingTop: height * 0.40 + 20,
     paddingBottom: 30,
     justifyContent: 'space-between',
   },
   headerInGreen: {
     position: 'absolute',
-    top: 70,
+    top: 60,
     left: 0,
     right: 0,
     alignItems: 'center',
     paddingHorizontal: 20,
-    zIndex: 10,
-    elevation: 10,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 36,
   },
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 16,
     width: '100%',
-    zIndex: 11,
-    elevation: 11
+  },
+  logoImage: {
+    width: 300,
+    height: 120,
+    marginBottom: 8,
+  },
+  logoGlow: {
+    display: 'none',
   },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 9,
-    borderRadius: 24,
-    gap: 7,
-    marginTop: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.35)',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   badgeText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#ffffff',
     fontWeight: '700',
-    letterSpacing: 0.6,
+    letterSpacing: 0.4,
   },
   welcomeText: {
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: '800',
     color: '#ffffff',
-    marginBottom: 5,
-    marginTop: 0,
+    marginBottom: 6,
+    marginTop: 12,
     textAlign: 'center',
     letterSpacing: -0.6,
+    textDecorationLine: 'none',
   },
   subtitleText: {
-    fontSize: 14,
-    color: '#ffffff',
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.95)',
     textAlign: 'center',
-    lineHeight: 20,
-    maxWidth: 290,
+    lineHeight: 18,
+    maxWidth: 320,
     fontWeight: '500',
-    opacity: 0.95,
   },
   formContainer: {
     marginBottom: 20,
@@ -683,6 +682,11 @@ const styles = StyleSheet.create({
         elevation: 2,
       },
     }),
+  },
+  googleIcon: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain',
   },
   googleButtonDisabled: {
     opacity: 0.6,

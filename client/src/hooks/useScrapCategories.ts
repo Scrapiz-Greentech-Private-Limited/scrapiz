@@ -38,12 +38,12 @@ export const useScrapCategories = (products: ProductSummary[], categories: Categ
         }
         const getColor  = (name: string): string => {
         const lowerName = name.toLowerCase();
-        if (lowerName.includes('paper')) return '#10b981';
-        if (lowerName.includes('plastic')) return '#3b82f6';
-        if (lowerName.includes('metal')) return '#f59e0b';
-        if (lowerName.includes('electricals')) return '#8b5cf6';
-        if(lowerName.includes('glass')) return '#ef4444';
-        return '#6b7280';
+        if (lowerName.includes('paper')) return '#166534';
+        if (lowerName.includes('plastic')) return '#166534';
+        if (lowerName.includes('metal')) return '#166534';
+        if (lowerName.includes('electricals')) return '#166534';
+        if(lowerName.includes('glass')) return '#166534';
+        return '#166534';
     };
     return categories.map(category => {
       const categoryProducts = categoryMap.get(category.id) || [];

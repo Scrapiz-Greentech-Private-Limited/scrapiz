@@ -19,18 +19,24 @@ import gu from './translations/gu.json';
  * Custom language detector plugin for i18next
  * Detects and caches user language preference in AsyncStorage
  */
+/**
+ * Custom language detector plugin for i18next
+ * Detects and caches user language preference in AsyncStorage
+ */
 const languageDetector = {
   type: 'languageDetector' as const,
   async: true,
-  
-  /**
-   * Detect the user's preferred language from AsyncStorage
-   * Falls back to DEFAULT_LANGUAGE (English) if not found or on error
-   */
   detect: async (callback: (lang: string) => void) => {
+    if (typeof window === 'undefined') {
+      console.log('[i18n] Build environment detected, using default language.');
+      // ** FIX 1: The 'detect' function MUST call the callback **
+      callback(DEFAULT_LANGUAGE);
+      return;
+    }
+
     try {
       const savedLanguage = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
-      
+
       if (savedLanguage) {
         console.log('[i18n] Detected saved language:', savedLanguage);
         callback(savedLanguage);
@@ -44,28 +50,28 @@ const languageDetector = {
       callback(DEFAULT_LANGUAGE);
     }
   },
-  
-  init: () => {
-    console.log('[i18n] Language detector initialized');
-  },
-  
-  /**
-   * Cache the user's language preference to AsyncStorage
-   * Handles errors gracefully with logging
-   */
-  cacheUserLanguage: async (language: string) => {
-    try {
-      await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, language);
-      console.log('[i18n] Language cached successfully:', language);
-    } catch (error) {
-      console.error('[i18n] Failed to cache language to AsyncStorage:', error);
-    }
-  }
+
+    init: () => {
+      console.log('[i18n] Language detector initialized');
+    },
+
+
+      cacheUserLanguage: async (language: string) => {
+        if (typeof window === 'undefined') {
+          console.log('[i18n] Build environment detected, skipping language cache.');
+          // ** FIX 2: The 'cache' function MUST NOT call callback. Just return. **
+          return;
+        }
+        try {
+          await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, language);
+          console.log('[i18n] Language cached successfully:', language);
+        } catch (error) {
+          console.error('[i18n] Failed to cache language to AsyncStorage:', error);
+        }
+      }
 };
 
-/**
- * Initialize i18next with configuration
- */
+
 i18n
   .use(languageDetector)
   .use(initReactI18next)
@@ -77,26 +83,26 @@ i18n
       mr: { translation: mr },
       gu: { translation: gu }
     },
-    
+
     // Fallback language when translation is missing
     fallbackLng: DEFAULT_LANGUAGE,
-    
+
     // Compatibility with JSON v3 format
     compatibilityJSON: 'v3',
-    
+
     // Interpolation options
     interpolation: {
       escapeValue: false // React Native doesn't need HTML escaping
     },
-    
+
     // React-specific options
     react: {
       useSuspense: false // Disable suspense for React Native
     },
-    
+
     // Enable debug mode in development
     debug: __DEV__,
-    
+
     // Handle missing keys
     saveMissing: false,
     missingKeyHandler: (lngs, ns, key, fallbackValue) => {
@@ -104,7 +110,7 @@ i18n
         console.warn(`[i18n] Missing translation key: ${key} for languages: ${lngs.join(', ')}`);
       }
     },
-    
+
     // Return empty string for missing keys instead of the key itself
     returnEmptyString: false,
     returnNull: false
