@@ -13,7 +13,7 @@ def authenticate_request(request, need_user=False):
     token = request.headers.get('Authorization')
     secret_key = request.headers.get('x-auth-app')
 
-    # 🔐 Secret key check
+    # ðŸ” Secret key check
     if not secret_key or secret_key != os.getenv('MY_FRONTEND_SECRET'):
         raise AuthenticationFailed('Invalid secret key!')
 
@@ -34,8 +34,8 @@ def authenticate_request(request, need_user=False):
     if not user:
         raise AuthenticationFailed('User not found!')
 
-    # 🔑 Session ID check (important for single device login)
+    # ðŸ”‘ Session ID check (important for single device login)
     if user.session_id != payload.get('session_id'):
-        raise AuthenticationFailed('Session invalid — logged in from another device!')
+        raise AuthenticationFailed('Session invalid â€” logged in from another device!')
 
     return user

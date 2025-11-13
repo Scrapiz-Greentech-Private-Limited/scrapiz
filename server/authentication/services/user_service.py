@@ -1,74 +1,59 @@
-import uuid
-import jwt
-import datetime
-from django.contrib.auth.hashers import make_password
-from ..models import User
+import os
+from google.oauth2 import id_token
+from google.auth.transport import requests
+
+from dotenv import load_dotenv
 
 
-class UserService:
-    """Service for handling user management operations"""
-    
-    @staticmethod
-    def get_or_create_oauth_user(email, name):
-        """
-        Get existing user by email or create new OAuth user
-        
-        Args:
-            email (str): User's email address
-            name (str): User's full name
-            
-        Returns:
-            User: Existing or newly created user instance
-        """
-        try:
-            # Check if user exists
-            user = User.objects.filter(email=email).first()
-            
-            if user:
-                # Return existing user
-                return user
-            
-            # Create new OAuth user with unusable password
-            user = User.objects.create(
-                email=email,
-                name=name,
-                password=make_password(None),  # Unusable password for OAuth users
-                is_active=True
-            )
-            
-            return user
-            
-        except Exception as e:
-            raise Exception(f'Failed to get or create user: {str(e)}')
-    
-    @staticmethod
-    def generate_session_id():
-        """
-        Generate a unique session ID
-        
-        Returns:
-            str: UUID session ID as string
-        """
-        return str(uuid.uuid4())
-    
-    @staticmethod
-    def create_jwt_token(user_id, session_id):
-        """
-        Create JWT token for authenticated user
-        
-        Args:
-            user_id (int): User's database ID
-            session_id (str): User's session ID
-            
-        Returns:
-            str: Encoded JWT token
-        """
-        payload = {
-            'id': user_id,
-            'session_id': session_id,
-            'exp': datetime.datetime.utcnow() + datetime.timedelta(days=7),
-            'iat': datetime.datetime.utcnow()
-        }
-        
-        token = jwt.encode(payload, 'secret', algorithm='HS256')
-        return token
+
+class GoogleOAuthService():
+      @staticmethod
+      def get_google_client():
+        client_ids = []
+        ios_client_id = os.getenv('GOOGLE_IOS_CLIENT_ID')
+        if ios_client_id:
+          client_ids.append(ios_client_id)
+        android_client_id = os.getenv('GOOGLE_ANDROID_CLIENT_ID')
+        if android_client_id:
+          client_ids.append(android_client_id)
+        if not client_ids:
+          raise ValueError("No Google Client IDs configured. Set GOOGLE_IOS_CLIENT_ID, GOOGLE_ANDROID_CLIENT_ID")
+        return client_ids
+      
+      
+      @staticmethod
+      def verify_id_token(token):
+          try:
+             client_ids = GoogleOAuthService.get_google_client()
+             idinfo = None
+             last_error = None
+             for client_id in client_ids:
+               try:
+                 idinfo = id_token.verify_oauth2_token(
+                   token,
+                   requests.Request(),
+                   client_id
+                 )
+                 if idinfo:
+                   break
+               except ValueError as e:
+                 last_error =e
+                 continue
+             if not idinfo:
+               raise ValueError(f'Token verification failed with all client IDs: {str(last_error)}')
+             if idinfo['iss'] not in ['accounts.google.com', 'https://accounts.google.com']:
+               raise ValueError('Invalid token issuer')
+             user_data = {
+               'email': idinfo.get('email'),
+               'name': idinfo.get('name'),
+               'sub': idinfo.get('sub'),
+               'picture': idinfo.get('picture')
+             }
+             if not user_data['email']:
+               raise ValueError('Email not found in token')
+             return user_data
+          except ValueError as e:
+            raise ValueError(f'Invalid token: {str(e)}')
+          except Exception as e:
+            raise ValueError(f'Token verification failed: {str(e)}')
+                 

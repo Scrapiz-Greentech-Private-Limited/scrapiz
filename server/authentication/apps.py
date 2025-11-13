@@ -6,8 +6,5 @@ class AuthenticationConfig(AppConfig):
     name = 'authentication'
     
     def ready(self):
-        """
-        Import signals when the app is ready.
-        This ensures signal handlers are registered.
-        """
-        import authentication.signals  # noqa: F401
+      import authentication.signals
+

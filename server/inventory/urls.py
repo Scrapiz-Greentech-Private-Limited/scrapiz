@@ -7,7 +7,6 @@ from .views import (
     OrderNoViewSet,
     OrderViewSet,
     CreateOrderAPIView,
-    UpdateOrderStatusAPIView,
     CancelOrderAPIView,
 )
 
@@ -21,6 +20,6 @@ router.register("orders", OrderViewSet)
 urlpatterns = [
     path("", include(router.urls)),
     path("create-order/", CreateOrderAPIView.as_view(), name="create-order"),
-    path("update-order-status/", UpdateOrderStatusAPIView.as_view(), name="update-order-status"),
     path("cancel-order/", CancelOrderAPIView.as_view(), name="cancel-order"),
+
 ]

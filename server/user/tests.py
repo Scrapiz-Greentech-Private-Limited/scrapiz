@@ -13,7 +13,7 @@ from .models import NotificationPreference
 class NotificationPreferenceAPITests(APITestCase):
 	def setUp(self):
 		self.secret = 'test-frontend-secret'
-		os.environ['FRONTEND_SECRET'] = self.secret
+		os.environ['MY_FRONTEND_SECRET'] = self.secret
 
 		self.user = User.objects.create_user(
 			email='test@example.com',
@@ -32,8 +32,8 @@ class NotificationPreferenceAPITests(APITestCase):
 		self.url = reverse('notification-settings')
 
 	def tearDown(self):
-		if 'FRONTEND_SECRET' in os.environ:
-			del os.environ['FRONTEND_SECRET']
+		if 'MY_FRONTEND_SECRET' in os.environ:
+			del os.environ['MY_FRONTEND_SECRET']
 
 	def _auth_headers(self):
 		return {

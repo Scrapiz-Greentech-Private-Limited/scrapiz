@@ -1,16 +1,9 @@
-"""
-Notification services package
-"""
-from .notification_manager import NotificationManager
-from .email_service import EmailNotificationService
-from .whatsapp_service import WhatsAppNotificationService
-from .dashboard_service import DashboardNotificationService
-from .supabase_client import SupabaseNotificationClient
+from .manager import NotificationManager
+from .email import EmailNotificationService
+from .whatsapp import WhatsappNotification
+from .dashboard import DashboardNotification
+from .client import ClientService
 
-__all__ = [
-    'NotificationManager',
-    'EmailNotificationService',
-    'WhatsAppNotificationService',
-    'DashboardNotificationService',
-    'SupabaseNotificationClient',
-]
+
+
+__all__ = ['NotificationManager','EmailNotificationService', 'WhatsappNotification', 'DashboardNotification','ClientService']

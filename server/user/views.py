@@ -14,7 +14,7 @@ class AuthenticatedAPIView(APIView):
         token = request.headers.get('Authorization')
         secret_key = request.headers.get('x-auth-app')
 
-        if not secret_key or secret_key != os.getenv('FRONTEND_SECRET'):
+        if not secret_key or secret_key != os.getenv('MY_FRONTEND_SECRET'):
             raise AuthenticationFailed('Invalid secret key')
 
         if not token:
@@ -76,19 +76,16 @@ class AddressAPIView(AuthenticatedAPIView):
     # ✅ Delete apna hi address
     def delete(self, request, pk):
         try:
-            user = self.authenticate_user(request)
-
-            try:
-                address = AddressModel.objects.get(pk=pk, user=user)
-            except AddressModel.DoesNotExist:
-                return Response({"error": "Address not found"}, status=status.HTTP_404_NOT_FOUND)
-
-            address.delete()
-            # Return 204 No Content (standard for successful DELETE with no body)
-            return Response(status=status.HTTP_204_NO_CONTENT)
+          user = self.authenticate_user(request)
+          try:
+            address = AddressModel.objects.get(pk=pk, user=user)
+          except AddressModel.DoesNotExist:
+            return Response({"error": "Address not found"}, status=status.HTTP_404_NOT_FOUND)
+          address.delete()
+          return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as e:
-            print(f"Error deleting address: {str(e)}")
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+          print(f"Error deleting address: {str(e)}")
+          return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class NotificationPreferenceAPIView(AuthenticatedAPIView):

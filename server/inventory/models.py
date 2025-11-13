@@ -4,6 +4,12 @@ from user.models import AddressModel
 
 class Category(models.Model):
     name = models.CharField(max_length=50, null=True, blank=True)
+    image_url = models.URLField(
+        max_length=500,
+        null=True,
+        blank=True,
+        help_text="URL to category image stored in S3"
+    )
 
     def __str__(self):
         return self.name or "Unnamed Category"
@@ -16,7 +22,13 @@ class Product(models.Model):
     unit = models.CharField(max_length=50, null=True, blank=True)
     description = models.CharField(max_length=50, null=True, blank=True) 
     category = models.ForeignKey(Category, related_name="products", on_delete=models.CASCADE)
-
+    image_url = models.URLField(
+        max_length=500,
+        null=True,
+        blank=True,
+        help_text="URL to product image stored in S3"
+    )
+    
     def __str__(self):
         return self.name or "Unnamed Product"
 
@@ -35,22 +47,8 @@ class OrderNo(models.Model):
     status = models.ForeignKey(Status, related_name="order_numbers", on_delete=models.CASCADE, null=True, blank=True)
     address = models.ForeignKey(AddressModel, related_name="address", on_delete=models.CASCADE, null=True, blank=True)
     images = models.JSONField(null=True, blank=True, default=list)
-    
-    # Referral System Field
-    redeemed_referral_bonus = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=0.00,
-        help_text="Amount redeemed from referral balance for this order"
-    )
-    
-    # Order Value Tracking Field
-    estimated_order_value = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=0.00,
-        help_text="Estimated total value of all items in this order"
-    )
+    redeemed_referral_bonus = models.DecimalField(max_digits=10,decimal_places=2,default=0.00)
+    estimated_order_value = models.DecimalField(max_digits=10,decimal_places=2,default=0.00)  
 
     def __str__(self):
         return f"OrderNo {self.order_number} by {self.user}"

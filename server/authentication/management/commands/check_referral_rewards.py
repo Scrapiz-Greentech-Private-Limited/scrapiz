@@ -1,13 +1,10 @@
-"""
-Django management command to check and manually process referral rewards.
-Usage: python manage.py check_referral_rewards
-"""
+
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from decimal import Decimal
 from authentication.models import User
 from inventory.models import OrderNo
-from inventory.utils import calculate_order_value
+from utils.referral_check import calculate_order
 import logging
 
 logger = logging.getLogger(__name__)
@@ -58,23 +55,23 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f'Order {order_number} not found'))
             return
 
-        self.stdout.write(f'\n📦 Order: {order.order_number}')
+        self.stdout.write(f'\n?? Order: {order.order_number}')
         self.stdout.write(f'   User: {order.user.email}')
         self.stdout.write(f'   Status: {order.status.name if order.status else "No status"}')
         
         # Calculate order value
         order_value = calculate_order_value(order)
-        self.stdout.write(f'   Order Value: ₹{order_value}')
+        self.stdout.write(f'   Order Value: ?{order_value}')
         
         # Check eligibility
         user = order.user
-        self.stdout.write(f'\n🔍 Eligibility Check:')
-        self.stdout.write(f'   ✓ Has referrer: {"Yes" if user.referred_by else "No"}')
+        self.stdout.write(f'\n?? Eligibility Check:')
+        self.stdout.write(f'   ? Has referrer: {"Yes" if user.referred_by else "No"}')
         if user.referred_by:
             self.stdout.write(f'     Referred by: {user.referred_by.email}')
-        self.stdout.write(f'   ✓ First order completed: {"Yes" if user.has_completed_first_order else "No"}')
-        self.stdout.write(f'   ✓ Order value > ₹500: {"Yes" if order_value > Decimal("500.00") else "No"}')
-        self.stdout.write(f'   ✓ Status is Completed: {"Yes" if order.status and order.status.name.lower() == "completed" else "No"}')
+        self.stdout.write(f'   ? First order completed: {"Yes" if user.has_completed_first_order else "No"}')
+        self.stdout.write(f'   ? Order value > ?500: {"Yes" if order_value > Decimal("500.00") else "No"}')
+        self.stdout.write(f'   ? Status is Completed: {"Yes" if order.status and order.status.name.lower() == "completed" else "No"}')
         
         # Check if eligible
         is_eligible = (
@@ -86,14 +83,14 @@ class Command(BaseCommand):
         )
         
         if is_eligible:
-            self.stdout.write(self.style.SUCCESS('\n✅ Order is ELIGIBLE for referral rewards!'))
+            self.stdout.write(self.style.SUCCESS('\n? Order is ELIGIBLE for referral rewards!'))
             
             if process:
                 self.process_reward(order)
             else:
                 self.stdout.write(self.style.WARNING('   (Dry-run mode - use --process to actually grant rewards)'))
         else:
-            self.stdout.write(self.style.ERROR('\n❌ Order is NOT eligible for referral rewards'))
+            self.stdout.write(self.style.ERROR('\n? Order is NOT eligible for referral rewards'))
 
     def check_user_orders(self, email, process):
         """Check all orders for a specific user"""
@@ -103,11 +100,11 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f'User {email} not found'))
             return
 
-        self.stdout.write(f'\n👤 User: {user.email}')
+        self.stdout.write(f'\n?? User: {user.email}')
         self.stdout.write(f'   Name: {user.name}')
         self.stdout.write(f'   Referred by: {user.referred_by.email if user.referred_by else "None"}')
         self.stdout.write(f'   First order completed: {"Yes" if user.has_completed_first_order else "No"}')
-        self.stdout.write(f'   Referral balance: ₹{user.referral_balance}')
+        self.stdout.write(f'   Referral balance: ?{user.referred_balance}')
         
         # Get all orders
         orders = OrderNo.objects.filter(user=user).order_by('created_at')
@@ -116,15 +113,15 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING('\n   No orders found for this user'))
             return
         
-        self.stdout.write(f'\n📦 Orders ({orders.count()}):')
+        self.stdout.write(f'\n?? Orders ({orders.count()}):')
         
         for order in orders:
-            order_value = calculate_order_value(order)
+            order_value = calculate_order(order)
             status_name = order.status.name if order.status else "No status"
             
             self.stdout.write(f'\n   Order: {order.order_number}')
             self.stdout.write(f'   Status: {status_name}')
-            self.stdout.write(f'   Value: ₹{order_value}')
+            self.stdout.write(f'   Value: ?{order_value}')
             self.stdout.write(f'   Created: {order.created_at}')
             
             # Check if this order is eligible
@@ -137,11 +134,11 @@ class Command(BaseCommand):
             )
             
             if is_eligible:
-                self.stdout.write(self.style.SUCCESS('   ✅ ELIGIBLE for rewards'))
+                self.stdout.write(self.style.SUCCESS('   ? ELIGIBLE for rewards'))
                 if process:
                     self.process_reward(order)
             else:
-                self.stdout.write('   ❌ Not eligible')
+                self.stdout.write('   ? Not eligible')
 
     def check_all_referrals(self, process):
         """Check all users who were referred"""
@@ -151,7 +148,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING('No referred users found'))
             return
         
-        self.stdout.write(f'\n👥 Found {referred_users.count()} referred users\n')
+        self.stdout.write(f'\n?? Found {referred_users.count()} referred users\n')
         
         for user in referred_users:
             self.stdout.write(f'\n{"="*60}')
@@ -165,17 +162,17 @@ class Command(BaseCommand):
         try:
             with transaction.atomic():
                 # Grant rewards
-                referrer.referral_balance += Decimal('20.00')
-                referrer.save(update_fields=['referral_balance'])
+                referrer.referred_balance += Decimal('20.00')
+                referrer.save(update_fields=['referred_balance'])
                 
-                user.referral_balance += Decimal('5.00')
+                user.referred_balance += Decimal('5.00')
                 user.has_completed_first_order = True
-                user.save(update_fields=['referral_balance', 'has_completed_first_order'])
+                user.save(update_fields=['referred_balance', 'has_completed_first_order'])
                 
                 self.stdout.write(self.style.SUCCESS(
-                    f'\n💰 Rewards Granted:'
-                    f'\n   Referrer ({referrer.email}): +₹20 (total: ₹{referrer.referral_balance})'
-                    f'\n   User ({user.email}): +₹5 (total: ₹{user.referral_balance})'
+                    f'\n?? Rewards Granted:'
+                    f'\n   Referrer ({referrer.email}): +?20 (total: ?{referrer.referred_balance})'
+                    f'\n   User ({user.email}): +?5 (total: ?{user.referred_balance})'
                 ))
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f'\n❌ Error processing rewards: {str(e)}'))
+            self.stdout.write(self.style.ERROR(f'\n? Error processing rewards: {str(e)}'))

@@ -44,6 +44,11 @@ class NotificationConfig:
         return getattr(settings, 'NOTIFICATION_RETRY_DELAY', 60)
     
     @staticmethod
+    def get_user_email_delay() -> int:
+        """Get delay in seconds before sending user confirmation email"""
+        return getattr(settings, 'USER_EMAIL_DELAY', 5)
+    
+    @staticmethod
     def validate_config() -> Dict[str, any]:
         """Validate notification configuration and return status"""
         issues = []

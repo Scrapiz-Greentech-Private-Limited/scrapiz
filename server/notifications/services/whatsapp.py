@@ -1,31 +1,25 @@
-"""
-WhatsApp notification service
-Handles sending WhatsApp messages via Twilio API
-"""
 import logging
 from typing import List, Optional
 from django.conf import settings
 from django.utils import timezone
 from datetime import datetime
+from inventory.models import OrderNo
 
 try:
     from twilio.rest import Client as TwilioClient
+    from twilio.base.exceptions import TwilioRestException
     TWILIO_AVAILABLE = True
-except ImportError:
+except:
     TWILIO_AVAILABLE = False
     TwilioClient = None
+    TwilioRestException = None
 
 logger = logging.getLogger(__name__)
 
 
-class WhatsAppNotificationService:
-    """Handle WhatsApp notification delivery via Twilio"""
+class WhatsappNotification():
     
     def __init__(self):
-        if not TWILIO_AVAILABLE:
-            logger.error("Twilio library not installed. Install with: pip install twilio")
-            raise ImportError("twilio library is required")
-        
         account_sid = getattr(settings, 'TWILIO_ACCOUNT_SID', None)
         auth_token = getattr(settings, 'TWILIO_AUTH_TOKEN', None)
         self.from_number = getattr(settings, 'TWILIO_WHATSAPP_NUMBER', None)
@@ -41,30 +35,26 @@ class WhatsAppNotificationService:
             logger.error(f"Failed to initialize Twilio client: {str(e)}")
             raise
     
-    def send_order_whatsapp(self, order_no, recipients: List[str]) -> bool:
-        """
-        Send WhatsApp message to recipients
-        
-        Args:
-            order_no: OrderNo model instance
-            recipients: List of phone numbers (with country code)
-            
-        Returns:
-            True if all messages sent successfully, False otherwise
-        """
+    def send_order(self, order_no: OrderNo, recipients: List[str]) -> bool:
+        """Send Messages to recipients"""
         if not recipients:
-            logger.warning("No recipients provided for WhatsApp notification")
+            logger.warning(f"No recipients provided for WhatsApp notification for order {order_no.order_number}")
             return False
         
         message = self._format_whatsapp_message(order_no)
-        success_count = 0
+        all_successful = True
+        
+        logger.info(f"Attempting to send WhatsApp for order {order_no.order_number} to {len(recipients)} recipients.")
         
         for recipient in recipients:
+            if not recipient:
+                logger.warning(f"Skipping empty recipient number for order {order_no.order_number}.")
+                all_successful = False
+                continue
+            
             try:
-                # Ensure number has whatsapp: prefix
                 to_number = recipient if recipient.startswith('whatsapp:') else f'whatsapp:{recipient}'
                 
-                # Send message
                 message_obj = self.client.messages.create(
                     body=message,
                     from_=self.from_number,
@@ -72,35 +62,23 @@ class WhatsAppNotificationService:
                 )
                 
                 logger.info(f"WhatsApp sent to {recipient}: SID {message_obj.sid}")
-                success_count += 1
                 
+            except TwilioRestException as e:
+                logger.error(f"Twilio API error sending WhatsApp to {recipient} for order {order_no.order_number}: {e.status} - {e.msg}", exc_info=False)
+                all_successful = False
             except Exception as e:
                 logger.error(f"Failed to send WhatsApp to {recipient}: {str(e)}", exc_info=True)
+                all_successful = False
         
-        return success_count == len(recipients)
+        return all_successful
     
     def _format_whatsapp_message(self, order_no) -> str:
-        """
-        Generate concise WhatsApp message
-        
-        Args:
-            order_no: OrderNo model instance
-            
-        Returns:
-            Formatted WhatsApp message string
-        """
-        # Calculate time ago
         time_ago = self._get_time_ago(order_no.created_at)
-        
-        # Count items
         items_count = order_no.orders.count()
-        
-        # Get customer name
         customer_name = order_no.user.name if hasattr(order_no.user, 'name') else order_no.user.email.split('@')[0]
         
-        # Build message
         lines = [
-            "🛒 *New Order Alert*",
+            "*New Order Alert*",
             "",
             f"*Order:* #{order_no.order_number}",
             f"*Customer:* {customer_name}",
@@ -108,41 +86,31 @@ class WhatsAppNotificationService:
             f"*Time:* {time_ago}",
         ]
         
-        # Add address if available
         if order_no.address:
             lines.append(f"*Location:* {order_no.address.city}, {order_no.address.state}")
         
-        # Add view link
         admin_url = getattr(
             settings,
             'ADMIN_DASHBOARD_URL',
-            f"http://localhost:8000/admin/inventory/orderno/{order_no.id}/change/"
+            f"http://api.scrapiz.in/admin/inventory/orderno/{order_no.id}/change/"
         )
+        
         short_url = self._generate_short_url(order_no.id, admin_url)
+        
         lines.extend([
             "",
-            f"View details: {short_url}",
+            f"View details: {short_url}"
         ])
         
         return "\n".join(lines)
     
     def _get_time_ago(self, dt: datetime) -> str:
-        """
-        Get human-readable time ago string
-        
-        Args:
-            dt: Datetime object
-            
-        Returns:
-            Time ago string (e.g., "5 minutes ago")
-        """
         now = timezone.now()
         diff = now - dt
-        
         seconds = diff.total_seconds()
         
         if seconds < 60:
-            return "just now"
+            return "Just Now"
         elif seconds < 3600:
             minutes = int(seconds / 60)
             return f"{minutes} minute{'s' if minutes != 1 else ''} ago"
@@ -157,13 +125,6 @@ class WhatsAppNotificationService:
         """
         Create shortened URL for order details
         For MVP, returns full URL. Can integrate URL shortener service later.
-        
-        Args:
-            order_id: Order ID
-            full_url: Full admin URL
-            
-        Returns:
-            URL string
         """
         # For MVP, return full URL
         # In production, integrate with bit.ly, TinyURL, or custom shortener

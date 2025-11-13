@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Confirmation</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f5f5f5;
+            color: #333333;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+        }
+        .header {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            padding: 40px 20px;
+            text-align: center;
+        }
+        .logo {
+            font-size: 36px;
+            font-weight: bold;
+            color: #ffffff;
+            margin: 0;
+        }
+        .success-icon {
+            font-size: 64px;
+            margin: 20px 0;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .success-badge {
+            display: inline-block;
+            background-color: #10b981;
+            color: #ffffff;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #1f2937;
+            font-size: 28px;
+            margin: 0 0 15px 0;
+        }
+        .greeting {
+            color: #6b7280;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+        .order-number {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: #ffffff;
+            font-size: 24px;
+            font-weight: bold;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .info-section {
+            background-color: #f9fafb;
+            border-left: 4px solid #10b981;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #6b7280;
+            font-size: 14px;
+        }
+        .info-value {
+            color: #1f2937;
+            text-align: right;
+            font-size: 14px;
+        }
+        .items-section {
+            margin: 30px 0;
+        }
+        .section-title {
+            color: #1f2937;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            background-color: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .items-table th {
+            background-color: #f3f4f6;
+            padding: 15px 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #374151;
+            font-size: 14px;
+        }
+        .items-table td {
+            padding: 15px 12px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 14px;
+        }
+        .product-name {
+            font-weight: 500;
+            color: #1f2937;
+        }
+        .category-badge {
+            display: inline-block;
+            background-color: #e0e7ff;
+            color: #4f46e5;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .address-box {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 2px solid #fbbf24;
+            border-radius: 12px;
+            padding: 25px;
+            margin: 25px 0;
+        }
+        .address-title {
+            font-weight: 700;
+            color: #92400e;
+            margin-bottom: 15px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+        }
+        .address-text {
+            color: #78350f;
+            line-height: 1.8;
+            font-size: 15px;
+        }
+        .next-steps {
+            background-color: #eff6ff;
+            border: 2px solid #3b82f6;
+            border-radius: 12px;
+            padding: 25px;
+            margin: 25px 0;
+        }
+        .next-steps-title {
+            color: #1e40af;
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 15px;
+        }
+        .next-steps ul {
+            margin: 0;
+            padding-left: 20px;
+            color: #1e3a8a;
+        }
+        .next-steps li {
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+        .support-box {
+            background-color: #f9fafb;
+            border-radius: 12px;
+            padding: 25px;
+            margin: 25px 0;
+            text-align: center;
+        }
+        .support-title {
+            color: #1f2937;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .support-text {
+            color: #6b7280;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .footer {
+            background-color: #1f2937;
+            padding: 30px;
+            text-align: center;
+            color: #9ca3af;
+            font-size: 14px;
+        }
+        .footer-logo {
+            color: #ffffff;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        .footer-text {
+            line-height: 1.6;
+            margin: 10px 0;
+        }
+        .social-links {
+            margin-top: 20px;
+        }
+        .social-links a {
+            color: #10b981;
+            text-decoration: none;
+            margin: 0 10px;
+            font-weight: 500;
+        }
+        @media only screen and (max-width: 600px) {
+            .content {
+                padding: 20px 15px;
+            }
+            .header {
+                padding: 30px 15px;
+            }
+            .order-number {
+                font-size: 20px;
+                padding: 15px;
+            }
+            .info-row {
+                flex-direction: column;
+            }
+            .info-value {
+                text-align: left;
+                margin-top: 5px;
+            }
+            .items-table {
+                font-size: 12px;
+            }
+            .items-table th,
+            .items-table td {
+                padding: 10px 8px;
+            }
+            h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- Header -->
+        <div class="header">
+            <div style="text-align: center; margin-bottom: 20px;">
+            <img src="https://scrapiz-inventory.s3.ap-south-1.amazonaws.com/static/authentication/LogowithoutS.png" alt="Scrapiz Logo" style="max-width: 200px;">
+            </div>
+            
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <span class="success-badge">ORDER CONFIRMED</span>
+            <h1>Thank You for Your Order!</h1>
+            
+            <p class="greeting">
+                Hi <strong>{{ customer_name }}</strong>,<br><br>
+                We've received your scrap pickup order and our team is getting ready to collect it. 
+                Your contribution to recycling makes a real difference!
+            </p>
+
+            <!-- Order Number -->
+            <div class="order-number">
+                Order #{{ order_number }}
+            </div>
+
+            <!-- Order Information -->
+            <div class="info-section">
+                <div class="info-row">
+                    <span class="info-label">Order Date:</span>
+                    <span class="info-value">{{ created_at }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Status:</span>
+                    <span class="info-value"> {{ status }} </span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Total Items:</span>
+                    <span class="info-value"> {{ items_count }}  item{% if items_count != 1 %}s{% endif %}</span>
+                </div>
+                {% if estimated_value %}
+                <div class="info-row">
+                    <span class="info-label">Estimated Value:</span>
+                    <span class="info-value"> {{ estimated_value }} </span>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Order Items -->
+            <div class="items-section">
+                <div class="section-title">
+                    Your Items
+                </div>
+                <table class="items-table">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Category</th>
+                            <th>Quantity</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in order_items %}
+                        <tr>
+                            <td class="product-name">{{ item.product_name }}</td>
+                            <td><span class="category-badge">{{ item.category }}</span></td>
+                            <td>{{ item.quantity }} {{ item.unit }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pickup Address -->
+            {% if address %}
+            <div class="address-box">
+                <div class="address-title">
+                    Pickup Address
+                </div>
+                <div class="address-text">
+                    <strong>{{ address.name }}</strong><br>
+                    {{ address.street }}<br>
+                    {{ address.area }}<br>
+                    {{ address.city }}, {{ address.state }} - {{ address.pincode }}<br>
+                    Phone: {{ address.phone }}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Next Steps -->
+            <div class="next-steps">
+                <div class="next-steps-title">What Happens Next</div>
+                <ul>
+                    <li><strong>Order Review:</strong> Our team will review your order details</li>
+                    <li><strong>Schedule Pickup:</strong> We'll contact you to schedule a convenient pickup time</li>
+                    <li><strong>Collection:</strong> Our team will arrive at your location to collect the scrap</li>
+                    <li><strong>Payment:</strong> You'll receive payment after weighing and verification</li>
+                </ul>
+            </div>
+
+            <!-- Support -->
+            <div class="support-box">
+                <div class="support-title">Need Help</div>
+                <p class="support-text">
+                    If you have any questions about your order, feel free to reach out to our support team. 
+                    We're here to help!<br>
+                    <strong>Order Reference: #{{ order_number }}</strong>
+                </p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <div style="text-align: center; margin-bottom: 20px;">
+            <img src="https://scrapiz-inventory.s3.ap-south-1.amazonaws.com/static/authentication/LogowithoutS.png" alt="Scrapiz Logo" style="max-width: 200px;">
+            </div>
+            <p class="footer-text">
+                Making recycling easy and rewarding.<br>
+                Together, we're building a sustainable future.
+            </p>
+            <p class="footer-text" style="font-size: 12px; margin-top: 20px;">
+                This is an automated confirmation email. Please do not reply to this email.
+            </p>
+            <p style="margin-top: 15px; font-size: 12px;">
+                (c) {{ current_year }} Scrapiz. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

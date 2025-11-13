@@ -1,7 +1,4 @@
-"""
-Management command to generate referral codes for users who don't have one
-Usage: python manage.py generate_referral_codes
-"""
+
 from django.core.management.base import BaseCommand
 from authentication.models import User
 from authentication.utils import generate_referral_code
@@ -25,6 +22,6 @@ class Command(BaseCommand):
             user.referral_code = generate_referral_code()
             user.save(update_fields=['referral_code'])
             updated += 1
-            self.stdout.write(f'  ✓ Generated code for {user.email}: {user.referral_code}')
+            self.stdout.write(f'  ? Generated code for {user.email}: {user.referral_code}')
         
-        self.stdout.write(self.style.SUCCESS(f'\n✅ Successfully generated {updated} referral codes!'))
+        self.stdout.write(self.style.SUCCESS(f'\n? Successfully generated {updated} referral codes!'))

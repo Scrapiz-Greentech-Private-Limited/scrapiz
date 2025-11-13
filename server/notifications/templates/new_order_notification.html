@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>New Order Notification</title>
+    
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4; line-height: 1.6;">
+  
+    <table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="width: 600px; border-collapse: collapse; background-color: #ffffff; margin: 20px auto;">
+        
+        <tr>
+            <td align="center" style="padding: 20px 0; background-color: #764ba2; color: #ffffff;">
+                <h1 style="margin: 0; font-size: 32px; font-weight: bold;">Scrapiz</h1>
+            </td>
+        </tr>
+
+        <tr>
+            <td style="padding: 30px 40px;">
+                
+                <h2 style="margin: 0 0 10px 0; color: #1f2937;">New Order Received!</h2>
+                <p style="margin: 0 0 20px 0; font-size: 24px; font-weight: bold; color: #764ba2;">#{{ order_number }}</p>
+
+                <h3 style="border-bottom: 2px solid #eee; padding-bottom: 5px; font-size: 18px; color: #333; margin-top: 20px;">Customer</h3>
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="font-size: 14px; line-height: 1.6;">
+                    <tr>
+                        <td style="padding: 5px 0; color: #666; width: 100px;">Name:</td>
+                        <td style="padding: 5px 0; color: #000;">{{ customer_name }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0; color: #666;">Email:</td>
+                        <td style="padding: 5px 0; color: #000;">{{ customer_email }}</td>
+                    </tr>
+                </table>
+
+                <h3 style="border-bottom: 2px solid #eee; padding-bottom: 5px; font-size: 18px; color: #333; margin-top: 20px;">Items</h3>
+                <table border="0" cellpadding="8" cellspacing="0" width="100%" style="font-size: 14px; border: 1px solid #ddd;">
+                    <tr style="background-color: #f4f4f4;">
+                        <th style="text-align: left; padding: 8px;">Product</th>
+                        <th style="text-align: left; padding: 8px;">Category</th>
+                        <th style="text-align: left; padding: 8px;">Quantity</th>
+                    </tr>
+                    {% for item in order_items %}
+                    <tr>
+                        <td style="padding: 8px; border-top: 1px solid #ddd;">{{ item.product_name }}</td>
+                        <td style="padding: 8px; border-top: 1px solid #ddd;">{{ item.category }}</td>
+                        <td style="padding: 8px; border-top: 1px solid #ddd;">{{ item.quantity }} {{ item.unit }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+
+                {% if address %}
+                <h3 style="border-bottom: 2px solid #eee; padding-bottom: 5px; font-size: 18px; color: #333; margin-top: 20px;">Delivery Address</h3>
+                <p style="font-size: 14px; line-height: 1.6; background-color: #f9fafb; padding: 15px;">
+                    <strong>{{ address.name }}</strong><br>
+                    {{ address.street }}<br>
+                    {{ address.area }}<br>
+                    {{ address.city }}, {{ address.state }} - {{ address.pincode }}<br>
+                    Phone: {{ address.phone }}
+                </p>
+                {% endif %}
+
+                <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                    <tr>
+                        <td align="center" style="padding: 30px 0 10px 0;">
+                            <a href="{{ admin_dashboard_url }}" target="_blank" style="background-color: #764ba2; color: #ffffff; text-decoration: none; padding: 14px 32px; font-weight: bold; font-size: 16px;">
+                                View Order Details
+                            </a>
+                        </td>
+                    </tr>
+                </table>
+
+            </td>
+        </tr>
+
+        <tr>
+            <td align="center" style="padding: 20px; background-color: #f9fafb; color: #6b7280; font-size: 12px;">
+                &copy; {{ current_year }} Scrapiz. All rights reserved.
+            </td>
+        </tr>
+    </table>
+
+</body>
+</html>

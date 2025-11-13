@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User, AuditLog, AccountDeletionFeedback
+from .models import User, AuditLog
 
 
 # ✅ Register User model in admin
@@ -30,24 +30,6 @@ class AuditLogAdmin(admin.ModelAdmin):
     list_filter = ('action', 'user')
     search_fields = ('user__email', 'user__name', 'ip_address')
     ordering = ('-timestamp',)
-
-
-# ✅ Register AccountDeletionFeedback model in admin
-@admin.register(AccountDeletionFeedback)
-class AccountDeletionFeedbackAdmin(admin.ModelAdmin):
-    list_display = ('user_email', 'user_name', 'reason', 'deleted_at')
-    list_filter = ('reason', 'deleted_at')
-    search_fields = ('user_email', 'user_name', 'comments')
-    ordering = ('-deleted_at',)
-    readonly_fields = ('user_id', 'user_email', 'user_name', 'reason', 'comments', 'deleted_at')
-    
-    def has_add_permission(self, request):
-        # Prevent manual creation of feedback records
-        return False
-    
-    def has_delete_permission(self, request, obj=None):
-        # Prevent deletion of feedback records for audit purposes
-        return False
 
 
 # ✅ Admin branding
