@@ -1,4 +1,4 @@
-version: "3.9"
+
 
 services:
   server:
@@ -6,6 +6,7 @@ services:
       context: ./server
       dockerfile: Dockerfile
     container_name: server_scrapiz_api
+    command: sh -c "python manage.py migrate && python manage.py collectstatic --noinput && python manage.py runserver 0.0.0.0:8000"
     volumes:
       - ./server:/app
       - static_volume:/static
@@ -22,20 +23,17 @@ services:
   redis:
     image: redis:7-alpine
     container_name: redis_scrapiz
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
+    expose:
+      - "6379"
     networks:
       - templet
-    command: redis-server --appendonly yes
 
   celery_worker:
     build:
       context: ./server
       dockerfile: Dockerfile
     container_name: celery_worker_scrapiz
-    command: celery -A server worker -l info
+    command: celery -A server worker -l info -c 2
     volumes:
       - ./server:/app
     depends_on:
@@ -51,7 +49,7 @@ services:
       context: ./server
       dockerfile: Dockerfile
     container_name: celery_beat_scrapiz
-    command: celery -A server beat -l info
+    command: celery -A server beat -l info --scheduler django_celery_beat.schedulers.DatabaseScheduler
     volumes:
       - ./server:/app
     depends_on:
@@ -67,12 +65,26 @@ services:
     container_name: nginx_scrapiz
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
       - static_volume:/static
       - media_volume:/media
+      - certbot_certs:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
+      
     depends_on:
       - server
+    networks:
+      - templet
+  certbot:
+    image: certbot/certbot
+    container_name: certbot_scrapiz
+    volumes:
+      - certbot_certs:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
+    depends_on:
+      - nginx
     networks:
       - templet
 
@@ -84,3 +96,5 @@ volumes:
   static_volume:
   media_volume:
   redis_data:
+  certbot_certs:
+  certbot_webroot:

@@ -24,16 +24,26 @@ export const useScrapCategories = (products: ProductSummary[], categories: Categ
                 }
                 categoryMap.get(product.category)?.push(product);
         })
-        const getIcon = (name:string):string =>{
-            const lowerName = name.toLowerCase();
+        const getCategoryImage = (category: CategorySummary): any => {
+            // Priority 1: Use S3 image if available
+            if (category.image_url) {
+                return { uri: category.image_url };
+            }
+            
+            // Priority 2: Fallback to local assets based on name
+            const lowerName = category.name.toLowerCase();
             if (lowerName.includes('paper') || lowerName.includes('cardboard')) 
               return require('../../assets/images/Scrap_Rates_Photos/Book.jpg');
-            if (lowerName.includes('plastic')) return require('../../assets/images/Scrap_Rates_Photos/Plastics.jpg');
+            if (lowerName.includes('plastic')) 
+              return require('../../assets/images/Scrap_Rates_Photos/Plastics.jpg');
             if (lowerName.includes('metal') || lowerName.includes('iron') || lowerName.includes('steel')) 
               return require('../../assets/images/Scrap_Rates_Photos/Aluminium.jpg');
             if (lowerName.includes('electricals') || lowerName.includes('e-waste')) 
               return require('../../assets/images/Scrap_Rates_Photos/FrontLoadMachine.jpg');
-            if (lowerName.includes('glass')) return require('../../assets/images/Scrap_Rates_Photos/glass.jpg');
+            if (lowerName.includes('glass')) 
+              return require('../../assets/images/Scrap_Rates_Photos/glass.jpg');
+            
+            // Default fallback
             return require('../../assets/images/Scrap_Rates_Photos/TV.jpg');
         }
         const getColor  = (name: string): string => {
@@ -55,7 +65,7 @@ export const useScrapCategories = (products: ProductSummary[], categories: Categ
         id: category.id,
         name: category.name,
         rate: avgRate > 0 ? `₹${Math.round(avgRate)}/${categoryProducts[0]?.unit || 'kg'}` : 'N/A',
-        icon: getIcon(category.name),
+        icon: getCategoryImage(category),
         color: getColor(category.name),
         products: categoryProducts,
       };

@@ -1,12 +1,14 @@
 import React, { useState, useRef } from 'react';
 import {View,Text,StyleSheet,TouchableOpacity,Modal,ScrollView,TextInput,ActivityIndicator} from 'react-native';
-import { ChevronDown, MapPin, Navigation, Plus, X, Home, Building } from 'lucide-react-native';
+import { ChevronDown, MapPin, Navigation, Plus, X, Home, Building, Map } from 'lucide-react-native';
 import { useLocation, SavedLocation } from '../context/LocationContext';
+import MapLocationPicker from './MapLocationPicker';
 
 export default function LocationSelector(){
     const {currentLocation, saveLocation, isLoading, error, getCurrentLocation, selectLocation, savedLocations } = useLocation();
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [showManualEntry, setShowManualEntry] = useState(false);
+    const [showMapPicker, setShowMapPicker] = useState(false);
     const [manualAddress, setManualAddress] = useState({
         area: '',
         city: '',
@@ -60,8 +62,42 @@ export default function LocationSelector(){
         setFormErrors({});
     };
 
+    const handleMapLocationSelect = (location: any) => {
+        const locationData: SavedLocation = {
+            id: Date.now().toString(),
+            type: 'other',
+            label: location.area || location.city,
+            latitude: location.latitude,
+            longitude: location.longitude,
+            address: location.address,
+            city: location.city,
+            state: location.state,
+            pincode: location.pincode,
+            area: location.area,
+        };
+        saveLocation(locationData);
+        selectLocation(locationData);
+        setShowMapPicker(false);
+        setIsModalVisible(false);
+    };
+
     return (
             <>
+      {/* Map Location Picker Modal */}
+      <MapLocationPicker
+        visible={showMapPicker}
+        onClose={() => setShowMapPicker(false)}
+        onLocationSelect={handleMapLocationSelect}
+        initialLocation={
+          currentLocation
+            ? {
+                latitude: currentLocation.latitude,
+                longitude: currentLocation.longitude,
+              }
+            : undefined
+        }
+      />
+
       {/* Location Display Button */}
       <TouchableOpacity
         className='py-1 px-0 bg-transparent rounded-none border-0 border-transparent self-start'
@@ -162,6 +198,18 @@ export default function LocationSelector(){
                     ))}
                   </>
                 )}
+
+                {/* Use Map to Select Location */}
+                <TouchableOpacity
+                  className='flex-row items-center justify-center p-4 bg-blue-600/5 rounded-xl border border-blue-600 border-dashed gap-2 mt-2'
+                  onPress={() => {
+                    setIsModalVisible(false);
+                    setShowMapPicker(true);
+                  }}
+                >
+                  <Map size={20} color="#2563eb" />
+                  <Text className='text-[15px] font-semibold text-blue-600'>Select on Map</Text>
+                </TouchableOpacity>
 
                 {/* Add New Address */}
                 <TouchableOpacity

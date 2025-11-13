@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   TextInput,
+  StatusBar,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
@@ -31,12 +32,13 @@ import { AuthService } from '../../api/apiService';
 import Toast from 'react-native-toast-message';
 import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 import { useLocalization } from '../../context/LocalizationContext';
-
-const { width, height } = Dimensions.get('window');
+import {wp, hp, fs, spacing} from '../../utils/responsive'
+import {useTheme} from '../../context/ThemeContext.tsx';
 
 export default function LoginScreen() {
   const router = useRouter();
   const { t } = useLocalization();
+   const { colors, isDark } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -163,11 +165,12 @@ export default function LoginScreen() {
   const isAnyLoading = isLoading || isGoogleLoading;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
       <View style={styles.backgroundWrapper}>
         {/* Green Gradient Header */}
         <LinearGradient
-          colors={['#16a34a', '#15803d', '#14532d']}
+          colors={isDark ? ['#22c55e', '#16a34a', '#15803d'] : ['#16a34a', '#15803d', '#14532d']}
           style={styles.greenHeader}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -225,20 +228,16 @@ export default function LoginScreen() {
             
             <Text style={styles.welcomeText}>{t('auth.welcomeBack')}</Text>
             <Text style={styles.subtitleText}>
-            "Sign in to turn your scrap into instant cash 💰"
+            Sell scrap, get cash — sign in!
             </Text>
           </Animated.View>
         </LinearGradient>
 
         <KeyboardAvoidingView 
-          className='flex-1'
+          style={styles.keyboardView}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <ScrollView 
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
+          <View style={styles.scrollContent}>
             {/* Login Form */}
             <Animated.View 
               style={[
@@ -250,9 +249,9 @@ export default function LoginScreen() {
               ]}
             >
               <View style={styles.inputContainer}>
-                <View style={styles.inputWrapper}>
+                 <View style={[styles.inputWrapper, { backgroundColor: colors.card, borderColor: colors.border }, errors.email && styles.inputError]}>
                   <View style={styles.iconCircle}>
-                    <Mail size={20} color="#10b981" />
+                    <Mail size={20} color={colors.primary} />
                   </View>
                   <TextInput
                     style={[styles.input, errors.email && styles.inputError]}
@@ -282,9 +281,9 @@ export default function LoginScreen() {
               </View>
 
                <View style={styles.inputContainer}>
-                <View style={styles.inputWrapper}>
+                 <View style={[styles.inputWrapper, { backgroundColor: colors.card, borderColor: colors.border }, errors.password && styles.inputError]}>
                   <View style={styles.iconCircle}>
-                    <Lock size={20} color="#10b981" />
+                    <Lock size={20} color={colors.primary} />
                   </View>
                   <TextInput
                     ref={passwordInputRef}
@@ -305,7 +304,7 @@ export default function LoginScreen() {
                     editable={!isAnyLoading}
                   />
                   <TouchableOpacity
-                    className='p-2'
+                    style={styles.eyeIcon}
                     onPress={() => setShowPassword(!showPassword)}
                     disabled={isAnyLoading}
                   >
@@ -324,12 +323,13 @@ export default function LoginScreen() {
               </View>
 
               <Link href="/(auth)/forgot-password" asChild>
-                <TouchableOpacity style={styles.forgotPassword} disabled={isAnyLoading}>
+                <TouchableOpacity style={styles.forgotPassword} activeOpacity={0.7} disabled={isAnyLoading}>
                   <Text style={styles.forgotPasswordText}>{t('auth.forgotPasswordLink')}</Text>
                 </TouchableOpacity>
               </Link>
 
               <TouchableOpacity
+              activeOpacity={0.8}
                 style={[styles.loginButton, isAnyLoading && styles.loginButtonDisabled]}
                 onPress={handleLogin}
                 disabled={isAnyLoading}
@@ -411,7 +411,7 @@ export default function LoginScreen() {
                 <Text style={styles.trustText}>{t('auth.bestRates')}</Text>
               </View>
             </Animated.View>
-          </ScrollView>
+          </View>
         </KeyboardAvoidingView>
       </View>
       <Toast />
@@ -430,10 +430,10 @@ const styles = StyleSheet.create({
   greenHeader: {
     position: 'absolute',
     width: '100%',
-    height: height * 0.40,
+    height: hp(36),
     top: 0,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
+    borderBottomLeftRadius: spacing(32),
+    borderBottomRightRadius: spacing(32),
     overflow: 'hidden',
   },
   texturePattern: {
@@ -443,66 +443,66 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     opacity: 0.15,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
+    paddingHorizontal: spacing(20),
+    paddingVertical: spacing(20),
   },
   textureDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
+    width: spacing(3),
+    height: spacing(3),
+    borderRadius: spacing(1.5),
     backgroundColor: '#ffffff',
-    margin: 12,
+    margin: spacing(12),
   },
   bgCircle1: {
     position: 'absolute',
-    width: 300,
-    height: 300,
-    borderRadius: 150,
+    width: wp(80),
+    height: wp(80),
+    borderRadius: wp(40),
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    top: -100,
-    right: -80,
+    top: hp(-12.3),
+    right: wp(-21.3),
   },
   bgCircle2: {
     position: 'absolute',
-    width: 220,
-    height: 220,
-    borderRadius: 110,
+    width: wp(58.7),
+    height: wp(58.7),
+    borderRadius: wp(29.3),
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    bottom: -60,
-    left: -60,
+    bottom: hp(-7.4),
+    left: wp(-16),
   },
   keyboardView: {
     flex: 1,
   },
   scrollContent: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: height * 0.40 + 20,
-    paddingBottom: 30,
+    paddingHorizontal: spacing(24),
+    paddingTop: hp(36) + spacing(20),
+    paddingBottom: spacing(30),
     justifyContent: 'space-between',
   },
   headerInGreen: {
     position: 'absolute',
-    top: 60,
+    top: hp(7.4),
     left: 0,
     right: 0,
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing(20),
   },
   header: {
     alignItems: 'center',
-    marginBottom: 36,
+    marginBottom: spacing(36),
   },
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: spacing(16),
     width: '100%',
   },
   logoImage: {
-    width: 300,
-    height: 120,
-    marginBottom: 8,
+    width: wp(80),
+    height: hp(14.8),
+    marginBottom: spacing(8),
   },
   logoGlow: {
     display: 'none',
@@ -511,54 +511,56 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
+    paddingHorizontal: spacing(16),
+    paddingVertical: spacing(8),
+    borderRadius: spacing(20),
+    gap: spacing(6),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   badgeText: {
-    fontSize: 11,
+    fontSize: fs(11),
     color: '#ffffff',
     fontWeight: '700',
     letterSpacing: 0.4,
   },
   welcomeText: {
-    fontSize: 30,
+    fontSize: fs(20),
     fontWeight: '800',
     color: '#ffffff',
-    marginBottom: 6,
-    marginTop: 12,
+    marginBottom: spacing(8),
+    marginTop: spacing(4),
     textAlign: 'center',
-    letterSpacing: -0.6,
+    letterSpacing: -0.4,
     textDecorationLine: 'none',
+    paddingHorizontal: spacing(20),
+    lineHeight: fs(26),
   },
   subtitleText: {
-    fontSize: 13,
+    fontSize: fs(13),
     color: 'rgba(255, 255, 255, 0.95)',
     textAlign: 'center',
-    lineHeight: 18,
-    maxWidth: 320,
+    lineHeight: fs(18),
+    maxWidth: wp(85.3),
     fontWeight: '500',
   },
   formContainer: {
-    marginBottom: 20,
+    marginBottom: spacing(20),
   },
   inputContainer: {
-    marginBottom: 14,
+    marginBottom: spacing(14),
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f9fafb',
-    borderRadius: 16,
+    borderRadius: spacing(16),
     borderWidth: 1.5,
     borderColor: '#e5e7eb',
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-    height: 58,
+    paddingHorizontal: spacing(16),
+    paddingVertical: spacing(4),
+    height: hp(7.1),
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -572,17 +574,17 @@ const styles = StyleSheet.create({
     }),
   },
   iconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: wp(10.1),
+    height: wp(10.1),
+    borderRadius: wp(5.05),
     backgroundColor: '#dcfce7',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: spacing(12),
   },
   input: {
     flex: 1,
-    fontSize: 15,
+    fontSize: fs(15),
     color: '#1f2937',
     fontWeight: '500',
   },
@@ -591,31 +593,31 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   eyeIcon: {
-    padding: 8,
+    padding: spacing(8),
   },
   errorContainer: {
-    marginTop: 6,
-    marginLeft: 4,
+    marginTop: spacing(6),
+    marginLeft: spacing(4),
   },
   errorText: {
-    fontSize: 13,
+    fontSize: fs(13),
     color: '#dc2626',
     fontWeight: '600',
   },
   forgotPassword: {
     alignSelf: 'flex-end',
-    marginBottom: 20,
+    marginBottom: spacing(20),
   },
   forgotPasswordText: {
-    fontSize: 14,
+    fontSize: fs(14),
     color: '#16a34a',
     fontWeight: '700',
   },
   loginButton: {
-    borderRadius: 16,
-    height: 56,
+    borderRadius: spacing(16),
+    height: hp(6.9),
     overflow: 'hidden',
-    marginBottom: 18,
+    marginBottom: spacing(18),
     ...Platform.select({
       ios: {
         shadowColor: '#16a34a',
@@ -633,13 +635,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: spacing(10),
   },
   loginButtonDisabled: {
     opacity: 0.6,
   },
   loginButtonText: {
-    fontSize: 17,
+    fontSize: fs(17),
     fontWeight: '800',
     color: '#ffffff',
     letterSpacing: 0.3,
@@ -647,7 +649,7 @@ const styles = StyleSheet.create({
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: spacing(16),
   },
   dividerLine: {
     flex: 1,
@@ -655,22 +657,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#e5e7eb',
   },
   dividerText: {
-    fontSize: 13,
+    fontSize: fs(13),
     color: '#9ca3af',
     fontWeight: '600',
-    paddingHorizontal: 14,
+    paddingHorizontal: spacing(14),
   },
   googleButton: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    height: 56,
+    borderRadius: spacing(16),
+    height: hp(6.9),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
+    gap: spacing(12),
     borderWidth: 1.5,
     borderColor: '#e5e7eb',
-    marginBottom: 16,
+    marginBottom: spacing(16),
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -684,15 +686,15 @@ const styles = StyleSheet.create({
     }),
   },
   googleIcon: {
-    width: 24,
-    height: 24,
+    width: fs(24),
+    height: fs(24),
     resizeMode: 'contain',
   },
   googleButtonDisabled: {
     opacity: 0.6,
   },
   googleButtonText: {
-    fontSize: 15,
+    fontSize: fs(15),
     fontWeight: '700',
     color: '#1f2937',
   },
@@ -700,15 +702,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: spacing(12),
   },
   footerText: {
-    fontSize: 15,
+    fontSize: fs(15),
     color: '#6b7280',
     fontWeight: '500',
   },
   footerLink: {
-    fontSize: 15,
+    fontSize: fs(15),
     color: '#16a34a',
     fontWeight: '800',
   },
@@ -716,30 +718,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 10,
+    paddingVertical: spacing(12),
+    paddingHorizontal: spacing(10),
     backgroundColor: '#f0fdf4',
-    borderRadius: 14,
-    gap: 8,
+    borderRadius: spacing(14),
+    gap: spacing(8),
     borderWidth: 1,
     borderColor: '#bbf7d0',
   },
   trustItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: spacing(4),
     flex: 1,
     justifyContent: 'center',
   },
   trustText: {
-    fontSize: 11,
+    fontSize: fs(11),
     color: '#166534',
     fontWeight: '700',
     flexShrink: 1,
   },
   trustDivider: {
     width: 1,
-    height: 16,
+    height: spacing(16),
     backgroundColor: '#bbf7d0',
   },
 });

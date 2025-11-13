@@ -1,5 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
+import * as Sentry from '@sentry/react-native'
 import {
   View,
   Text,
@@ -24,17 +25,44 @@ import {
 } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { parse, isValid } from 'date-fns';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLocation } from '../../context/LocationContext';
+import { useTheme } from '../../contexts/ThemeContext';
+import { wp, hp, fs, spacing } from '../../utils/responsive';
 import { AuthService, ServiceBookingPayload } from '../../api/apiService';
 import { services } from '../(tabs)/services';
 
-const datePlaceHolder = 'YYYY-MM-DD';
-const timePlaceHolder = 'HH:MM (24h)';
+const timeSlots = [
+  '9:00 AM - 11:00 AM',
+  '11:00 AM - 1:00 PM',
+  '1:00 PM - 3:00 PM',
+  '3:00 PM - 5:00 PM',
+  '5:00 PM - 7:00 PM'
+];
+
+const getNextSevenDays = () => {
+  const days = [];
+  const today = new Date();
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(today);
+    date.setDate(today.getDate() + i);
+    days.push({
+      date: date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
+      fullDate: date.toLocaleDateString('en-IN'),
+      dayName: i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : date.toLocaleDateString('en-IN', { weekday: 'short' })
+    });
+  }
+  return days;
+};
 
 const validatePhone = (value: string) => /^(\+?\d{6,15})$/.test(value.trim());
 
 export default function BookingScreen() {
   const { service: serviceId } = useLocalSearchParams<{ service?: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { savedLocations } = useLocation();
+  const { colors, isDark } = useTheme();
 
   const selectedService = useMemo(() => {
     if (!serviceId) return services[0];
@@ -128,7 +156,7 @@ export default function BookingScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
       >
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBack} disabled={submitting}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBack} disabled={submitting} onPressIn={()=>{Sentry.captureException(new Error('First error'))}} >
             <ArrowLeft size={24} color="#111827" />
           </TouchableOpacity>
           <View style={styles.headerContent}>
@@ -249,6 +277,7 @@ export default function BookingScreen() {
             style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
             onPress={handleSubmit}
             disabled={submitting}
+            
           >
             <Text style={styles.submitText}>{submitting ? 'Submitting...' : 'Submit Booking Request'}</Text>
           </TouchableOpacity>

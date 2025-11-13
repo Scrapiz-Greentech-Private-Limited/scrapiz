@@ -1,4 +1,5 @@
 import { Stack, Tabs } from "expo-router";
+import * as Sentry from '@sentry/react-native'
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '@expo-google-fonts/inter';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -23,6 +24,15 @@ SplashScreen.preventAutoHideAsync();
  * Handles loading states for fonts and i18n initialization
  * Wrapped by LocalizationProvider to access localization context
  */
+Sentry.init({
+  dsn: 'https://9807026f129b55b9e72bd3463a847960@o4510356583284736.ingest.de.sentry.io/4510356588003408',
+  sendDefaultPii: true,
+  enableLogs: true,
+  replaysSessionSampleRate: 0.1,
+  replaysOnErrorSampleRate: ,
+  integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
+  spotlight: __DEV__,
+})
 function AppContent() {
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -74,6 +84,8 @@ function AppContent() {
  * Root of the application with LocalizationProvider wrapping everything
  * Ensures i18n is initialized before the app renders
  */
+export Sentry.wrap(AppContent);
+
 export default function RootLayout() {
   return (
     <LocalizationProvider>

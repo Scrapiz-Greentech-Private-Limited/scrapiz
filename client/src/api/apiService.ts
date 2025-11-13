@@ -16,11 +16,13 @@ export interface ProductSummary {
   unit: string;
   description: string;
   category: number;
+  image_url?: string | null;
 }
 
 export interface CategorySummary {
   id: number;
   name: string;
+  image_url?: string | null;
 }
 
 export interface OrderItemSummary {

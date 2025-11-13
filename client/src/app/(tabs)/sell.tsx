@@ -39,7 +39,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
 import { AuthService, ProductSummary, AddressSummary } from '../../api/apiService';
 import { useReferral } from '../../context/ReferralContext';
-import {useOrderCalculationStore} from '../../store/orderCalculationStore'
+import {useOrderCalculationStore} from '../../store/orderCalculationStore';
+import { RemoteImage } from '../../components/RemoteImage';
 const { width, height } = Dimensions.get('window');
 
 type SelectedItem = {
@@ -66,9 +67,15 @@ const stepTitles = [
   'Order Summary'
 ];
 
-// Helper to get product image
-const getImageForProduct = (productName: string) => {
-  const name = productName.toLowerCase();
+// Helper to get product image - checks S3 URL first, then falls back to local assets
+const getImageForProduct = (product: ProductSummary) => {
+  // Priority 1: Use S3 image if available
+  if (product.image_url) {
+    return { uri: product.image_url };
+  }
+  
+  // Priority 2: Fallback to local assets based on product name
+  const name = product.name.toLowerCase();
   if (name.includes('newspaper')) return require('../../../assets/images/Scrap_Rates_Photos/Newspaper.jpg');
   if (name.includes('cardboard')) return require('../../../assets/images/Scrap_Rates_Photos/Cardboard.jpg');
   if (name.includes('book') || name.includes('paper')) return require('../../../assets/images/Scrap_Rates_Photos/Book.jpg');
@@ -88,6 +95,31 @@ const getImageForProduct = (productName: string) => {
   if (name.includes('microwave')) return require('../../../assets/images/Scrap_Rates_Photos/Microwave.jpg');
   if (name.includes('glass')) return require('../../../assets/images/Scrap_Rates_Photos/glass.jpg');
   return null;
+};
+
+// Helper to get fallback image for a product (used by RemoteImage component)
+const getFallbackImageForProduct = (productName: string) => {
+  const name = productName.toLowerCase();
+  if (name.includes('newspaper')) return require('../../../assets/images/Scrap_Rates_Photos/Newspaper.jpg');
+  if (name.includes('cardboard')) return require('../../../assets/images/Scrap_Rates_Photos/Cardboard.jpg');
+  if (name.includes('book') || name.includes('paper')) return require('../../../assets/images/Scrap_Rates_Photos/Book.jpg');
+  if (name.includes('plastic')) return require('../../../assets/images/Scrap_Rates_Photos/Plastics.jpg');
+  if (name.includes('iron') || name.includes('steel')) return require('../../../assets/images/Scrap_Rates_Photos/Iron.jpg');
+  if (name.includes('aluminum') || name.includes('aluminium')) return require('../../../assets/images/Scrap_Rates_Photos/Aluminium.jpg');
+  if (name.includes('copper')) return require('../../../assets/images/Scrap_Rates_Photos/Copper.jpg');
+  if (name.includes('brass')) return require('../../../assets/images/Scrap_Rates_Photos/Brass.jpg');
+  if (name.includes('tin')) return require('../../../assets/images/Scrap_Rates_Photos/Tin.jpg');
+  if (name.includes('refrigerator')) return require('../../../assets/images/Scrap_Rates_Photos/fridge.jpg');
+  if (name.includes('battery')) return require('../../../assets/images/Scrap_Rates_Photos/Battery.jpg');
+  if (name.includes('front load machine')) return require('../../../assets/images/Scrap_Rates_Photos/FrontLoadMachine.jpg');
+  if (name.includes('tv')) return require('../../../assets/images/Scrap_Rates_Photos/TV.jpg');
+  if (name.includes('laptops')) return require('../../../assets/images/Scrap_Rates_Photos/Laptops.jpg');
+  if (name.includes('windowac')) return require('../../../assets/images/Scrap_Rates_Photos/WindowAC.jpg');
+  if (name.includes('printer')) return require('../../../assets/images/Scrap_Rates_Photos/Printer.jpg');
+  if (name.includes('microwave')) return require('../../../assets/images/Scrap_Rates_Photos/Microwave.jpg');
+  if (name.includes('glass')) return require('../../../assets/images/Scrap_Rates_Photos/glass.jpg');
+  // Default fallback
+  return require('../../../assets/images/Scrap_Rates_Photos/TV.jpg');
 };
 
 export default function SellScreen() {
@@ -145,10 +177,22 @@ export default function SellScreen() {
     setAvailableReferralBalance(walletBalance);
   },[walletBalance, setAvailableReferralBalance])
 
-  // Load products and addresses
+  // Load products, addresses, and user data
   useEffect(() => {
     loadData();
+    loadUserData();
   }, []);
+
+  const loadUserData = async () => {
+    try {
+      const user = await AuthService.getUser();
+      if (user && user.name) {
+        setContactForm(prev => ({ ...prev, name: user.name }));
+      }
+    } catch (error) {
+      console.log('Could not load user data:', error);
+    }
+  };
  
 
   const loadData = async () => {
@@ -241,13 +285,14 @@ export default function SellScreen() {
 
   const addItem = (product: ProductSummary) => {
     const rate = (product.max_rate + product.min_rate) / 2;
+    console.log(`Adding ${product.name}: min=${product.min_rate}, max=${product.max_rate}, avg=${rate}`);
     addItemToStore({
       id: product.id,
       name: product.name,
       rate,
       unit: product.unit,
       quantity: 1,
-      image: getImageForProduct(product.name)
+      image: getImageForProduct(product)
     });
   };
 
@@ -264,7 +309,13 @@ export default function SellScreen() {
   };
 
   const getTotalAmount = () => {
-    return selectedItems.reduce((total, item) => total + (item.rate * item.quantity), 0);
+    const total = selectedItems.reduce((sum, item) => {
+      const itemTotal = item.rate * item.quantity;
+      console.log(`${item.name}: ${item.rate} × ${item.quantity} = ${itemTotal}`);
+      return sum + itemTotal;
+    }, 0);
+    console.log(`Total Amount: ${total}`);
+    return total;
   };
 
   // Calculate referral discount - use full wallet balance as bonus
@@ -579,7 +630,8 @@ export default function SellScreen() {
               
               <View style={styles.categoryItems}>
                 {categoryProducts.map((product) => {
-                  const productImage = getImageForProduct(product.name);
+                  const productImage = getImageForProduct(product);
+                  const fallbackImage = getFallbackImageForProduct(product.name);
                   return (
                     <TouchableOpacity
                       key={product.id}
@@ -587,7 +639,14 @@ export default function SellScreen() {
                       onPress={() => addItem(product)}
                     >
                       <View style={styles.itemLeft}>
-                        {productImage && <Image source={productImage} style={styles.itemIconImage} />}
+                        {productImage && (
+                          <RemoteImage 
+                            source={productImage} 
+                            fallback={fallbackImage}
+                            style={styles.itemIconImage}
+                            showLoadingIndicator={false}
+                          />
+                        )}
                         <View style={styles.itemInfo}>
                           <Text style={styles.itemName}>{product.name}</Text>
                           <Text style={styles.itemRate}>
@@ -613,40 +672,50 @@ export default function SellScreen() {
       {selectedItems.length > 0 && (
         <View style={styles.selectedItems}>
           <Text style={styles.selectedItemsTitle}>Selected Items ({selectedItems.length})</Text>
-          {selectedItems.map((item) => (
-            <View key={item.id} style={styles.selectedItemCard}>
-              <View style={styles.selectedItemLeft}>
-                {item.image && <Image source={item.image} style={styles.selectedItemIconImage} />}
-                <View>
-                  <Text style={styles.selectedItemName}>{item.name}</Text>
-                  <Text style={styles.selectedItemRate}>
-                    ₹{Math.round(item.rate)}/{item.unit}
-                  </Text>
+          {selectedItems.map((item) => {
+            const fallbackImage = getFallbackImageForProduct(item.name);
+            return (
+              <View key={item.id} style={styles.selectedItemCard}>
+                <View style={styles.selectedItemLeft}>
+                  {item.image && (
+                    <RemoteImage 
+                      source={item.image} 
+                      fallback={fallbackImage}
+                      style={styles.selectedItemIconImage}
+                      showLoadingIndicator={false}
+                    />
+                  )}
+                  <View>
+                    <Text style={styles.selectedItemName}>{item.name}</Text>
+                    <Text style={styles.selectedItemRate}>
+                      ₹{Math.round(item.rate)}/{item.unit}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.quantityControls}>
+                  <TouchableOpacity
+                    style={styles.quantityButton}
+                    onPress={() => updateQuantity(item.id, -1)}
+                  >
+                    <Minus size={16} color="#6b7280" />
+                  </TouchableOpacity>
+                  <Text style={styles.quantityText}>{item.quantity}{item.unit}</Text>
+                  <TouchableOpacity
+                    style={styles.quantityButton}
+                    onPress={() => updateQuantity(item.id, 1)}
+                  >
+                    <Plus size={16} color="#6b7280" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => removeItem(item.id)}
+                  >
+                    <Trash2 size={16} color="#dc2626" />
+                  </TouchableOpacity>
                 </View>
               </View>
-              <View style={styles.quantityControls}>
-                <TouchableOpacity
-                  style={styles.quantityButton}
-                  onPress={() => updateQuantity(item.id, -1)}
-                >
-                  <Minus size={16} color="#6b7280" />
-                </TouchableOpacity>
-                <Text style={styles.quantityText}>{item.quantity}{item.unit}</Text>
-                <TouchableOpacity
-                  style={styles.quantityButton}
-                  onPress={() => updateQuantity(item.id, 1)}
-                >
-                  <Plus size={16} color="#6b7280" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.removeButton}
-                  onPress={() => removeItem(item.id)}
-                >
-                  <Trash2 size={16} color="#dc2626" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       )}
 
@@ -962,19 +1031,29 @@ export default function SellScreen() {
       
       <View style={styles.summaryCard}>
         <Text style={styles.summaryTitle}>Items</Text>
-        {selectedItems.map((item) => (
-          <View key={item.id} style={styles.summaryItem}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 12 }}>
-              {item.image && <Image source={item.image} style={styles.summaryItemIconImage} />}
-              <Text style={styles.summaryItemName} numberOfLines={2}>
-                {item.name} ({item.quantity}{item.unit})
+        {selectedItems.map((item) => {
+          const fallbackImage = getFallbackImageForProduct(item.name);
+          return (
+            <View key={item.id} style={styles.summaryItem}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 12 }}>
+                {item.image && (
+                  <RemoteImage 
+                    source={item.image} 
+                    fallback={fallbackImage}
+                    style={styles.summaryItemIconImage}
+                    showLoadingIndicator={false}
+                  />
+                )}
+                <Text style={styles.summaryItemName} numberOfLines={2}>
+                  {item.name} ({item.quantity}{item.unit})
+                </Text>
+              </View>
+              <Text style={styles.summaryItemAmount}>
+                ₹{Math.round(item.rate * item.quantity)}
               </Text>
             </View>
-            <Text style={styles.summaryItemAmount}>
-              ₹{Math.round(item.rate * item.quantity)}
-            </Text>
-          </View>
-        ))}
+          );
+        })}
         <View style={styles.summaryDivider} />
         <View style={styles.summaryTotal}>
           <Text style={styles.summaryTotalLabel}>Estimated Total</Text>

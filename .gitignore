@@ -6,7 +6,7 @@
 myenv
 env
 *.pyc
-
+.env
 __pycache__/
 *.egg-info/
 .coverage
@@ -30,4 +30,4 @@ yarn-error.log*
 
 
 
-.gitignore.local
+.gitignore.localserver/.env

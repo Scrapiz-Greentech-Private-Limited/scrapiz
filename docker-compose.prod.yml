@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: server_scrapiz_api
+    # CRITICAL: Use Gunicorn, not runserver.
+    # This also runs migrate and collectstatic on startup.
+    command: sh -c "python manage.py migrate && 
+                   python manage.py collectstatic --noinput && 
+                   gunicorn server.wsgi:application --bind 0.0.0.0:8000 --workers 4"
+    volumes:
+      # We still mount the code for debugging, but volumes are gone
+      - ./server:/app
+    expose:
+      - "8000"
+    networks:
+      - templet
+    env_file:
+      - ./server/.env
+    # NOTE: 'depends_on: - redis' is removed, as Redis is now external
+
+  celery_worker:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: celery_worker_scrapiz
+    command: celery -A server worker -l info -c 2
+    volumes:
+      - ./server:/app
+    depends_on:
+      - server
+    networks:
+      - templet
+    env_file:
+      - ./server/.env
+
+  celery_beat:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: celery_beat_scrapiz
+    command: celery -A server beat -l info --scheduler django_celery_beat.schedulers.DatabaseScheduler
+    volumes:
+      - ./server:/app
+    depends_on:
+      - server
+    networks:
+      - templet
+    env_file:
+      - ./server/.env
+
+networks:
+  templet:
+    driver: bridge
