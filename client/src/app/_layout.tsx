@@ -1,9 +1,9 @@
 import { Stack, Tabs } from "expo-router";
-import * as Sentry from '@sentry/react-native'
+
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '@expo-google-fonts/inter';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import '@/global.css';
 import React from "react";
@@ -13,6 +13,10 @@ import { LocationProvider } from "../context/LocationContext";
 import { ProfileProvider } from "../context/ProfileContext";
 import { ReferralProvider } from "../context/ReferralContext";
 import { LocalizationProvider, useLocalization } from "../context/LocalizationContext";
+import { ThemeProvider } from "../context/ThemeContext";
+import * as Notifications from 'expo-notifications';
+import { useRouter } from 'expo-router';
+import { setupNotificationListener } from '../utils/notifications';
 
 import '../localization/i18n';
 
@@ -24,15 +28,7 @@ SplashScreen.preventAutoHideAsync();
  * Handles loading states for fonts and i18n initialization
  * Wrapped by LocalizationProvider to access localization context
  */
-Sentry.init({
-  dsn: 'https://9807026f129b55b9e72bd3463a847960@o4510356583284736.ingest.de.sentry.io/4510356588003408',
-  sendDefaultPii: true,
-  enableLogs: true,
-  replaysSessionSampleRate: 0.1,
-  replaysOnErrorSampleRate: ,
-  integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
-  spotlight: __DEV__,
-})
+
 function AppContent() {
   const [fontsLoaded] = useFonts({
     'Inter-Regular': Inter_400Regular,
@@ -41,6 +37,8 @@ function AppContent() {
   });
 
   const { isLoading: isLocalizationLoading } = useLocalization();
+  const router = useRouter();
+  const notificationListener = useRef<Notifications.Subscription>();
 
   useEffect(() => {
     // Hide splash screen only when both fonts and i18n are ready
@@ -48,6 +46,19 @@ function AppContent() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, isLocalizationLoading]);
+
+  // Set up notification response listener
+  useEffect(() => {
+    // Set up listener for when user taps on a notification
+    notificationListener.current = setupNotificationListener(router);
+
+    // Cleanup on unmount
+    return () => {
+      if (notificationListener.current) {
+        notificationListener.current.remove();
+      }
+    };
+  }, [router]);
 
   // Show loading indicator while fonts or i18n are initializing
   if (!fontsLoaded || isLocalizationLoading) {
@@ -59,23 +70,25 @@ function AppContent() {
   }
 
   return (
-    <AuthProvider>
-      <ReferralProvider>
-        <ProfileProvider>
-          <LocationProvider>
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="index" options={{ headerShown: false }} />
-              <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="profile" options={{ headerShown: false }} />
-              <Stack.Screen name="+not-found" />
-            </Stack>
-            <Toast />
-            <StatusBar style="auto" />
-          </LocationProvider>
-        </ProfileProvider>
-      </ReferralProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <ReferralProvider>
+          <ProfileProvider>
+            <LocationProvider>
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="index" options={{ headerShown: false }} />
+                <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="profile" options={{ headerShown: false }} />
+                <Stack.Screen name="+not-found" />
+              </Stack>
+              <Toast />
+              <StatusBar style="auto" />
+            </LocationProvider>
+          </ProfileProvider>
+        </ReferralProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 
@@ -84,7 +97,6 @@ function AppContent() {
  * Root of the application with LocalizationProvider wrapping everything
  * Ensures i18n is initialized before the app renders
  */
-export Sentry.wrap(AppContent);
 
 export default function RootLayout() {
   return (

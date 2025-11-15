@@ -49,6 +49,26 @@ class NotificationConfig:
         return getattr(settings, 'USER_EMAIL_DELAY', 5)
     
     @staticmethod
+    def is_push_enabled() -> bool:
+        """Check if push notification service is enabled"""
+        return getattr(settings, 'PUSH_NOTIFICATION_ENABLED', True)
+    
+    @staticmethod
+    def get_expo_access_token() -> str:
+        """Get Expo access token"""
+        return getattr(settings, 'EXPO_ACCESS_TOKEN', None)
+    
+    @staticmethod
+    def get_push_batch_size() -> int:
+        """Get push notification batch size"""
+        return getattr(settings, 'PUSH_NOTIFICATION_BATCH_SIZE', 100)
+    
+    @staticmethod
+    def get_push_max_retries() -> int:
+        """Get maximum retry attempts for push notifications"""
+        return getattr(settings, 'PUSH_NOTIFICATION_MAX_RETRIES', 3)
+    
+    @staticmethod
     def validate_config() -> Dict[str, any]:
         """Validate notification configuration and return status"""
         issues = []
@@ -82,6 +102,18 @@ class NotificationConfig:
                 issues.append("Dashboard channel enabled but SUPABASE_URL not configured")
             if not getattr(settings, 'SUPABASE_SERVICE_KEY', None):
                 issues.append("Dashboard channel enabled but SUPABASE_SERVICE_KEY not configured")
+        
+        if 'push' in channels:
+            if not NotificationConfig.is_push_enabled():
+                warnings.append("Push channel in NOTIFICATION_CHANNELS but PUSH_NOTIFICATION_ENABLED is false")
+            if not NotificationConfig.get_expo_access_token():
+                issues.append("Push channel enabled but EXPO_ACCESS_TOKEN not configured")
+            batch_size = NotificationConfig.get_push_batch_size()
+            if batch_size <= 0 or batch_size > 1000:
+                warnings.append(f"Push batch size ({batch_size}) should be between 1 and 1000")
+            max_retries = NotificationConfig.get_push_max_retries()
+            if max_retries < 0 or max_retries > 10:
+                warnings.append(f"Push max retries ({max_retries}) should be between 0 and 10")
         
         return {
             'valid': len(issues) == 0,

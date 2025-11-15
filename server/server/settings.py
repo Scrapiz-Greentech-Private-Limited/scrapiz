@@ -199,9 +199,9 @@ TWILIO_WHATSAPP_NUMBER = os.getenv('TWILIO_WHATSAPP_NUMBER')
 
 
 
-NOTIFICATION_ENABLED = 'true'.lower() == 'true'
+NOTIFICATION_ENABLED = os.getenv('NOTIFICATION_ENABLED', 'true').lower() == 'true'
 NOTIFICATION_CHANNELS = [
-    ch.strip() for ch in 'email,whatsapp,dashboard'.split(',')
+    ch.strip() for ch in os.getenv('NOTIFICATION_CHANNELS', 'email,whatsapp,dashboard').split(',')
 ]
 
 
@@ -221,3 +221,11 @@ NOTIFICATION_MAX_RETRIES = 3
 NOTIFICATION_RETRY_DELAY = 60 
 
 ADMIN_DASHBOARD_URL = 'https://api.scrapiz.in/admin/'
+
+# ----------------------
+# Push Notification Configuration
+# ----------------------
+PUSH_NOTIFICATION_ENABLED = os.getenv('PUSH_NOTIFICATION_ENABLED', 'true').lower() == 'true'
+EXPO_ACCESS_TOKEN = os.getenv('EXPO_ACCESS_TOKEN')
+PUSH_NOTIFICATION_BATCH_SIZE = int(os.getenv('PUSH_NOTIFICATION_BATCH_SIZE', '100'))
+PUSH_NOTIFICATION_MAX_RETRIES = int(os.getenv('PUSH_NOTIFICATION_MAX_RETRIES', '3'))

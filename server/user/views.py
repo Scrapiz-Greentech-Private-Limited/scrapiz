@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed
 from .serializers import AddressSerializer, NotificationPreferenceSerializer
-from .models import AddressModel, NotificationPreference
+from .models import AddressModel, NotificationPreference, PushToken
 from authentication.models import User
 
 
@@ -103,3 +103,201 @@ class NotificationPreferenceAPIView(AuthenticatedAPIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class RegisterPushTokenAPIView(AuthenticatedAPIView):
+    """
+    Register Expo Push Token for authenticated user
+    
+    POST /api/user/register-push-token/
+    Body:
+        {
+            "token": "ExponentPushToken[...]",
+            "device_name": "iPhone 13" (optional)
+        }
+    """
+    
+    def post(self, request):
+        try:
+            user = self.authenticate_user(request)
+        except AuthenticationFailed as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        token = request.data.get('token', '').strip()
+        device_name = request.data.get('device_name', '').strip()
+        
+        if not token:
+            return Response(
+                {'error': 'Token is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate token format using PushNotificationService
+        try:
+            from notifications.services.push import PushNotificationService
+            push_service = PushNotificationService()
+            
+            if not push_service.validate_token_format(token):
+                return Response(
+                    {'error': 'Invalid token format. Expected format: ExponentPushToken[...]'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to validate token: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+        # Create or update token
+        try:
+            push_token, created = PushToken.objects.update_or_create(
+                token=token,
+                defaults={
+                    'user': user,
+                    'device_name': device_name if device_name else None,
+                    'is_active': True
+                }
+            )
+            
+            return Response({
+                'success': True,
+                'message': 'Token registered successfully',
+                'created': created
+            }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to register token: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class UnregisterPushTokenAPIView(AuthenticatedAPIView):
+    """
+    Unregister Expo Push Token for authenticated user
+    
+    POST /api/user/unregister-push-token/
+    Body:
+        {
+            "token": "ExponentPushToken[...]"
+        }
+    """
+    
+    def post(self, request):
+        try:
+            user = self.authenticate_user(request)
+        except AuthenticationFailed as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        token = request.data.get('token', '').strip()
+        
+        if not token:
+            return Response(
+                {'error': 'Token is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            deleted_count = PushToken.objects.filter(
+                user=user,
+                token=token
+            ).delete()[0]
+            
+            return Response({
+                'success': True,
+                'message': 'Token unregistered successfully',
+                'deleted': deleted_count > 0
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to unregister token: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class PushNotificationPreferencesAPIView(AuthenticatedAPIView):
+    """
+    Get and update user's push notification preferences
+    
+    GET /api/user/notification-preferences/
+    Returns user's notification preferences
+    
+    PUT /api/user/notification-preferences/
+    Body:
+        {
+            "push_notification_enabled": true,
+            "order_updates": true,
+            "promotions": false,
+            "announcements": true,
+            "general": true
+        }
+    """
+    
+    def get(self, request):
+        try:
+            user = self.authenticate_user(request)
+        except AuthenticationFailed as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        return Response({
+            'success': True,
+            'preferences': {
+                'push_notification_enabled': user.push_notification_enabled,
+                'order_updates': user.notify_order_updates,
+                'promotions': user.notify_promotions,
+                'announcements': user.notify_announcements,
+                'general': user.notify_general
+            }
+        }, status=status.HTTP_200_OK)
+    
+    def put(self, request):
+        try:
+            user = self.authenticate_user(request)
+        except AuthenticationFailed as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        try:
+            # Update preferences if provided in request
+            if 'push_notification_enabled' in request.data:
+                user.push_notification_enabled = request.data['push_notification_enabled']
+            if 'order_updates' in request.data:
+                user.notify_order_updates = request.data['order_updates']
+            if 'promotions' in request.data:
+                user.notify_promotions = request.data['promotions']
+            if 'announcements' in request.data:
+                user.notify_announcements = request.data['announcements']
+            if 'general' in request.data:
+                user.notify_general = request.data['general']
+            
+            user.save()
+            
+            return Response({
+                'success': True,
+                'message': 'Preferences updated successfully',
+                'preferences': {
+                    'push_notification_enabled': user.push_notification_enabled,
+                    'order_updates': user.notify_order_updates,
+                    'promotions': user.notify_promotions,
+                    'announcements': user.notify_announcements,
+                    'general': user.notify_general
+                }
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to update preferences: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

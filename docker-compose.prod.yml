@@ -27,6 +27,9 @@ services:
       context: ./server
       dockerfile: Dockerfile
     container_name: celery_worker_scrapiz
+    # Celery worker handles async tasks including push notifications
+    # -c 2 = 2 concurrent workers for handling multiple tasks
+    # NOTE: Redis is external in production - ensure CELERY_BROKER_URL points to production Redis
     command: celery -A server worker -l info -c 2
     volumes:
       - ./server:/app

@@ -7,7 +7,8 @@ node_modules
 .expo/
 # C extensions
 *.so
-
+client/@ayaan_amjad__Scrapiz-keystore-credentials.md
+client/@ayaan_amjad__Scrapiz-keystore.bak.jks
 # Distribution / packaging
 .Python
 build/

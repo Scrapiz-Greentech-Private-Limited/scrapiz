@@ -23,6 +23,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: redis_scrapiz
+    # Redis serves as the message broker for Celery tasks
+    # Used for push notification task queue and results backend
     expose:
       - "6379"
     networks:
@@ -33,6 +35,8 @@ services:
       context: ./server
       dockerfile: Dockerfile
     container_name: celery_worker_scrapiz
+    # Celery worker handles async tasks including push notifications
+    # -c 2 = 2 concurrent workers for handling multiple tasks
     command: celery -A server worker -l info -c 2
     volumes:
       - ./server:/app

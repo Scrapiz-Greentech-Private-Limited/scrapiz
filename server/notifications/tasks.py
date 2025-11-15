@@ -153,6 +153,87 @@ def send_user_confirmation_email_task(self, order_no_id: int):
     countdown = 60 * (2 ** retry_count)
     logger.info(f"Retrying user confirmation email task (attempt {retry_count + 1}/3) in {countdown}s")
     raise self.retry(exc=e, countdown=countdown)
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_admin_push_notification_task(
+    self,
+    title: str,
+    message: str,
+    category: str,
+    deep_link_data: dict = None,
+    image_url: str = None,
+    admin_user_id: int = None
+):
+    """
+    Celery task to send push notification from admin
+    
+    Args:
+        title: Notification title
+        message: Notification body
+        category: Notification category (order_updates, promotions, announcements, general)
+        deep_link_data: Optional deep link data for navigation
+        image_url: Optional image URL for rich notifications
+        admin_user_id: ID of admin who triggered the notification
+    
+    Returns:
+        Dict with success status and delivery statistics
+    """
+    try:
+        logger.info(f"Starting admin push notification task: title='{title}', category='{category}'")
+        
+        # Log admin user if provided
+        if admin_user_id:
+            logger.info(f"Push notification triggered by admin user ID: {admin_user_id}")
+        
+        # Import NotificationManager
+        from .services.manager import NotificationManager
+        manager = NotificationManager()
+        
+        # Send push notification
+        result = manager.send_admin_push_notification(
+            title=title,
+            message=message,
+            category=category,
+            deep_link_data=deep_link_data,
+            image_url=image_url,
+            admin_user_id=admin_user_id
+        )
+        
+        # Check if notification was successful
+        if not result.get('success'):
+            error_msg = result.get('error', 'Unknown error')
+            logger.error(f"Push notification failed: {error_msg}")
+            raise Exception(f"Push notification failed: {error_msg}")
+        
+        # Log success with statistics
+        sent_count = result.get('sent_count', 0)
+        failed_count = result.get('failed_count', 0)
+        total_tokens = result.get('total_tokens', 0)
+        
+        logger.info(
+            f"Push notification sent successfully: "
+            f"sent={sent_count}/{total_tokens}, failed={failed_count}, "
+            f"category='{category}'"
+        )
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error in push notification task: {str(e)}", exc_info=True)
+        
+        # Calculate retry countdown with exponential backoff
+        retry_count = self.request.retries
+        max_retries = self.max_retries if self.max_retries is not None else 3
+        countdown = 60 * (2 ** retry_count)  # 60s, 120s, 240s
+        
+        logger.warning(
+            f"Retrying push notification task in {countdown} seconds "
+            f"(Attempt {retry_count + 1}/{max_retries + 1})"
+        )
+        
+        # Retry with exponential backoff
+        raise self.retry(exc=e, countdown=countdown)
     
     
     

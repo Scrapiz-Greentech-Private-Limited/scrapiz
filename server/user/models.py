@@ -1,5 +1,52 @@
 from django.db import models
+from django.conf import settings
 from authentication.models import User
+
+
+class PushToken(models.Model):
+    """Store Expo Push Tokens for user devices"""
+    
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='push_tokens'
+    )
+    token = models.CharField(
+        max_length=255,
+        unique=True,
+        db_index=True,
+        help_text="Expo Push Token (ExponentPushToken[...])"
+    )
+    device_name = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="Optional device identifier"
+    )
+    is_active = models.BooleanField(
+        default=True,
+        db_index=True,
+        help_text="Whether this token is valid and active"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    last_used_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Last time a notification was sent to this token"
+    )
+    
+    class Meta:
+        db_table = 'push_tokens'
+        ordering = ['-created_at']
+        verbose_name = 'Push Token'
+        verbose_name_plural = 'Push Tokens'
+        indexes = [
+            models.Index(fields=['user', 'is_active']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user.email} - {self.token[:20]}..."
 
 
 class AddressModel(models.Model):

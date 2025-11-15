@@ -24,10 +24,22 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_deleted = models.BooleanField(default=False , db_index=True)
     deleted_at = models.DateTimeField(null= True , blank = True)
     
+    # Push Notification Preference Fields
+    push_notification_enabled = models.BooleanField(default=True)
+    notify_order_updates = models.BooleanField(default=True)
+    notify_promotions = models.BooleanField(default=True)
+    notify_announcements = models.BooleanField(default=True)
+    notify_general = models.BooleanField(default=True)
+    
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
 
     objects = CustomUserManager()
+    
+    class Meta:
+        permissions = [
+            ("can_send_push_notifications", "Can send push notifications to users"),
+        ]
 
     def __str__(self):
         return self.email

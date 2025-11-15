@@ -24,6 +24,9 @@ export const API_CONFIG = {
     USER_ADDRESSES: '/user/address/',
     USER_NOTIFICATION_SETTINGS: '/user/notification-settings/',
     SERVICE_BOOKINGS: '/services/bookings/',
+    REGISTER_PUSH_TOKEN: '/user/register-push-token/',
+    UNREGISTER_PUSH_TOKEN: '/user/unregister-push-token/',
+    PUSH_NOTIFICATION_PREFERENCES: '/user/notification-preferences/',
     
     // Referral endpoints
     REFERRED_USERS: '/authentication/referrals/users/',
@@ -83,6 +86,14 @@ export interface NotificationSettings {
   weeklyReports: boolean;
   emailNotifications: boolean;
   smsNotifications: boolean;
+}
+
+export interface PushNotificationPreferences {
+  push_notification_enabled: boolean;
+  order_updates: boolean;
+  promotions: boolean;
+  announcements: boolean;
+  general: boolean;
 }
 
 export interface ServiceBookingPayload {

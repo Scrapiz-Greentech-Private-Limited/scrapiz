@@ -16,7 +16,6 @@ import * as Location from 'expo-location';
 import { X, MapPin, Navigation, Search } from 'lucide-react-native';
 import {
   DEFAULT_MAP_STYLE,
-  MAP_STYLES,
   getIndiaBounds,
   MAPBOX_API_KEY,
   buildGeocodingUrl,
@@ -24,11 +23,6 @@ import {
   MAP_SETTINGS,
   DEFAULT_CENTER,
 } from '../config/mapConfig';
-
-// Initialize MapLibre - IMPORTANT: Must be done before any MapLibre components
-
-
-// Build the style URL directly to ensure it's correct
 
 MapboxGL.setAccessToken(MAPBOX_API_KEY);
 
@@ -49,7 +43,6 @@ interface KrutrimReverseGeocodeResult {
   place_id: string;
 }
 
-// Your component interfaces (unchanged)
 interface LocationResult {
   latitude: number;
   longitude: number;
@@ -59,6 +52,7 @@ interface LocationResult {
   pincode: string;
   area: string;
 }
+
 interface MapLocationPickerProps {
   visible: boolean;
   onClose: () => void;
@@ -72,28 +66,21 @@ export default function MapLocationPicker({
   onLocationSelect,
   initialLocation,
 }: MapLocationPickerProps) {
-  // --- STATE ---
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<KrutrimAutocompleteResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
-  const [isMapReady, setIsMapReady] = useState(false); // Modal fix (KEEP THIS)
+  const [isMapReady, setIsMapReady] = useState(false);
   const [selectedCoords, setSelectedCoords] = useState<[number, number]>(
     initialLocation ? [initialLocation.longitude, initialLocation.latitude] : DEFAULT_CENTER
   );
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [markerCoords, setMarkerCoords] = useState<[number, number]>(selectedCoords);
 
-  // --- REFS ---
-  // 5. UPDATE REFS TO USE MAPBOX TYPES
   const cameraRef = useRef<MapboxGL.Camera>(null);
   const mapRef = useRef<MapboxGL.MapView>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // --- EFFECTS ---
-
-  // 6. MODAL FIX (KEEP THIS)
-  // This waits for the modal animation to finish before rendering the map
   useEffect(() => {
     if (visible) {
       const timer = setTimeout(() => setIsMapReady(true), 300);
@@ -103,7 +90,6 @@ export default function MapLocationPicker({
     }
   }, [visible]);
 
-  // Debounced search (Updated to use local bounds)
   useEffect(() => {
     if (searchQuery.trim().length < MAP_SETTINGS.searchMinCharacters) {
       setSearchResults([]);
@@ -116,12 +102,11 @@ export default function MapLocationPicker({
       searchLocation(searchQuery);
     }, MAP_SETTINGS.searchDebounceMs);
 
-    return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); };
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
   }, [searchQuery]);
 
-  // --- API FUNCTIONS ---
-
-  // 7. SEARCH LOCATION (Updated for Krutrim)
   const searchLocation = async (query: string) => {
     if (!query.trim()) return;
     setIsSearching(true);
@@ -129,12 +114,11 @@ export default function MapLocationPicker({
       const url = buildGeocodingUrl(query, {
         proximity: selectedCoords,
         limit: 5,
-        bbox: getIndiaBounds(), // Use Mumbai-specific bounds
+        bbox: getIndiaBounds(),
       });
       const response = await fetch(url);
       const data = await response.json();
 
-      // Krutrim's response is in a 'predictions' array
       if (data.predictions) {
         setSearchResults(data.predictions);
         setShowResults(true);
@@ -148,8 +132,10 @@ export default function MapLocationPicker({
     }
   };
 
-  // 8. REVERSE GEOCODE (Updated for Krutrim)
-  const reverseGeocode = async (latitude: number, longitude: number): Promise<KrutrimReverseGeocodeResult | null> => {
+  const reverseGeocode = async (
+    latitude: number,
+    longitude: number
+  ): Promise<KrutrimReverseGeocodeResult | null> => {
     try {
       const url = buildReverseGeocodingUrl(longitude, latitude);
       const response = await fetch(url);
@@ -167,24 +153,15 @@ export default function MapLocationPicker({
     }
   };
 
-  // --- HANDLER FUNCTIONS ---
-
-  // 9. HANDLE RESULT SELECT (IMPORTANT - KRUTRIM API LIMITATION)
   const handleResultSelect = (result: KrutrimAutocompleteResult) => {
     setSearchQuery(result.description);
     setShowResults(false);
     Keyboard.dismiss();
-
-    // !!! IMPORTANT LIMITATION !!!
-    // Krutrim's Autocomplete API does NOT return coordinates, only a 'place_id'.
-    // To move the map, you would need to make a SECOND API call
-    // to their "Place Details" API using result.place_id.
-    //
-    // For now, this function just fills the search bar.
-    console.warn("Krutrim Autocomplete selected. A 'Place Details' API call is needed to get coordinates.");
+    console.warn(
+      "Krutrim Autocomplete selected. A 'Place Details' API call is needed to get coordinates."
+    );
   };
 
-  // 10. HANDLE USE CURRENT LOCATION (No changes needed, but uses our new reverseGeocode)
   const handleUseCurrentLocation = async () => {
     setIsLoadingLocation(true);
     try {
@@ -208,7 +185,6 @@ export default function MapLocationPicker({
 
       cameraRef.current?.flyTo(coords, MAP_SETTINGS.animationDuration);
       await reverseGeocode(coords[1], coords[0]);
-
     } catch (error) {
       console.error('Error getting current location:', error);
     } finally {
@@ -216,7 +192,6 @@ export default function MapLocationPicker({
     }
   };
 
-  // 11. HANDLE MAP PRESS (Updated to use new Mapbox types)
   const handleMapPress = async (feature: GeoJSON.Feature<GeoJSON.Point>) => {
     const { geometry } = feature;
     if (geometry && geometry.coordinates) {
@@ -227,11 +202,9 @@ export default function MapLocationPicker({
     }
   };
 
-  // 12. HANDLE CONFIRM LOCATION (Updated for Krutrim response)
   const handleConfirmLocation = async () => {
     const [longitude, latitude] = markerCoords;
-    
-    // Run reverse geocode one last time to get full details
+
     const result = await reverseGeocode(latitude, longitude);
 
     let locationResult: LocationResult = {
@@ -246,40 +219,43 @@ export default function MapLocationPicker({
 
     if (result) {
       const components = result.address_components;
-      
-      // Helper function to find parts of the address
-      const find = (type: string) => components.find(c => c.types.includes(type))?.long_name;
+
+      const find = (type: string) =>
+        components.find((c) => c.types.includes(type))?.long_name;
 
       locationResult.address = result.formatted_address;
-      locationResult.city = find('locality') || find('administrative_area_level_3') || 'Unknown';
+      locationResult.city =
+        find('locality') || find('administrative_area_level_3') || 'Unknown';
       locationResult.state = find('administrative_area_level_1') || 'Unknown';
       locationResult.pincode = find('postal_code') || '000000';
-      locationResult.area = find('sublocality_level_1') || find('neighborhood') || 'Unknown';
+      locationResult.area =
+        find('sublocality_level_1') || find('neighborhood') || 'Unknown';
     }
 
     onLocationSelect(locationResult);
     onClose();
   };
 
-  // --- RENDER ---
-  
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.container}>
-        {/* Header (Unchanged) */}
+        {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}><X size={24} color="#111827" /></TouchableOpacity>
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <X size={24} color="#111827" />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>Select Location</Text>
           <View style={styles.placeholder} />
         </View>
 
-        {/* Search Bar (Unchanged) */}
+        {/* Search Bar */}
         <View style={styles.searchContainer}>
           <View style={styles.searchBar}>
             <Search size={20} color="#6b7280" />
             <TextInput
               style={styles.searchInput}
               placeholder="Search for area, street name..."
+              placeholderTextColor="#9ca3af"
               value={searchQuery}
               onChangeText={setSearchQuery}
               autoCorrect={false}
@@ -299,73 +275,90 @@ export default function MapLocationPicker({
           </TouchableOpacity>
         </View>
 
-        {/* 13. SEARCH RESULTS (Updated for Krutrim response) */}
-        {showResults && searchResults.length > 0 && (
-          <View style={styles.resultsContainer}>
-            <FlatList
-              data={searchResults}
-              keyExtractor={(item) => item.place_id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.resultItem}
-                  onPress={() => handleResultSelect(item)}
-                >
-                  <MapPin size={18} color="#6b7280" />
-                  <View style={styles.resultTextContainer}>
-                    <Text style={styles.resultText} numberOfLines={2}>
-                      {item.description}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-              style={styles.resultsList}
-            />
-          </View>
-        )}
-
-        {/* 14. MAP (Updated to Mapbox component) */}
-        <View style={styles.mapContainer}>
-          {isMapReady ? (
-            <MapboxGL.MapView
-              ref={mapRef}
-              style={styles.map}
-              styleURL={DEFAULT_MAP_STYLE}
-              onPress={handleMapPress}
-              logoEnabled={false}
-              attributionEnabled={true}
-              attributionPosition={{ bottom: 8, left: 8 }}
-            >
-              <MapboxGL.Camera
-                ref={cameraRef}
-                centerCoordinate={selectedCoords}
-                zoomLevel={MAP_SETTINGS.defaultZoom}
-                animationMode="flyTo"
-                animationDuration={MAP_SETTINGS.animationDuration}
+        {/* Map Container - Now the results will push the map down */}
+        <View style={styles.mapWrapper}>
+          {/* Search Results - No longer absolute positioned */}
+          {showResults && searchResults.length > 0 && (
+            <View style={styles.resultsContainer}>
+              <FlatList
+                data={searchResults}
+                keyExtractor={(item) => item.place_id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.resultItem}
+                    onPress={() => handleResultSelect(item)}
+                  >
+                    <View style={styles.resultIconContainer}>
+                      <MapPin size={18} color="#16a34a" />
+                    </View>
+                    <View style={styles.resultTextContainer}>
+                      <Text style={styles.resultText} numberOfLines={2}>
+                        {item.description}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+                style={styles.resultsList}
+                keyboardShouldPersistTaps="handled"
               />
-              <MapboxGL.PointAnnotation
-                id="selected-location"
-                coordinate={markerCoords}
-              >
-                {/* Your custom marker view */}
-                <View style={styles.markerContainer}>
-                  <View style={styles.marker}>
-                    <MapPin size={24} color="#ffffff" fill="#16a34a" />
-                  </View>
-                </View>
-              </MapboxGL.PointAnnotation>
-            </MapboxGL.MapView>
-          ) : (
-            <View style={styles.mapLoadingContainer}>
-              <ActivityIndicator size="large" color="#16a34a" />
             </View>
           )}
+
+          {/* Map */}
+          <View style={styles.mapContainer}>
+            {isMapReady ? (
+              <MapboxGL.MapView
+                ref={mapRef}
+                style={styles.map}
+                styleURL={DEFAULT_MAP_STYLE}
+                onPress={handleMapPress}
+                logoEnabled={false}
+                attributionEnabled={true}
+                attributionPosition={{ bottom: 8, left: 8 }}
+              >
+                <MapboxGL.Camera
+                  ref={cameraRef}
+                  centerCoordinate={selectedCoords}
+                  zoomLevel={MAP_SETTINGS.defaultZoom}
+                  animationMode="flyTo"
+                  animationDuration={MAP_SETTINGS.animationDuration}
+                />
+                <MapboxGL.PointAnnotation
+                  id="selected-location"
+                  coordinate={markerCoords}
+                >
+                  <View style={styles.markerContainer}>
+                    <View style={styles.marker}>
+                      <MapPin size={24} color="#ffffff" fill="#16a34a" />
+                    </View>
+                    <View style={styles.markerShadow} />
+                  </View>
+                </MapboxGL.PointAnnotation>
+              </MapboxGL.MapView>
+            ) : (
+              <View style={styles.mapLoadingContainer}>
+                <ActivityIndicator size="large" color="#16a34a" />
+                <Text style={styles.loadingText}>Loading map...</Text>
+              </View>
+            )}
+          </View>
         </View>
 
-        {/* Confirm Button (Unchanged) */}
+        {/* Footer */}
         <View style={styles.footer}>
+          <View style={styles.addressPreview}>
+            <MapPin size={16} color="#6b7280" />
+            <Text style={styles.addressText} numberOfLines={1}>
+              {searchQuery || 'Tap on map to select location'}
+            </Text>
+          </View>
           <TouchableOpacity
-            style={styles.confirmButton}
+            style={[
+              styles.confirmButton,
+              !searchQuery && styles.confirmButtonDisabled,
+            ]}
             onPress={handleConfirmLocation}
+            disabled={!searchQuery}
           >
             <Text style={styles.confirmButtonText}>Confirm Location</Text>
           </TouchableOpacity>
@@ -375,7 +368,6 @@ export default function MapLocationPicker({
   );
 }
 
-// 15. STYLES (Added mapLoadingContainer)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -388,16 +380,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'ios' ? 50 : 16,
     paddingBottom: 16,
+    backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 3,
   },
   closeButton: {
     padding: 8,
+    borderRadius: 8,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#111827',
+    letterSpacing: -0.3,
   },
   placeholder: {
     width: 40,
@@ -409,16 +409,18 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: '#f3f4f6',
   },
   searchBar: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#f9fafb',
     borderRadius: 12,
     paddingHorizontal: 12,
     gap: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
   searchInput: {
     flex: 1,
@@ -433,55 +435,66 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#16a34a',
   },
+  mapWrapper: {
+    flex: 1,
+  },
   resultsContainer: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 140 : 100,
-    left: 16,
-    right: 16,
     backgroundColor: '#ffffff',
-    borderRadius: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    maxHeight: 280,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-    zIndex: 1000,
-    maxHeight: 300,
+    shadowRadius: 4,
+    elevation: 4,
   },
   resultsList: {
-    maxHeight: 300,
+    flexGrow: 0,
   },
   resultItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     gap: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
+  },
+  resultIconContainer: {
+    width: 36,
+    height: 36,
+    backgroundColor: '#f0fdf4',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   resultTextContainer: {
     flex: 1,
   },
   resultText: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#111827',
-  },
-  resultSubtext: { // This is no longer used, but fine to keep
-    fontSize: 13,
-    color: '#6b7280',
+    lineHeight: 20,
   },
   mapContainer: {
     flex: 1,
   },
-  mapLoadingContainer: { // Added for the modal fix
+  mapLoadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#f9fafb',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
   },
   map: {
     flex: 1,
@@ -491,33 +504,76 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   marker: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#ffffff',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowColor: '#16a34a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    borderWidth: 3,
+    borderColor: '#f0fdf4',
+  },
+  markerShadow: {
+    position: 'absolute',
+    bottom: -8,
+    width: 20,
+    height: 8,
+    borderRadius: 10,
+    backgroundColor: '#000',
+    opacity: 0.2,
   },
   footer: {
     padding: 16,
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  addressPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+  },
+  addressText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
   },
   confirmButton: {
     backgroundColor: '#16a34a',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
+    shadowColor: '#16a34a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  confirmButtonDisabled: {
+    backgroundColor: '#d1d5db',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   confirmButtonText: {
     fontSize: 16,
     fontWeight: '700',
     color: '#ffffff',
+    letterSpacing: 0.3,
   },
 });

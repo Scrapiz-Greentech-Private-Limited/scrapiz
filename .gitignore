@@ -27,7 +27,8 @@ yarn-error.log*
 /android/.gradle
 /web-build
 
-
-
+client/@ayaan_amjad__Scrapiz-keystore.bak.jks
+client/@ayaan_amjad__Scrapiz-keystore-credentials.md
 
 .gitignore.localserver/.env
+client/scrapiz-592a0-firebase-adminsdk-fbsvc-9952d166e1.json

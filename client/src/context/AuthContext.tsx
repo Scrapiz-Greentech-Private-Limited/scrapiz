@@ -3,6 +3,7 @@ import {StyleSheet} from 'react-native'
 import { useRouter, useSegments } from 'expo-router';
 import { AuthService, setGlobalSessionExpiredHandler, setCurrentRouteGetter } from '../api/apiService';
 import SessionExpiredDialog from '../components/SessionExpiredDialog';
+import { useNotifications } from '../hooks/useNotifications';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -35,6 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const router = useRouter();
   const segments = useSegments();
   const currentRouteRef = useRef<string>('');
+  const { registerForPushNotifications, unregisterPushToken, expoPushToken } = useNotifications();
 
   // Track current route
   useEffect(() => {
@@ -60,6 +62,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const authenticated = await AuthService.isAuthenticated();
       setIsAuthenticated(authenticated);
+      
+      // Register for push notifications if user is already authenticated
+      if (authenticated) {
+        try {
+          await registerForPushNotifications();
+        } catch (notifError) {
+          // Don't fail auth check if push notification registration fails
+          console.error('Failed to register push notifications on app launch:', notifError);
+        }
+      }
     } catch (error) {
       console.error('Error checking auth status:', error);
     } finally {
@@ -71,6 +83,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await AuthService.login({ email, password });
       setIsAuthenticated(true);
+      
+      // Register for push notifications after successful login
+      try {
+        await registerForPushNotifications();
+      } catch (notifError) {
+        // Don't fail login if push notification registration fails
+        console.error('Failed to register push notifications:', notifError);
+      }
     } catch (error) {
       throw error;
     }
@@ -78,6 +98,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
+      // Unregister push token before logout
+      if (expoPushToken) {
+        try {
+          await unregisterPushToken(expoPushToken);
+        } catch (notifError) {
+          // Don't fail logout if push token unregistration fails
+          console.error('Failed to unregister push token:', notifError);
+        }
+      }
+      
       await AuthService.logout();
       setIsAuthenticated(false);
     } catch (error) {
@@ -102,6 +132,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await AuthService.verifyOtp({ email, otp });
       setIsAuthenticated(true);
+      
+      // Register for push notifications after successful OTP verification
+      try {
+        await registerForPushNotifications();
+      } catch (notifError) {
+        // Don't fail OTP verification if push notification registration fails
+        console.error('Failed to register push notifications:', notifError);
+      }
     } catch (error) {
       throw error;
     }
@@ -117,6 +155,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const clearAuthState = async () => {
     try {
+      // Unregister push token before clearing auth state
+      if (expoPushToken) {
+        try {
+          await unregisterPushToken(expoPushToken);
+        } catch (notifError) {
+          console.error('Failed to unregister push token:', notifError);
+        }
+      }
+      
       // Clear authentication token from AsyncStorage
       await AuthService.logout();
       

@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
-import * as Sentry from '@sentry/react-native'
+
 import {
   View,
   Text,
@@ -27,7 +27,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { parse, isValid } from 'date-fns';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocation } from '../../context/LocationContext';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../context/ThemeContext';
 import { wp, hp, fs, spacing } from '../../utils/responsive';
 import { AuthService, ServiceBookingPayload } from '../../api/apiService';
 import { services } from '../(tabs)/services';
@@ -156,7 +156,7 @@ export default function BookingScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
       >
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBack} disabled={submitting} onPressIn={()=>{Sentry.captureException(new Error('First error'))}} >
+          <TouchableOpacity style={styles.backButton} onPress={handleBack} disabled={submitting} >
             <ArrowLeft size={24} color="#111827" />
           </TouchableOpacity>
           <View style={styles.headerContent}>

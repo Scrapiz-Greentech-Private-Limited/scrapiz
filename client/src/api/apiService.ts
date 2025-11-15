@@ -1,10 +1,10 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_CONFIG, ApiResponse, RegisterRequest, LoginRequest, VerifyOtpRequest, PasswordResetRequest, NotificationSettings, ServiceBookingPayload, ServiceBooking } from './config';
+import { API_CONFIG, ApiResponse, RegisterRequest, LoginRequest, VerifyOtpRequest, PasswordResetRequest, NotificationSettings, ServiceBookingPayload, ServiceBooking, PushNotificationPreferences } from './config';
 import { ReferredUser, ReferralTransaction } from '../types/referral';
 import { DeletionFeedback } from '../types/account';
 
-export type { NotificationSettings, ServiceBookingPayload, ServiceBooking } from './config';
+export type { NotificationSettings, ServiceBookingPayload, ServiceBooking, PushNotificationPreferences } from './config';
 export type { DeletionFeedback } from '../types/account';
 
 // User types
@@ -689,6 +689,51 @@ export class AuthService {
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Failed to redeem referral balance');
+    }
+  }
+
+  // Register push notification token
+  static async registerPushToken(token: string, deviceName?: string): Promise<ApiResponse> {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.REGISTER_PUSH_TOKEN, {
+        token,
+        device_name: deviceName || ''
+      });
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to register push token');
+    }
+  }
+
+  // Unregister push notification token
+  static async unregisterPushToken(token: string): Promise<ApiResponse> {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.UNREGISTER_PUSH_TOKEN, {
+        token
+      });
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to unregister push token');
+    }
+  }
+
+  // Get push notification preferences
+  static async getPushNotificationPreferences(): Promise<PushNotificationPreferences> {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.PUSH_NOTIFICATION_PREFERENCES);
+      return response.data.preferences;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to get push notification preferences');
+    }
+  }
+
+  // Update push notification preferences
+  static async updatePushNotificationPreferences(preferences: Partial<PushNotificationPreferences>): Promise<ApiResponse> {
+    try {
+      const response = await apiClient.put(API_CONFIG.ENDPOINTS.PUSH_NOTIFICATION_PREFERENCES, preferences);
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to update push notification preferences');
     }
   }
 }

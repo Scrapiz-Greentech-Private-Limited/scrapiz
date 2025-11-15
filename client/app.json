@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Scrapiz",
-    "slug": "Scrapiz",
+    "slug": "scrapiz-client",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/scrapiz.png",
@@ -29,10 +29,12 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.INTERNET"
+        "android.permission.INTERNET",
+        "android.permission.RECORD_AUDIO"
       ],
       "package": "com.scrapiz.app",
-      "versionCode": 11
+      "googleServicesFile":"./scrapiz-592a0-firebase-adminsdk-fbsvc-9952d166e1.json",
+      "versionCode": 12
     },
     "web": {
       "bundler": "metro",
@@ -95,7 +97,7 @@
       },
       "router": {},
       "eas": {
-        "projectId": "ecd7e0de-6b00-4bb9-acde-8dda52a2fd22"
+        "projectId": "53993ab9-a554-4468-bbb9-e825c5646e77"
       }
     },
     "runtimeVersion": {
@@ -103,6 +105,7 @@
     },
     "updates": {
       "url": "https://u.expo.dev/ecd7e0de-6b00-4bb9-acde-8dda52a2fd22"
-    }
+    },
+    "owner": "scrapiz"
   }
 }
