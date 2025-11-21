@@ -3,6 +3,7 @@ import { View, Text,StyleSheet,ScrollView,TouchableOpacity,Dimensions,Image,Plat
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import {
   TrendingUp,
@@ -29,10 +30,9 @@ import { useHomeData } from '../../hooks/useHomeData';
 import { useScrapCategories } from '../../hooks/useScrapCategories';
 import { useRecentActivity } from '../../hooks/useRecentActivity';
 import { useLocalization } from '../../context/LocalizationContext';
-
+import { useTheme } from '../../context/ThemeContext';
 import { useEnvironmentalImpact } from '../../hooks/useImpact';
-
-const { width } = Dimensions.get('window');
+import { wp, hp, fs } from '../../utils/responsive';
 
 function formatAMPM(date: Date) {
   let hours = date.getHours();
@@ -76,13 +76,13 @@ const ServiceIcon = ({ iconName, color }: { iconName: string, color: string }) =
 
 export default function HomeScreen() {
   const router = useRouter();
-  
+  const { colors, isDark } = useTheme();
   const { user, products, categories, orders, loading, error, refetch } = useHomeData();
   const scrapCategories = useScrapCategories(products || [], categories || []);
   const { treesSaved, co2Reduced } = useEnvironmentalImpact(orders || []);
   const [refreshing, setRefreshing] = useState(false);
   const [imageError, setImageError] = useState(false);
-  
+  const insets = useSafeAreaInsets();
   const { t } = useLocalization();
   const adScrollRef = useRef<ScrollView | null>(null);
   const [adIndex, setAdIndex] = useState(0);
@@ -172,7 +172,12 @@ const services = useMemo(() => [
     );
   }
   return (
-    <View className='flex-1 bg-slate-100'>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar 
+        barStyle={isDark ? "light-content" : "dark-content"}
+        backgroundColor="transparent"
+        translucent
+      />
       <ScrollView 
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -185,25 +190,25 @@ const services = useMemo(() => [
       >
         {/* Combined Header Section with Green Background */}
         <LinearGradient 
-          colors={['#16a34a', '#15803d', '#166534']} 
-          className='pt-[55px] px-[18px] pb-[22px] rounded-b-3xl overflow-hidden relative'
+          colors={isDark ? ['#22c55e', '#16a34a', '#15803d'] : ['#16a34a', '#15803d', '#166534']} 
+          style={styles.headerSection}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
           {/* Decorative circles */}
-          <View className='absolute w-[220px] h-[220px] rounded-[110px] bg-white/10 -top-[60px] -right-[60px] opacity-60' />
-          <View className='absolute w-[160px] h-[160px] rounded-[80px] bg-white/[.08] -bottom-[40px] -left-[40px] opacity-50' />
-          <View className='absolute w-[100px] h-[100px] rounded-[50px] bg-white/[.06] top-10 left-[100px] opacity-40' />
+v          <View style={styles.decorativeCircle1} />
+          <View style={styles.decorativeCircle2} />
+          <View style={styles.decorativeCircle3} />
           
           {/* Top Row: Location & Profile */}
-          <View className='flex-row justify-between items-center mb-[14px]'>
+          <View style={styles.topRow}>
             {/* Location Selector */}
-            <View className='flex-grow-0 flex-shrink mr-4'>
+            <View style={styles.locationContainer}>
               <LocationSelector />
             </View>
 
             {/* Right Side: Profile */}
-            <View className='flex-row items-center gap-2.5'>
+            <View style={styles.rightContainer}>
               {/* Coins Badge - Hidden for future use */}
               {/* <TouchableOpacity 
                 style={styles.coinsContainer}
@@ -218,7 +223,7 @@ const services = useMemo(() => [
 
               {/* Profile Icon */}
               <TouchableOpacity
-                className='bg-white w-11 h-11 rounded-full justify-center items-center shadow-lg shadow-green-600/25 border-2 border-green-600/15 ml-1 overflow-hidden'
+                style={styles.profileButton}
                 onPress={() => router.push('/(tabs)/profile')}
                 activeOpacity={0.7}
               >
@@ -235,16 +240,16 @@ const services = useMemo(() => [
                     </Text>
                   </View>
                 ) : (
-                  <View className='w-full h-full justify-center items-center'>
-                    <User size={20} color="#16a34a" strokeWidth={2.8} />
-                  </View>
+                  <View style={styles.profileIconWrapper}>
+                  <User size={fs(20)} color={isDark ? '#6ee7b7' : '#16a34a'} strokeWidth={2.8} />
+                </View>
                 )}
               </TouchableOpacity>
             </View>
           </View>
 
           {/* Search Bar */}
-          <View className='mb-2'>
+          <View style={styles.searchBarContainer}>
             <SearchBar />
           </View>
         </LinearGradient>
@@ -252,25 +257,25 @@ const services = useMemo(() => [
         <CustomCarousel />
 
         {/* Quick Actions */}
-        <View className='px-5 py-3'>
-          <View className='flex-row items-center mb-[14px] gap-2'>
-            <Text className='text-lg font-bold text-gray-900 font-inter-bold tracking-[-0.3px]'>{t('home.quickActions')}</Text>
-            <View className='bg-amber-100 px-2 py-0.5 rounded-lg'>
-              <Text className='text-[10px] font-bold text-amber-500 uppercase tracking-[0.5px]'>{t('home.popular')}</Text>
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('home.quickActions')}</Text>
+            <View style={[styles.sectionBadge, { backgroundColor: colors.primary }]}>
+              <Text style={[styles.sectionBadgeText, { color: 'white' }]}>{t('home.popular')}</Text>
             </View>
           </View>
-          <View className='flex-row gap-3'>
+          <View style={styles.actionsGrid}>
             <TouchableOpacity
-              className='flex-1 rounded-2xl overflow-hidden shadow-lg shadow-black/15'
+              style={styles.actionCard}
               onPress={() => handleNavigate('/(tabs)/sell')}
               activeOpacity={0.8}
             >
               <LinearGradient
                 colors={['#16a34a', '#15803d']}
-                className='p-[18px] items-center min-h-[140px] justify-center'
+                style={styles.actionCardGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-              >
+            >
                 <View style={[styles.actionIcon, { backgroundColor: 'white' }]}>
                   <PackagePlus size={22} color="#16a34a" strokeWidth={2.5} />
                 </View>
@@ -279,16 +284,16 @@ const services = useMemo(() => [
               </LinearGradient>
             </TouchableOpacity>
             <TouchableOpacity
-              className='flex-1 rounded-2xl overflow-hidden shadow-lg shadow-black/15'
+              style={styles.actionCard}
               onPress={() => handleNavigate('/(tabs)/rates')}
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={['#16a34a', '#15803d']}
-                className='p-[18px] items-center min-h-[140px] justify-center'
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
+              colors={['#16a34a', '#15803d']}
+              style={styles.actionCardGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
                 <View style={[styles.actionIcon, { backgroundColor: 'white' }]}>
                   <AreaChart size={22} color="#16a34a" strokeWidth={2.5} />
                 </View>
@@ -300,27 +305,32 @@ const services = useMemo(() => [
         </View>
 
         {/* Market Rates - Backend Data */}
-        <View className='px-5 py-3'>
-          <View className='flex-row justify-between items-center mb-4'>
-            <Text className='text-lg font-bold text-gray-900 font-inter-bold tracking-[-0.3px]'>{t('home.todaysMarketRates')}</Text>
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('home.todaysMarketRates')}</Text>
             <TouchableOpacity onPress={() => handleNavigate('/(tabs)/rates')}>
-              <TrendingUp size={16} color="#16a34a" />
+             <TrendingUp size={fs(16)} color={colors.primary} strokeWidth={2.5} />
             </TouchableOpacity>
           </View>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            className='-mx-2'
+            contentContainerStyle={styles.ratesScrollContent}
+            style={styles.ratesScrollView}
           >
             {scrapCategories.length > 0 ? (
               scrapCategories.slice(0, 4).map((category) => (
                 <TouchableOpacity
                   key={category.id}
-                  className='bg-white rounded-2xl p-4 mx-2 min-w-[120px] items-center shadow-sm shadow-black/10'
+                  style={[
+                  styles.rateCard,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                index === homeRateItems.length - 1 && { marginRight: 0 }
+              ]}
                   onPress={() => handleNavigate('/(tabs)/rates')}
                 >
-                  <Image source={category.icon} className='w-12 h-12 mb-2.5 rounded-full' />
-                  <Text className='text-xs text-gray-500 font-inter-medium text-center mb-1'>{category.name}</Text>
+                  <Image source={category.icon} style={styles.itemImage} />
+                  <Text style={[styles.categoryName, { color: colors.text }]}>{category.name}</Text>
                   <Text style={[styles.categoryRate, { color: category.color }]}>
                     {category.rate}
                   </Text>
@@ -335,38 +345,38 @@ const services = useMemo(() => [
         </View>
 
         {/* Tip of the Day */}
-        <View className='px-5 py-3'>
+        <View style={styles.section}>
           <LinearGradient
-            colors={['#ecfdf5', '#d1fae5']}
-            className='rounded-2xl p-5 flex-row items-center'
-          >
-            <View className='w-14 h-14 bg-white rounded-full justify-center items-center shadow-md shadow-emerald-700/15'>
-              <Lightbulb size={24} color="#059669" />
+          colors={isDark ? ['#065f46', '#047857'] : ['#ecfdf5', '#d1fae5']}
+          style={styles.tipCard}
+        >
+            <View style={styles.tipIconContainer}>
+               <Lightbulb size={fs(24)} color={isDark ? '#6ee7b7' : '#059669'} strokeWidth={2.5} />
             </View>
-            <View className='flex-1 ml-4'>
-              <Text className='text-sm font-semibold text-emerald-700 font-inter-semibold mb-1'>{t('home.tipOfTheDay')}</Text>
-              <Text className='text-[13px] text-emerald-800 font-inter-regular leading-[18px]'>{randomTip}</Text>
+            <View style={styles.tipTextContainer}>
+              <Text style={[styles.tipTitle, { color: isDark ? '#f0fdf4' : '#064e3b' }]}>{t('home.tipOfTheDay')}</Text>
+              <Text style={[styles.tipText, { color: isDark ? '#d1fae5' : '#065f46' }]}>{randomTip}</Text>
             </View>
           </LinearGradient>
         </View>
 
         {/* Services */}
-        <View className='px-5 py-3'>
-          <View className='flex-row justify-between items-center mb-4'>
-            <Text className='text-lg font-bold text-gray-900 font-inter-bold tracking-[-0.3px]'>{t('home.services')}</Text>
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('home.services')}</Text>
             <TouchableOpacity onPress={() => handleNavigate('/(tabs)/services')}>
-              <Text className='text-sm text-green-600 font-inter-semibold'>{t('home.moreServices')}</Text>
+              <Text style={[styles.moreServicesText, { color: colors.primary }]}>{t('home.moreServices')}</Text>
             </TouchableOpacity>
           </View>
-          <View className='gap-3'>
+          <View style={styles.servicesList}>
             {services.map((service) => (
               <LinearGradient
                 key={service.id}
                 colors={serviceGradients[service.id as keyof typeof serviceGradients]}
-                className='rounded-2xl p-3 flex-row items-center shadow-sm shadow-black/10'
+                style={styles.serviceCard}
               >
                 <TouchableOpacity
-                  className='flex-row items-center flex-1'
+                  style={styles.serviceCardTouchable}
                   onPress={() => handleNavigate(`/services/${service.id}`)}
                 >
                   <View style={[styles.serviceIconContainer, { backgroundColor: 'white' }]}>
@@ -388,28 +398,28 @@ const services = useMemo(() => [
         </View>
 
         {/* Refer & Earn */}
-        <View className='px-5 py-3'>
+        <View style={styles.section}>
           <TouchableOpacity 
-            className='rounded-[20px] overflow-hidden shadow-lg shadow-amber-500/20'
-            onPress={() => handleNavigate('/profile/refer-friends')}
-            activeOpacity={0.8}
-          >
+          style={styles.referCard} 
+          onPress={() => handleNavigate('/profile/refer-friends')}
+          activeOpacity={0.8}
+        >
             <LinearGradient
-              colors={['#fef3c7', '#fde68a']}
-              className='rounded-[20px] p-[18px] flex-row items-center'
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <View className='w-12 h-12 bg-white rounded-full justify-center items-center shadow-md shadow-amber-500/20'>
-                <Gift size={28} color="#f59e0b" strokeWidth={2.5} />
+            colors={isDark ? ['#78350f', '#92400e'] : ['#fef3c7', '#fde68a']}
+            style={styles.referCardGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+               <View style={styles.referIconContainer}>
+                <Gift size={fs(28)} color={isDark ? '#fbbf24' : '#f59e0b'} strokeWidth={2.5} />
               </View>
-              <View className='flex-1 mx-[14px]'>
-                <Text className='text-[15px] font-bold text-amber-800 font-inter-bold mb-0.5'>{t('home.referAndEarn')}</Text>
-                <Text className='text-xs text-amber-700 font-inter-medium'>
+              <View style={styles.referTextContainer}>
+                <Text style={[styles.referTitle, { color: isDark ? '#fef3c7' : '#78350f' }]}>{t('home.referAndEarn')}</Text>
+                <Text style={[styles.referSubtitle, { color: isDark ? '#fde68a' : '#92400e' }]}>
                   {t('home.referSubtitle')}
                 </Text>
               </View>
-              <ChevronRight size={20} color="#f59e0b" strokeWidth={2.5} />
+               <ChevronRight size={fs(20)} color={isDark ? '#fbbf24' : '#f59e0b'} strokeWidth={2.5} />
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -417,30 +427,30 @@ const services = useMemo(() => [
         {/* Environmental Impact - Backend Data */}
         {(treesSaved > 0 || co2Reduced > 0) && (
           <View style={[styles.section, styles.impactSection]}>
-            <View className='flex-row items-center mb-[14px] gap-2'>
-              <Text className='text-lg font-bold text-gray-900 font-inter-bold tracking-[-0.3px]'>{t('home.yourImpact')}</Text>
+            <View style={styles.sectionHeaderRow}>
+               <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('home.yourImpact')}</Text>
             </View>
             <LinearGradient
               colors={['#10b981', '#059669', '#047857']}
-              className='rounded-[20px] p-6 flex-row items-start shadow-xl shadow-emerald-500/25'
+              style={styles.impactCard}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-            >
-              <View className='w-15 h-15 rounded-full bg-white justify-center items-center mr-4'>
-                <Text className='text-[32px]'>🌱</Text>
+        >
+               <View style={styles.impactIconContainer}>
+                <Text style={styles.impactEmoji}>🌱</Text>
               </View>
-              <View className='flex-1'>
-                <Text className='text-[15px] text-white font-semibold leading-[22px] mb-3'>
+              <View style={styles.impactTextContainer}>
+                <Text style={styles.impactText}>
                   You've helped save{' '}
-                  <Text className='font-extrabold text-white text-base'>{treesSaved} trees</Text> and reduced{' '}
-                  <Text className='font-extrabold text-white text-base'>{co2Reduced}kg CO₂</Text> emissions this year!
+                 <Text style={styles.impactHighlight}>{treesSaved} trees</Text> and reduced{' '}
+                   <Text style={styles.impactHighlight}>{co2Reduced}kg CO₂</Text> emissions this year!
                 </Text>
-                <View className='flex-row gap-2.5 mt-1'>
-                  <View className='bg-white/25 px-3 py-1.5 rounded-xl border border-white/30'>
-                    <Text className='text-xs font-bold text-white'>🌳 +{treesSaved}</Text>
+                <View style={styles.impactStats}>
+                  <View style={styles.statBadge}>
+                    <Text style={styles.statBadgeText}>🌳 +{treesSaved}</Text>
                   </View>
-                  <View className='bg-white/25 px-3 py-1.5 rounded-xl border border-white/30'>
-                    <Text className='text-xs font-bold text-white'>♻️ {co2Reduced}kg</Text>
+                  <View style={styles.statBadge}>
+                    <Text style={styles.statBadgeText}>♻️ {co2Reduced}kg</Text>
                   </View>
                 </View>
               </View>
@@ -449,36 +459,36 @@ const services = useMemo(() => [
         )}
 
         {/* Branding Section */}
-        <View className='mt-0 mb-5 mx-5 overflow-hidden rounded-3xl'>
+        <View style={styles.brandingSection}>
           <LinearGradient
             colors={['#0f172a', '#1e293b', '#334155']}
-            className='py-10 px-6 relative overflow-hidden rounded-3xl'
+            style={styles.brandingGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
             {/* Decorative Elements */}
-            <View className='absolute w-[300px] h-[300px] rounded-[150px] bg-emerald-500/[.08] -top-[100px] -right-[80px] border border-emerald-500/15' />
-            <View className='absolute w-[250px] h-[250px] rounded-[125px] bg-blue-500/[.06] -bottom-[80px] -left-[60px] border border-blue-500/[.12]' />
+            <View style={styles.brandingCircle1} />
+            <View style={styles.brandingCircle2} />
             
-            <View className='relative z-10'>
-              <View className='bg-green-600/15 px-[14px] py-1.5 rounded-full self-start mb-[18px] border border-green-600/30'>
-                <Text className='text-[11px] font-extrabold text-green-600 tracking-[1.2px]'>{t('home.indiaNumber1')}</Text>
-              </View>
-              
-              <Text className='text-[32px] font-black text-white text-left tracking-[-1px] leading-10'>{t('home.onlineScrapPlatform')}</Text>
-              <Text className='text-[32px] font-black text-white text-left tracking-[-1px] leading-10'>{t('home.selling')}</Text>
-              
-              <View className='w-[70px] h-[3px] bg-green-600 rounded-full my-[18px]' />
-              
-              <View className='flex-row items-start justify-start mb-2.5 bg-transparent'>
-                <Image 
-                  source={require('../../../assets/images/LogowithoutS.png')}
-                  className='w-[220px] h-[68px] -ml-4 shadow-none'
-                  resizeMode="contain"
-                  fadeDuration={0}
-                />
-              </View>
+            <View style={styles.brandingContent}>
+            <View style={styles.brandingBadge}>
+              <Text style={styles.brandingBadgeText}>🇮🇳 INDIA'S #1</Text>
             </View>
+            
+            <Text style={styles.brandingTagline}>Online Scrap</Text>
+            <Text style={styles.brandingTagline}>Selling Platform</Text>
+            
+            <View style={styles.brandingDivider} />
+            
+            <View style={styles.brandingLogoContainer}>
+              <Image 
+                source={require('../../../assets/images/LogoWithoutS.png')}
+                style={styles.brandingLogoImage}
+                resizeMode="contain"
+                fadeDuration={0}
+              />
+            </View>
+          </View>
           </LinearGradient>
         </View>
       </ScrollView>
@@ -488,24 +498,15 @@ const services = useMemo(() => [
 }
 
 const styles = StyleSheet.create({
- container: {
+  container: {
     flex: 1,
     backgroundColor: '#f1f5f9',
   },
-  centerContent: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#6b7280',
-    fontFamily: 'Inter-Medium',
-  },
+  // New consolidated header section
   headerSection: {
-    paddingTop: 55,
-    paddingHorizontal: 18,
-    paddingBottom: 22,
+    paddingTop: hp(6.8), // 55
+    paddingHorizontal: wp(4.8), // 18
+    paddingBottom: hp(2.7), // 22
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     overflow: 'hidden',
@@ -513,59 +514,60 @@ const styles = StyleSheet.create({
   },
   decorativeCircle1: {
     position: 'absolute',
-    width: 220,
-    height: 220,
-    borderRadius: 110,
+    width: wp(58.7), // 220
+    height: wp(58.7), // 220
+    borderRadius: wp(29.3), // 110
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    top: -60,
-    right: -60,
+    top: hp(-7.4), // -60
+    right: wp(-16), // -60
     opacity: 0.6,
   },
   decorativeCircle2: {
     position: 'absolute',
-    width: 160,
-    height: 160,
-    borderRadius: 80,
+    width: wp(42.7), // 160
+    height: wp(42.7), // 160
+    borderRadius: wp(21.3), // 80
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    bottom: -40,
-    left: -40,
+    bottom: hp(-4.9), // -40
+    left: wp(-10.7), // -40
     opacity: 0.5,
   },
   decorativeCircle3: {
     position: 'absolute',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: wp(26.7), // 100
+    height: wp(26.7), // 100
+    borderRadius: wp(13.3), // 50
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    top: 40,
-    left: 100,
+    top: hp(4.9), // 40
+    left: wp(26.7), // 100
     opacity: 0.4,
   },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: hp(1.7), // 14
   },
   locationContainer: {
+    // Don't let location take the full row; allow it to shrink
     flexGrow: 0,
     flexShrink: 1,
-    marginRight: 16,
+    marginRight: wp(4.3), // 16
   },
   rightContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: wp(2.7), // 10
   },
   coinsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'white',
-    paddingLeft: 6,
-    paddingRight: 12,
-    paddingVertical: 6,
+    paddingLeft: wp(1.3), // Reduced from 1.6
+    paddingRight: wp(2.7), // Reduced from 3.2
+    paddingVertical: hp(0.6), // Reduced from 0.7
     borderRadius: 20,
-    gap: 6,
+    gap: wp(1.3), // Reduced from 1.6
     shadowColor: '#f59e0b',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
@@ -575,24 +577,25 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(245, 158, 11, 0.2)',
   },
   coinsIconWrapper: {
-    width: 26,
-    height: 26,
+    width: wp(6), // Reduced from 6.9
+    height: wp(6), // Reduced from 6.9
     backgroundColor: '#fef3c7',
-    borderRadius: 13,
+    borderRadius: wp(3), // Reduced from 3.5
     justifyContent: 'center',
     alignItems: 'center',
   },
   coinsText: {
-    fontSize: 14,
+    fontSize: fs(13), // Reduced from 14
     fontWeight: '800',
     color: '#111827',
+    fontFamily: 'Inter-ExtraBold',
     letterSpacing: -0.3,
   },
   profileButton: {
     backgroundColor: 'white',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: wp(10), // Reduced from 11.7
+    height: wp(10), // Reduced from 11.7
+    borderRadius: wp(5), // Reduced from 5.9
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#16a34a',
@@ -602,7 +605,7 @@ const styles = StyleSheet.create({
     elevation: 5,
     borderWidth: 2,
     borderColor: 'rgba(22, 163, 74, 0.15)',
-    marginLeft: 4,
+    marginLeft: wp(1.1), // 4
   },
   profileIconWrapper: {
     width: '100%',
@@ -611,28 +614,86 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   searchBarContainer: {
-    marginBottom: 8,
+    marginBottom: hp(1), // 8
+  },
+  // Stats Cards
+  statsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: wp(4.3), // 16
+    paddingVertical: hp(2), // 16
+    gap: wp(2.7), // 10
+    marginTop: hp(-1.2), // -10
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: 'white',
+    borderRadius: 14,
+    padding: wp(2.7), // Reduced from 3.2
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  statIconContainer: {
+    width: wp(8), // Reduced from 9.6
+    height: wp(8), // Reduced from 9.6
+    backgroundColor: '#f0fdf4',
+    borderRadius: wp(4), // Reduced from 4.8
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: hp(0.6), // Reduced from 0.7
+  },
+  statValue: {
+    fontSize: fs(15), // Reduced from 16
+    fontWeight: '700',
+    color: '#111827',
+    fontFamily: 'Inter-Bold',
+    marginBottom: hp(0.2), // 2
+  },
+  statLabel: {
+    fontSize: fs(9), // Reduced from 10
+    color: '#6b7280',
+    fontFamily: 'Inter-Medium',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  searchSection: {
+    paddingHorizontal: wp(5.3), // 20
+    paddingVertical: hp(2), // 16
+    backgroundColor: 'white',
+  },
+  header: {
+    paddingTop: hp(7.4), // 60
+    paddingHorizontal: wp(5.3), // 20
+    paddingBottom: hp(3), // 24
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   section: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: wp(5.3), // 20
+    paddingVertical: hp(1.5), // 12
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 14,
-    gap: 8,
+    marginBottom: hp(1.7), // 14
+    gap: wp(2.1), // 8
   },
   sectionBadge: {
-    backgroundColor: '#fef3c7',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: wp(2.1), // 8
+    paddingVertical: hp(0.4), // 3
     borderRadius: 8,
   },
   sectionBadgeText: {
-    fontSize: 10,
+    fontSize: fs(10), // 10
     fontWeight: '700',
-    color: '#f59e0b',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -640,59 +701,56 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: hp(2), // 16
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: fs(17), // Reduced from 18
     fontWeight: '700',
     color: '#111827',
+    fontFamily: 'Inter-Bold',
     letterSpacing: -0.3,
   },
-  ratesScroll: {
-    marginHorizontal: -8,
+  ratesScrollView: {
+    paddingBottom: hp(1), // 8px bottom spacing - reduced
+  },
+  ratesScrollContent: {
+    paddingHorizontal: wp(5.3), // 20
   },
   rateCard: {
     backgroundColor: 'white',
     borderRadius: 16,
-    padding: 16,
-    marginHorizontal: 8,
-    minWidth: 120,
+    padding: wp(3.5), // Reduced from 4.3
+    marginRight: wp(3.2), // 12 spacing between cards
+    width: wp(28), // Reduced from 32
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
   },
   itemImage: {
-    width: 48,
-    height: 48,
-    marginBottom: 10,
-    borderRadius: 24,
+    width: wp(11), // Reduced from 12.8
+    height: wp(11), // Reduced from 12.8
+    marginBottom: hp(1), // Reduced from 1.2
+    borderRadius: wp(5.5), // Reduced from 6.4
+    backgroundColor: '#f3f4f6',
   },
   categoryName: {
-    fontSize: 12,
+    fontSize: fs(11), // Reduced from 12
     color: '#6b7280',
+    fontFamily: 'Inter-Medium',
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: hp(0.4), // Reduced from 0.5
   },
   categoryRate: {
-    fontSize: 16,
+    fontSize: fs(15), // Reduced from 16
     fontWeight: '600',
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#9ca3af',
+    fontFamily: 'Inter-SemiBold',
   },
   actionsGrid: {
     flexDirection: 'row',
-    gap: 12,
+    gap: wp(3.2), // 12
   },
   actionCard: {
     flex: 1,
@@ -705,18 +763,18 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   actionCardGradient: {
-    padding: 18,
+    padding: wp(4), // Reduced from 4.8
     alignItems: 'center',
-    minHeight: 140,
+    minHeight: hp(15), // Reduced from 17.2
     justifyContent: 'center',
   },
   actionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: wp(10), // Reduced from 11.7
+    height: wp(10), // Reduced from 11.7
+    borderRadius: wp(5), // Reduced from 5.9
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: hp(1), // Reduced from 1.2
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -724,64 +782,81 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   actionTitle: {
-    fontSize: 15,
+    fontSize: fs(14), // Reduced from 15
     fontWeight: '700',
-    marginBottom: 3,
+    fontFamily: 'Inter-Bold',
+    marginBottom: hp(0.3), // Reduced from 0.4
   },
   actionSubtitle: {
-    fontSize: 11,
+    fontSize: fs(10), // Reduced from 11
+    fontFamily: 'Inter-Regular',
     opacity: 0.9,
   },
   moreServicesText: {
-    fontSize: 14,
+    fontSize: fs(14), // 14
     color: '#16a34a',
-    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+  },
+  viewAllText: {
+    fontSize: fs(14), // 14
+    color: '#16a34a',
+    fontFamily: 'Inter-Medium',
   },
   servicesList: {
-    gap: 12,
+    gap: wp(3.2), // 12
   },
   serviceCard: {
     borderRadius: 16,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
   },
   serviceCardTouchable: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    padding: wp(3.5), // Reduced from 4
   },
   serviceIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: wp(11), // Reduced from 12.8
+    height: wp(11), // Reduced from 12.8
+    borderRadius: wp(5.5), // Reduced from 6.4
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: wp(2.7), // Reduced from 3.2
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
   },
   serviceInfo: {
     flex: 1,
+    marginRight: wp(2.7), // 10
   },
   serviceTitle: {
-    fontSize: 16,
+    fontSize: fs(15), // Reduced from 16
     fontWeight: '600',
-    marginBottom: 2,
+    fontFamily: 'Inter-SemiBold',
+    marginBottom: hp(0.3), // 2
+    letterSpacing: -0.2,
   },
   serviceDescription: {
-    fontSize: 13,
+    fontSize: fs(12), // Reduced from 13
+    fontFamily: 'Inter-Regular',
+    opacity: 0.95,
+    lineHeight: fs(16), // Reduced from 18
   },
   impactSection: {
-    marginTop: 8,
-    marginBottom: 20,
+    marginTop: hp(1), // 8
+    marginBottom: hp(0.5), // Reduced from 1.2 to decrease gap with branding
   },
   impactCard: {
     borderRadius: 20,
-    padding: 24,
+    padding: wp(6.4), // 24
     flexDirection: 'row',
     alignItems: 'flex-start',
     shadowColor: '#10b981',
@@ -791,47 +866,47 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   impactIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: wp(16), // 60
+    height: wp(16), // 60
+    borderRadius: wp(8), // 30
     backgroundColor: '#ffffff',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: wp(4.3), // 16
   },
   impactEmoji: {
-    fontSize: 32,
+    fontSize: fs(32), // 32
   },
   impactTextContainer: {
     flex: 1,
   },
   impactText: {
-    fontSize: 15,
+    fontSize: fs(15), // 15
     color: '#ffffff',
     fontWeight: '600',
-    lineHeight: 22,
-    marginBottom: 12,
+    lineHeight: hp(2.7), // 22
+    marginBottom: hp(1.5), // 12
   },
   impactHighlight: {
     fontWeight: '800',
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: fs(16), // 16
   },
   impactStats: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 4,
+    gap: wp(2.7), // 10
+    marginTop: hp(0.5), // 4
   },
   statBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: wp(3.2), // 12
+    paddingVertical: hp(0.7), // 6
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   statBadgeText: {
-    fontSize: 12,
+    fontSize: fs(12), // 12
     fontWeight: '700',
     color: '#ffffff',
   },
@@ -846,15 +921,15 @@ const styles = StyleSheet.create({
   },
   referCardGradient: {
     borderRadius: 20,
-    padding: 18,
+    padding: wp(4.8), // 18
     flexDirection: 'row',
     alignItems: 'center',
   },
   referIconContainer: {
-    width: 48,
-    height: 48,
+    width: wp(12.8), // 48
+    height: wp(12.8), // 48
     backgroundColor: 'white',
-    borderRadius: 24,
+    borderRadius: wp(6.4), // 24
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#f59e0b',
@@ -865,29 +940,32 @@ const styles = StyleSheet.create({
   },
   referTextContainer: {
     flex: 1,
-    marginHorizontal: 14,
+    marginHorizontal: wp(3.7), // 14
   },
   referTitle: {
-    fontSize: 15,
+    fontSize: fs(15), // 15
     fontWeight: '700',
     color: '#92400e',
-    marginBottom: 3,
+    fontFamily: 'Inter-Bold',
+    marginBottom: hp(0.4), // 3
   },
   referSubtitle: {
-    fontSize: 12,
+    fontSize: fs(12), // 12
     color: '#b45309',
+    fontFamily: 'Inter-Medium',
   },
   tipCard: {
     borderRadius: 16,
-    padding: 20,
+    padding: wp(5.3), // 20
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: hp(0.2), // Reduced from 0.6 to decrease gap
   },
   tipIconContainer: {
-    width: 56,
-    height: 56,
+    width: wp(14.9), // 56
+    height: wp(14.9), // 56
     backgroundColor: '#ffffff',
-    borderRadius: 28,
+    borderRadius: wp(7.5), // 28
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#059669',
@@ -898,49 +976,147 @@ const styles = StyleSheet.create({
   },
   tipTextContainer: {
     flex: 1,
-    marginLeft: 16,
+    marginLeft: wp(4.3), // 16
   },
   tipTitle: {
-    fontSize: 14,
+    fontSize: fs(14), // 14
     fontWeight: '600',
     color: '#047857',
-    marginBottom: 4,
+    fontFamily: 'Inter-SemiBold',
+    marginBottom: hp(0.5), // 4
   },
   tipText: {
-    fontSize: 13,
+    fontSize: fs(13), // 13
     color: '#065f46',
-    lineHeight: 18,
+    fontFamily: 'Inter-Regular',
+    lineHeight: hp(2.2), // 18
   },
-  brandingSection: {
-    marginTop: 0,
-    marginBottom: 20,
-    marginHorizontal: 20,
-    overflow: 'hidden',
-    borderRadius: 24,
+  // Branding Section
+    brandingSection: {
+      marginTop: 0,
+      marginBottom: wp(5.3), // 20
+      marginHorizontal: wp(5.3), // 20
+      overflow: 'hidden',
+      borderRadius: 24,
+    },
+    brandingGradient: {
+      paddingVertical: hp(4.9), // 40
+      paddingHorizontal: wp(6.4), // 24
+      position: 'relative',
+      overflow: 'hidden',
+      borderRadius: 24,
+    },
+    brandingCircle1: {
+      position: 'absolute',
+      width: wp(80), // 300
+      height: wp(80), // 300
+      borderRadius: wp(40), // 150
+      backgroundColor: 'rgba(16, 185, 129, 0.08)',
+      top: hp(-12.3), // -100
+      right: wp(-21.3), // -80
+      borderWidth: 1,
+      borderColor: 'rgba(16, 185, 129, 0.15)',
+    },
+    brandingCircle2: {
+      position: 'absolute',
+      width: wp(66.7), // 250
+      height: wp(66.7), // 250
+      borderRadius: wp(33.3), // 125
+      backgroundColor: 'rgba(59, 130, 246, 0.06)',
+      bottom: hp(-9.8), // -80
+      left: wp(-16), // -60
+      borderWidth: 1,
+      borderColor: 'rgba(59, 130, 246, 0.12)',
+    },
+    brandingContent: {
+      position: 'relative',
+      zIndex: 1,
+    },
+    brandingBadge: {
+      backgroundColor: 'rgba(22, 163, 74, 0.15)',
+      paddingHorizontal: wp(3.7), // 14
+      paddingVertical: hp(0.7), // 6
+      borderRadius: 18,
+      alignSelf: 'flex-start',
+      marginBottom: hp(2.2), // 18
+      borderWidth: 1,
+      borderColor: 'rgba(22, 163, 74, 0.3)',
+    },
+    brandingBadgeText: {
+      fontSize: fs(11), // 11
+      fontWeight: '800',
+      color: '#16a34a',
+      letterSpacing: 1.2,
+    },
+    brandingTagline: {
+      fontSize: fs(32), // 32
+      fontWeight: '900',
+      color: '#ffffff',
+      textAlign: 'left',
+      letterSpacing: -1,
+      lineHeight: hp(4.9), // 40
+    },
+    brandingDivider: {
+      width: wp(18.7), // 70
+      height: 3,
+      backgroundColor: '#16a34a',
+      borderRadius: 2,
+      marginVertical: hp(2.2), // 18
+      alignSelf: 'flex-start', // Align divider to the left
+    },
+    brandingLogoContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+    marginBottom: hp(1.2), // 10
+    backgroundColor: 'transparent',
   },
-  brandingGradient: {
-    paddingVertical: 40,
-    paddingHorizontal: 24,
-    position: 'relative',
-    overflow: 'hidden',
-    borderRadius: 24,
+  brandingLogoImage: {
+    width: wp(55), // Reduced from 75 to make it smaller
+    height: hp(8), // Reduced from 11 to make it smaller
+    marginLeft: wp(-2), // Move more to the left
+    ...(Platform.OS === 'ios' && {
+      shadowColor: 'transparent',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0,
+      shadowRadius: 0,
+    }),
   },
-  brandingCircle1: {
-    position: 'absolute',
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-    backgroundColor: 'rgba(16, 185, 129, 0.08)',
-    top: -100,
-    right: -80,
+  brandingSubtext: {
+    fontSize: fs(15), // 15
+    color: '#94a3b8',
+    fontWeight: '600',
+  },
+  brandingStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    padding: wp(5.3), // 20
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.15)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  brandingCircle2: {
-    position: 'absolute',
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-    backgroundColor: 'rgba(59, 130, 246, 0.06)',
+  brandingStat: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  brandingStatNumber: {
+    fontSize: fs(24), // 24
+    fontWeight: '800',
+    color: '#10b981',
+    marginBottom: hp(0.5), // 4
+  },
+  brandingStatLabel: {
+    fontSize: fs(11), // 11
+    color: '#94a3b8',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  brandingStatDivider: {
+    width: 1,
+    height: hp(4.9), // 40
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginHorizontal: wp(3.2), // 12
   },
 });

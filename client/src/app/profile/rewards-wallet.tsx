@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import {
   View,
   Text,
+  StatusBar,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -29,8 +30,8 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useReferral } from '../../context/ReferralContext';
-
-const { width } = Dimensions.get('window');
+import { useTheme } from '../../contexts/ThemeContext';
+import { wp, hp, fs, spacing } from '../../utils/responsive';
 
 export default function RewardsWalletScreen() {
   const router = useRouter();
@@ -161,49 +162,50 @@ export default function RewardsWalletScreen() {
   }
 
   return (
-    <View className='flex-1 bg-gray-100'>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header with Gradient */}
+      <StatusBar barStyle="light-content" />
       <LinearGradient
         colors={['#16a34a', '#15803d', '#166534']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        className='pt-14 px-5 pb-6'
+        className={styles.header}
       >
-        <View className='flex-row items-center justify-between mb-6'>
-          <TouchableOpacity
-            className='w-10 h-10 rounded-full bg-white/25 items-center justify-center'
+        <View style={styles.headerTop}>
+          <TouchableOpacity 
+            style={styles.backButton} 
             onPress={() => router.back()}
             activeOpacity={0.7}
           >
             <ArrowLeft size={24} color="white" />
           </TouchableOpacity>
-          <Text className='text-xl font-bold text-white tracking-wider'>Rewards Wallet</Text>
-          <View className='w-10' />
+          <Text style={styles.headerTitle}>Rewards Wallet</Text>
+          <View style={styles.headerRight} />
         </View>
 
         {/* Main Balance Card */}
-        <View className='bg-white/15 rounded-xl p-6 border border-white/25'>
-          <View className='flex-row items-center mb-4'>
-            <View className='w-12 h-12 rounded-full bg-amber-500/20 justify-center items-center mr-3'>
+        <View style={styles.balanceCard}>
+          <View style={styles.balanceHeader}>
+            <View style={styles.balanceIconBox}>
               <Coins size={28} color="#f59e0b" strokeWidth={2.5} />
             </View>
-            <Text className='text-[15px] font-semibold text-white/90 tracking-[0.3] font-inter-semibold'>Available Balance</Text>
+            <Text style={styles.balanceLabel}>Available Balance</Text>
           </View>
 
-          <View className='flex-row items-center mb-3'>
+          <View style={styles.balanceAmountRow}>
             <IndianRupee size={36} color="white" strokeWidth={3} />
-            <Text className='text-[56px] font-extrabold text-white ml-2 tracking-tighter font-inter-bold'>{referralBalance.toFixed(2)}</Text>
+            <Text style={styles.balanceAmount}>{referralBalance.toFixed(2)}</Text>
           </View>
 
-          <Text className='text-sm text-white/80 font-inter-regular mb-3'>
+          <Text style={styles.balanceSubtext}>
             💰 Extra earnings from referrals - withdraw anytime to your bank
           </Text>
 
           {/* Pending Badge */}
           {pendingBalance > 0 && (
-            <View className='flex-row items-center bg-amber-400/25 px-3 py-2 rounded-lg self-start gap-1.5 border border-amber-400/40'>
+            <View style={styles.pendingBadge}>
               <Clock size={14} color="white" />
-              <Text className='text-xs font-semibold text-white font-inter-semibold'>
+              <Text style={styles.pendingText}>
                 ₹{pendingBalance.toFixed(2)} pending verification
               </Text>
             </View>
@@ -212,7 +214,7 @@ export default function RewardsWalletScreen() {
           {/* Withdraw Button */}
           {canRedeem && (
             <TouchableOpacity
-              className='flex-row items-center justify-center bg-white/25 border-2 border-white rounded-xl py-[14px] px-5 mt-4 gap-2'
+              style={styles.withdrawButton}
               activeOpacity={0.8}
               onPress={() => {
                 // Withdraw functionality
@@ -220,13 +222,13 @@ export default function RewardsWalletScreen() {
               }}
             >
               <IndianRupee size={18} color="white" strokeWidth={2.5} />
-              <Text className='text-[15px] font-bold text-white font-inter-bold'>Withdraw to Bank</Text>
+              <Text style={styles.withdrawButtonText}>Withdraw to Bank</Text>
             </TouchableOpacity>
           )}
 
           {!canRedeem && referralBalance > 0 && (
-            <View className='bg-white/10 border border-white/30 rounded-xl py-3 px-4 mt-4 items-center'>
-              <Text className='text-sm font-semibold text-white/70 font-inter-semibold'>
+            <View style={styles.withdrawDisabled}>
+              <Text style={styles.withdrawDisabledText}>
                 ₹{(120 - referralBalance).toFixed(2)} more to withdraw (Min ₹120)
               </Text>
             </View>
@@ -235,7 +237,7 @@ export default function RewardsWalletScreen() {
       </LinearGradient>
 
       <ScrollView
-        className='flex-1'
+        style={styles.content}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
@@ -248,72 +250,71 @@ export default function RewardsWalletScreen() {
         }
       >
         {/* Stats */}
-        <View className='flex-row gap-3 mb-5'>
-          <View className='flex-1 bg-white rounded-2xl p-[18px] items-center shadow-lg shadow-black/5'>
-            <View className='w-11 h-11 rounded-full bg-emerald-50 justify-center items-center mb-3'>
+        <View style={styles.statsContainer}>
+          <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.statIconWrapper, { backgroundColor: colors.primaryLight + '30' }]}>
               <TrendingUp size={20} color="#16a34a" />
             </View>
-            <Text className='text-2xl font-bold text-gray-900 font-inter-bold mb-1'>₹{totalEarned.toFixed(2)}</Text>
-            <Text className='text-xs text-gray-500 font-inter-medium'>Referrals Earned</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>₹{totalEarned}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Referrals Earned</Text>
           </View>
 
-          <View className='flex-1 bg-white rounded-2xl p-[18px] items-center shadow-lg shadow-black/5'>
-            <View className='w-11 h-11 rounded-full bg-emerald-50 justify-center items-center mb-3'>
+          <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.statIconWrapper, { backgroundColor: '#f59e0b20' }]}>
               <Zap size={20} color="#f59e0b" />
             </View>
-            <Text className='text-2xl font-bold text-gray-900 font-inter-bold mb-1'>₹{totalSpent.toFixed(2)}</Text>
-            <Text className='text-xs text-gray-500 font-inter-medium'>Withdrawn</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>₹{totalSpent}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Withdrawn</Text>
           </View>
         </View>
 
         {/* How It Works */}
-        <View className='bg-white rounded-xl p-5 mb-4 shadow-xl shadow-black/10'>
-          <View className='flex-row items-center mb-4'>
-            <View className='w-10 h-10 rounded-full bg-emerald-50 justify-center items-center mr-3'>
-              <Info size={20} color="#16a34a" />
+       <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.infoHeader}>
+            <View style={[styles.infoIconBox, { backgroundColor: colors.primaryLight + '30' }]}>
+              <Info size={20} color={colors.primary} />
             </View>
-            <Text className='text-lg font-bold text-gray-900 font-inter-bold'>How Referral Wallet Works</Text>
+            <Text style={[styles.infoTitle, { color: colors.text }]}>How Referral Wallet Works</Text>
           </View>
 
-          <View className='gap-3 mb-4'>
-            <View className='flex-row items-start'>
-              <View className='w-1.5 h-1.5 rounded-full bg-green-600 mt-[7px] mr-3' />
-              <Text className='flex-1 text-sm text-gray-500 font-inter-regular leading-relaxed'>
-                <Text className='font-semibold text-gray-900 font-inter-semibold'>Sell scrap, get paid directly</Text> to your bank account
+          <View style={styles.infoContent}>
+            <View style={styles.infoPoint}>
+              <View style={[styles.infoDot, { backgroundColor: colors.primary }]} />
+              <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                <Text style={[styles.infoBold, { color: colors.text }]}>Sell scrap, get paid directly</Text> to your bank account
               </Text>
             </View>
 
-            <View className='flex-row items-start'>
-              <View className='w-1.5 h-1.5 rounded-full bg-green-600 mt-[7px] mr-3' />
-              <Text className='flex-1 text-sm text-gray-500 font-inter-regular leading-relaxed'>
-                <Text className='font-semibold text-gray-900 font-inter-semibold'>Referral bonus is separate</Text> - earn extra ₹20 per referral
+            <View style={styles.infoPoint}>
+              <View style={[styles.infoDot, { backgroundColor: colors.primary }]} />
+              <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                <Text style={[styles.infoBold, { color: colors.text }]}>Referral bonus is separate</Text> - earn extra ₹20 per referral
               </Text>
             </View>
 
-            <View className='flex-row items-start'>
-              <View className='w-1.5 h-1.5 rounded-full bg-green-600 mt-[7px] mr-3' />
-              <Text className='flex-1 text-sm text-gray-500 font-inter-regular leading-relaxed'>
-                <Text className='font-semibold text-gray-900 font-inter-semibold'>Withdraw anytime</Text> - minimum ₹100 to bank account
+            <View style={styles.infoPoint}>
+              <View style={[styles.infoDot, { backgroundColor: colors.primary }]} />
+              <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                <Text style={[styles.infoBold, { color: colors.text }]}>Withdraw anytime</Text> - minimum ₹100 to bank account
               </Text>
             </View>
           </View>
 
           {/* Example Card */}
-          <View className='bg-gray-50 rounded-xl p-[14px] border border-gray-200'>
-            <Text className='text-sm font-semibold text-gray-900 font-inter-semibold mb-2.5'>💡 How it works:</Text>
-            <View className='flex-row justify-between items-center mb-1.5'>
-              <Text className='text-sm text-gray-500 font-inter-regular'>Scrap Payment:</Text>
-              <Text className='text-sm font-semibold text-gray-900 font-inter-semibold'>Direct to Bank ✅</Text>
+          <View style={[styles.exampleBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.exampleTitle, { color: colors.text }]}>💡 How it works:</Text>
+            <View style={styles.exampleRow}>
+              <Text style={[styles.exampleText, { color: colors.textSecondary }]}>Scrap Payment:</Text>
+              <Text style={[styles.exampleValue, { color: colors.text }]}>Direct to Bank ✅</Text>
             </View>
-            <View className='h-px bg-gray-200 my-2' />
-            <View className='flex-row justify-between items-center mb-1.5'>
-              <Text className='text-sm text-gray-500 font-inter-regular'>Referral Bonus:</Text>
-              <Text className='text-sm font-bold text-gray-900 font-inter-bold'>In Wallet ₹{referralBalance.toFixed(2)}</Text>
+            <View style={styles.exampleRow}>
+              <Text style={[styles.exampleText, { color: colors.textSecondary }]}>Referral Bonus:</Text>
+              <Text style={[styles.exampleValueGreen, { color: colors.primary }]}>In Wallet ₹120</Text>
             </View>
-            <View className='h-px bg-gray-200 my-2' />
-            <View className='flex-row justify-between items-center mb-1.5'>
-              <Text className='text-sm font-bold text-gray-900 font-inter-bold'>Withdraw Option:</Text>
-              <Text className='text-base font-bold text-green-600 font-inter-bold'>Min ₹120</Text>
+            <View style={[styles.exampleDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.exampleRow}>
+              <Text style={[styles.exampleTextBold, { color: colors.text }]}>Withdraw Option:</Text>
+              <Text style={[styles.exampleValueBold, { color: colors.text }]}>Min ₹100</Text>
             </View>
           </View>
         </View>

@@ -17,8 +17,9 @@ import { useRouter } from 'expo-router';
 import { useHomeData } from '../hooks/useHomeData';
 import { useScrapCategories } from '../hooks/useScrapCategories';
 import { services } from '../app/(tabs)/services';
+import { wp, hp, fs, spacing } from '../utils/responsive';
+import { useTheme } from '../context/ThemeContext';
 
-const { width } = Dimensions.get('window');
 
 interface SearchResult {
   id: string;
@@ -34,6 +35,7 @@ interface SearchResult {
 
 export default function SearchBar() {
   const router = useRouter();
+  const { colors, isDark } = useTheme();
   
   // Backend data hooks
   const { products, categories, loading, error, refetch } = useHomeData();
@@ -45,14 +47,14 @@ export default function SearchBar() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isNavigating, setIsNavigating] = useState(false);
 
-  // Create category lookup map (Task 2.1)
+  // Create category lookup map
   const categoryMap = useMemo(() => {
     const map = new Map();
     categories.forEach(cat => map.set(cat.id, cat));
     return map;
   }, [categories]);
 
-  // Task 3.1: Generate popular searches from scrapCategories
+  // Generate popular searches from scrapCategories
   const popularSearches = useMemo(() => {
     return scrapCategories.slice(0, 4).map(category => {
       // Remove common prefixes/suffixes for cleaner display labels
@@ -72,15 +74,17 @@ export default function SearchBar() {
 
   const handleSearch = useCallback((query: string) => {
     setSearchQuery(query);
+    
     if (query.trim().length === 0) {
       setSearchResults([]);
       return;
     }
+
     const results: SearchResult[] = [];
     const lowerQuery = query.toLowerCase();
     const addedIds = new Set<string>();
     
-    // Task 2.2: Search backend products
+    // Search backend products
     products.forEach((product) => {
       const category = categoryMap.get(product.category);
       const itemId = `product-${product.id}`;
@@ -104,7 +108,7 @@ export default function SearchBar() {
       }
     });
 
-    // Task 2.3: Search services (static data - unchanged)
+    // Search services
     services.forEach((service) => {
       const serviceId = `service-${service.id}`;
       if (!addedIds.has(serviceId) &&
@@ -126,73 +130,91 @@ export default function SearchBar() {
     setSearchResults(results);
   }, [products, categoryMap]);
 
+  const handleSelectResult = useCallback((result: SearchResult) => {
+    if (isNavigating) return;
+    
+    setIsNavigating(true);
+    Keyboard.dismiss();
+    setIsFocused(false);
+    setSearchQuery('');
+    setSearchResults([]);
+    
+    if (result.type === 'service') {
+      const serviceId = result.id.replace('service-', '');
+      router.push(`/services/${serviceId}` as any);
+    } else {
+      router.push({
+        pathname: '/(tabs)/sell',
+        params: {
+          preSelectedItem: result.name,
+          preSelectedCategory: result.category,
+        }
+      } as any);
+    }
+    
+    setTimeout(() => setIsNavigating(false), 1000);
+  }, [isNavigating, router]);
+
   const handleClear = useCallback(() => {
     setSearchQuery('');
     setSearchResults([]);
   }, []);
 
   const handleCloseModal = useCallback(() => {
+    Keyboard.dismiss();
     setIsFocused(false);
     setSearchQuery('');
     setSearchResults([]);
-    Keyboard.dismiss();
+    setIsNavigating(false);
   }, []);
 
-  const handleSelectResult = useCallback((result: SearchResult) => {
-    if (isNavigating) return;
-    setIsNavigating(true);
-    
-    // TODO: Implement navigation logic in subsequent tasks
-    
-    setTimeout(() => {
-      setIsNavigating(false);
-      handleCloseModal();
-    }, 300);
-  }, [isNavigating, handleCloseModal]);
-
-  // Task 3.2: Navigation handler for popular searches
   const navigateToSellTab = useCallback((categoryName: string) => {
     if (isNavigating) return;
     setIsNavigating(true);
+    Keyboard.dismiss();
+    setIsFocused(false);
+    setSearchQuery('');
     
     router.push({
       pathname: '/(tabs)/sell',
-      params: { category: categoryName },
-    });
+      params: {
+        preSelectedCategory: categoryName,
+      }
+    } as any);
     
-    setTimeout(() => {
-      setIsNavigating(false);
-      handleCloseModal();
-    }, 300);
-  }, [isNavigating, router, handleCloseModal]);
+    setTimeout(() => setIsNavigating(false), 1000);
+  }, [isNavigating, router]);
 
   return (
-    <View style={styles.container}>
-      {/* Search Input Trigger */}
+    <>
+      {/* Search Input */}
       <TouchableOpacity
-        style={styles.searchInput}
+        style={styles.searchContainer}
         onPress={() => setIsFocused(true)}
-        activeOpacity={0.7}
+        activeOpacity={0.85}
       >
-        <Search size={20} color="#9ca3af" />
-        <Text style={styles.searchPlaceholder}>Search for scrap items...</Text>
+        <View style={styles.searchIconContainer}>
+          <Search size={18} color="#16a34a" strokeWidth={2.5} />
+        </View>
+        <Text style={styles.placeholderText}>Search scrap items & services...</Text>
       </TouchableOpacity>
 
       {/* Search Modal */}
       <Modal
         visible={isFocused}
         animationType="slide"
+        transparent={true}
         onRequestClose={handleCloseModal}
       >
-        <View style={styles.modalContainer}>
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
           {/* Search Header */}
-          <View style={styles.searchHeader}>
-            <View style={styles.searchInputContainer}>
-              <Search size={20} color="#9ca3af" />
+          <View style={[styles.searchHeader, { borderBottomColor: colors.border, backgroundColor: colors.surface }]}>
+            <View style={[styles.searchInputContainer, { backgroundColor: colors.card }]}>
+              <Search size={20} color={colors.textSecondary} />
               <TextInput
-                style={styles.searchTextInput}
-                placeholder="Search for scrap items..."
-                placeholderTextColor="#9ca3af"
+                style={[styles.searchInput, { color: colors.text }]}
+                placeholder="Search scrap items & services..."
+                placeholderTextColor={colors.textTertiary}
                 value={searchQuery}
                 onChangeText={handleSearch}
                 autoFocus
@@ -201,12 +223,15 @@ export default function SearchBar() {
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={handleClear} disabled={loading}>
-                  <X size={20} color="#9ca3af" />
+                  <X size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
               )}
             </View>
-            <TouchableOpacity onPress={handleCloseModal}>
-              <Text style={styles.cancelButton}>Cancel</Text>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={handleCloseModal}
+            >
+              <Text style={[styles.cancelText, { color: colors.primary }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
 
@@ -214,82 +239,77 @@ export default function SearchBar() {
           {loading && (
             <View style={styles.centerContainer}>
               <ActivityIndicator size="large" color="#16a34a" />
-              <Text style={styles.loadingText}>Loading data...</Text>
+              <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading data...</Text>
             </View>
           )}
 
-          {/* Error State - Task 5.2: Keep services section functional during errors */}
+          {/* Error State */}
           {error && !loading && (
-            <ScrollView style={styles.modalContent}>
+            <ScrollView style={styles.resultsContainer}>
               <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>Failed to load scrap data</Text>
-                <Text style={styles.errorSubtext}>{error}</Text>
+                <Text style={[styles.errorText, { color: colors.text }]}>Failed to load scrap data</Text>
+                <Text style={[styles.errorSubtext, { color: colors.textSecondary }]}>{error}</Text>
                 <TouchableOpacity onPress={refetch} style={styles.retryButton}>
                   <Text style={styles.retryText}>Retry</Text>
                 </TouchableOpacity>
               </View>
 
               {/* Services Section - Always functional during errors */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Services</Text>
-                <Text style={styles.sectionSubtitle}>
-                  Browse our professional services
-                </Text>
-                {services.map((service) => (
-                  <TouchableOpacity
-                    key={service.id}
-                    style={styles.categoryItem}
-                    onPress={() => handleSelectResult({
-                      id: `service-${service.id}`,
-                      name: service.title,
-                      description: service.description,
-                      category: 'Services',
-                      categoryIcon: '🛠️',
-                      categoryColor: '#16a34a',
-                      type: 'service',
-                    })}
-                  >
-                    <View style={styles.serviceIcon}>
-                      <Text style={styles.serviceEmoji}>🛠️</Text>
-                    </View>
-                    <View style={styles.categoryInfo}>
-                      <Text style={styles.categoryTitle}>{service.title}</Text>
-                      <Text style={styles.categoryCount}>{service.description}</Text>
-                    </View>
-                    <ChevronRight size={18} color="#9ca3af" />
-                  </TouchableOpacity>
-                ))}
-              </View>
+              <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginTop: 24 }]}>
+                Our Services
+              </Text>
+              {services.map((service) => (
+                <TouchableOpacity
+                  key={service.id}
+                  style={[styles.serviceItem, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  onPress={() => {
+                    if (isNavigating) return;
+                    setIsNavigating(true);
+                    Keyboard.dismiss();
+                    setIsFocused(false);
+                    router.push(`/services/${service.id}`);
+                    setTimeout(() => setIsNavigating(false), 1000);
+                  }}
+                >
+                  <View style={[styles.serviceIconContainer, { backgroundColor: colors.primaryLight + '30' }]}>
+                    <service.icon size={22} color={service.color} strokeWidth={2.5} />
+                  </View>
+                  <View style={styles.serviceInfo}>
+                    <Text style={[styles.serviceTitle, { color: colors.text }]}>{service.title}</Text>
+                    <Text style={[styles.serviceDescription, { color: colors.textSecondary }]}>{service.description}</Text>
+                  </View>
+                  <ChevronRight size={18} color={colors.textTertiary} strokeWidth={2} />
+                </TouchableOpacity>
+              ))}
             </ScrollView>
           )}
 
           {/* Content - Only show when not loading and no error */}
           {!loading && !error && (
-            <ScrollView style={styles.modalContent}>
-              {/* Search Results or Default View */}
-              {searchQuery.trim().length === 0 ? (
-                <View>
-                  {/* Task 5.3: Handle empty data states gracefully */}
+            <ScrollView style={styles.resultsContainer}>
+              {searchQuery.length === 0 ? (
+                <View style={styles.popularContainer}>
+                  {/* Handle empty data states gracefully */}
                   {scrapCategories.length === 0 ? (
                     <View style={styles.emptyStateContainer}>
-                      <Text style={styles.emptyStateText}>No categories available</Text>
-                      <Text style={styles.emptyStateSubtext}>
+                      <Text style={[styles.emptyStateText, { color: colors.text }]}>No categories available</Text>
+                      <Text style={[styles.emptyStateSubtext, { color: colors.textSecondary }]}>
                         Check back later for scrap categories
                       </Text>
                     </View>
                   ) : (
                     <>
-                      {/* Popular Searches - Task 3 */}
+                      {/* Popular Searches */}
                       {popularSearches.length > 0 && (
-                        <View style={styles.section}>
-                          <Text style={styles.sectionTitle}>Popular Searches</Text>
+                        <>
+                          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Popular Searches</Text>
                           <View style={styles.popularGrid}>
                             {popularSearches.map((item, index) => (
                               <TouchableOpacity
                                 key={index}
                                 style={[
-                                  styles.popularItem,
-                                  { backgroundColor: item.color + '15' },
+                                  styles.popularChip,
+                                  { backgroundColor: colors.card, borderColor: item.color + '40' },
                                 ]}
                                 onPress={() => navigateToSellTab(item.category)}
                               >
@@ -298,346 +318,399 @@ export default function SearchBar() {
                                   style={styles.popularImage}
                                   resizeMode="cover"
                                 />
-                                <Text
-                                  style={[styles.popularLabel, { color: item.color }]}
-                                  numberOfLines={1}
-                                >
-                                  {item.label}
-                                </Text>
+                                <Text style={[styles.popularLabel, { color: colors.text }]}>{item.label}</Text>
                               </TouchableOpacity>
                             ))}
                           </View>
-                        </View>
+                        </>
                       )}
 
-                      {/* Browse Categories - Task 4.1 & 4.2 */}
-                      <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Browse Categories</Text>
-                        {scrapCategories.map((category) => (
-                          <TouchableOpacity
-                            key={category.id}
-                            style={styles.categoryItem}
-                            onPress={() => navigateToSellTab(category.name)}
-                          >
-                            <Image
-                              source={category.icon}
-                              style={styles.categoryImage}
-                              resizeMode="cover"
-                            />
-                            <View style={styles.categoryInfo}>
-                              <Text style={styles.categoryTitle}>{category.name}</Text>
-                              <Text style={styles.categoryCount}>
-                                {category.products.length} items
-                              </Text>
-                            </View>
-                            <ChevronRight size={18} color="#9ca3af" />
-                          </TouchableOpacity>
-                        ))}
-                      </View>
+                      {/* Browse Categories */}
+                      <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginTop: 24 }]}>
+                        Browse Categories
+                      </Text>
+                      {scrapCategories.map((category) => (
+                        <TouchableOpacity
+                          key={category.id}
+                          style={[styles.categoryItem, { backgroundColor: colors.card }]}
+                          onPress={() => navigateToSellTab(category.name)}
+                        >
+                          <Image
+                            source={category.icon}
+                            style={styles.categoryImage}
+                            resizeMode="cover"
+                          />
+                          <View style={styles.categoryInfo}>
+                            <Text style={[styles.categoryTitle, { color: colors.text }]}>{category.name}</Text>
+                            <Text style={[styles.categoryCount, { color: colors.textSecondary }]}>
+                              {category.products.length} items
+                            </Text>
+                          </View>
+                          <ChevronRight size={18} color={colors.textTertiary} strokeWidth={2} />
+                        </TouchableOpacity>
+                      ))}
                     </>
                   )}
 
                   {/* Services Section - Always visible */}
-                  <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Services</Text>
-                    <Text style={styles.sectionSubtitle}>
-                      Browse our professional services
-                    </Text>
-                    {services.map((service) => (
-                      <TouchableOpacity
-                        key={service.id}
-                        style={styles.categoryItem}
-                        onPress={() => handleSelectResult({
-                          id: `service-${service.id}`,
-                          name: service.title,
-                          description: service.description,
-                          category: 'Services',
-                          categoryIcon: '🛠️',
-                          categoryColor: '#16a34a',
-                          type: 'service',
-                        })}
-                      >
-                        <View style={styles.serviceIcon}>
-                          <Text style={styles.serviceEmoji}>🛠️</Text>
+                  <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginTop: 24 }]}>
+                    Our Services
+                  </Text>
+                  {services.map((service) => (
+                    <TouchableOpacity
+                      key={service.id}
+                      style={[styles.serviceItem, { backgroundColor: colors.card, borderColor: colors.border }]}
+                      onPress={() => {
+                        if (isNavigating) return;
+                        setIsNavigating(true);
+                        Keyboard.dismiss();
+                        setIsFocused(false);
+                        router.push(`/services/${service.id}`);
+                        setTimeout(() => setIsNavigating(false), 1000);
+                      }}
+                    >
+                      <View style={[styles.serviceIconContainer, { backgroundColor: colors.primaryLight + '30' }]}>
+                        <service.icon size={22} color={service.color} strokeWidth={2.5} />
+                      </View>
+                      <View style={styles.serviceInfo}>
+                        <Text style={[styles.serviceTitle, { color: colors.text }]}>{service.title}</Text>
+                        <Text style={[styles.serviceDescription, { color: colors.textSecondary }]}>{service.description}</Text>
+                      </View>
+                      <ChevronRight size={18} color={colors.textTertiary} strokeWidth={2} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : searchResults.length > 0 ? (
+                /* Search Results */
+                <View style={styles.resultsContent}>
+                  <Text style={[styles.resultsCount, { color: colors.textSecondary }]}>
+                    {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}{' '}
+                    found
+                  </Text>
+                  {searchResults.map((result) => (
+                    <TouchableOpacity
+                      key={result.id}
+                      style={[styles.resultItem, { backgroundColor: colors.card }]}
+                      onPress={() => handleSelectResult(result)}
+                    >
+                      {result.type === 'scrap' && result.image ? (
+                        <Image
+                          source={result.image}
+                          style={styles.resultImage}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View
+                          style={[
+                            styles.resultIcon,
+                            { backgroundColor: result.categoryColor + '20' },
+                          ]}
+                        >
+                          <Text style={styles.resultEmoji}>
+                            {result.categoryIcon}
+                          </Text>
                         </View>
-                        <View style={styles.categoryInfo}>
-                          <Text style={styles.categoryTitle}>{service.title}</Text>
-                          <Text style={styles.categoryCount}>{service.description}</Text>
-                        </View>
-                        <ChevronRight size={18} color="#9ca3af" />
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+                      )}
+                      <View style={styles.resultInfo}>
+                        <Text style={[styles.resultName, { color: colors.text }]}>{result.name}</Text>
+                        <Text style={[styles.resultDescription, { color: colors.textSecondary }]}>
+                          {result.description}
+                        </Text>
+                        {result.rate && (
+                          <Text style={[styles.resultRate, { color: colors.primary }]}>{result.rate}</Text>
+                        )}
+                        <Text
+                          style={[
+                            styles.resultCategory,
+                            { color: result.categoryColor },
+                          ]}
+                        >
+                          {result.category}
+                        </Text>
+                      </View>
+                      <ChevronRight size={18} color={colors.textTertiary} strokeWidth={2} />
+                    </TouchableOpacity>
+                  ))}
                 </View>
               ) : (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>
-                    Search Results ({searchResults.length})
+                /* No Results */
+                <View style={styles.noResults}>
+                  <Text style={styles.noResultsEmoji}>🔍</Text>
+                  <Text style={[styles.noResultsText, { color: colors.text }]}>No results found</Text>
+                  <Text style={[styles.noResultsSubtext, { color: colors.textSecondary }]}>
+                    Try searching for paper, plastic, metal, electronics, or services
                   </Text>
-                  {searchResults.length === 0 ? (
-                    <Text style={styles.noResultsText}>
-                      No results found for "{searchQuery}"
-                    </Text>
-                  ) : (
-                    searchResults.map((result) => (
-                      <TouchableOpacity
-                        key={result.id}
-                        style={styles.resultItem}
-                        onPress={() => handleSelectResult(result)}
-                      >
-                        <View style={styles.resultInfo}>
-                          <Text style={styles.resultName}>{result.name}</Text>
-                          <Text style={styles.resultDescription}>
-                            {result.description}
-                          </Text>
-                          {result.rate && (
-                            <Text style={styles.resultRate}>{result.rate}</Text>
-                          )}
-                          <Text style={styles.resultCategory}>
-                            {result.categoryIcon} {result.category}
-                          </Text>
-                        </View>
-                        <ChevronRight size={18} color="#9ca3af" />
-                      </TouchableOpacity>
-                    ))
-                  )}
                 </View>
               )}
             </ScrollView>
           )}
         </View>
       </Modal>
-    </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    marginHorizontal: 16,
-    marginVertical: 12,
-  },
-  searchInput: {
+  searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f3f4f6',
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
     borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
+    paddingHorizontal: spacing(14),
+    paddingVertical: spacing(12),
+    gap: spacing(10),
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  searchPlaceholder: {
-    fontSize: 16,
-    color: '#9ca3af',
+  searchIconContainer: {
+    width: wp(8.5),
+    height: wp(8.5),
+    backgroundColor: '#ecfdf5',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(22, 163, 74, 0.2)',
+  },
+  placeholderText: {
+    fontSize: fs(13),
+    color: '#6b7280',
+    flex: 1,
+    fontWeight: '600',
+  },
+  searchBadge: {
+    width: wp(7.5),
+    height: wp(7.5),
+    backgroundColor: '#fef3c7',
+    borderRadius: wp(3.75),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchBadgeText: {
+    fontSize: fs(14),
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#ffffff',
   },
   searchHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing(16),
+    paddingTop: Platform.OS === 'ios' ? spacing(50) : spacing(16),
+    paddingBottom: spacing(12),
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    gap: 12,
+    gap: spacing(12),
   },
   searchInputContainer: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f3f4f6',
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 8,
+    paddingHorizontal: spacing(12),
+    paddingVertical: Platform.OS === 'android' ? spacing(8) : spacing(10),
+    gap: spacing(8),
   },
-  searchTextInput: {
+  searchInput: {
     flex: 1,
-    fontSize: 16,
-    color: '#111827',
+    fontSize: fs(15),
+    ...Platform.select({
+      android: {
+        paddingVertical: 0,
+      },
+    }),
   },
   cancelButton: {
-    fontSize: 16,
-    color: '#16a34a',
-    fontWeight: '500',
+    paddingHorizontal: spacing(8),
   },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#6b7280',
-  },
-  errorContainer: {
-    alignItems: 'center',
-    padding: 24,
-    backgroundColor: '#fef2f2',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 12,
-  },
-  errorText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#dc2626',
-    marginBottom: 8,
-  },
-  errorSubtext: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  retryButton: {
-    backgroundColor: '#16a34a',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryText: {
-    color: '#ffffff',
-    fontSize: 16,
+  cancelText: {
+    fontSize: fs(15),
     fontWeight: '600',
   },
-  emptyStateContainer: {
-    alignItems: 'center',
-    padding: 32,
-    marginTop: 24,
-  },
-  emptyStateText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#6b7280',
-    marginBottom: 8,
-  },
-  emptyStateSubtext: {
-    fontSize: 14,
-    color: '#9ca3af',
-    textAlign: 'center',
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 12,
-  },
-  serviceIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
-    backgroundColor: '#f3f4f6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  serviceEmoji: {
-    fontSize: 24,
-  },
-  modalContent: {
+  resultsContainer: {
     flex: 1,
   },
-  section: {
-    padding: 16,
+  popularContainer: {
+    padding: spacing(20),
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: fs(14),
     fontWeight: '600',
-    color: '#111827',
-    marginBottom: 12,
-  },
-  placeholderText: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontStyle: 'italic',
-  },
-  noResultsText: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    paddingVertical: 24,
-  },
-  resultItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  resultInfo: {
-    flex: 1,
-  },
-  resultName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  resultDescription: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 4,
-  },
-  resultRate: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#16a34a',
-    marginBottom: 4,
-  },
-  resultCategory: {
-    fontSize: 12,
-    color: '#9ca3af',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: spacing(16),
   },
   popularGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    justifyContent: 'space-between',
+    gap: spacing(12),
   },
-  popularItem: {
-    width: (width - 56) / 2,
-    borderRadius: 12,
-    padding: 12,
+  popularChip: {
+    width: '48%', // Ensures 2x2 grid on all devices
+    flexDirection: 'column',
     alignItems: 'center',
-    gap: 8,
+    paddingHorizontal: spacing(14),
+    paddingVertical: spacing(16),
+    borderRadius: 16,
+    borderWidth: 1.5,
+    gap: spacing(10),
+    minHeight: hp(15), // Ensures consistent height
   },
   popularImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
+    width: wp(20),
+    height: wp(20),
+    borderRadius: 12,
+    backgroundColor: '#f3f4f6',
+  },
+  popularIcon: {
+    fontSize: fs(18),
   },
   popularLabel: {
-    fontSize: 14,
+    fontSize: fs(14),
     fontWeight: '600',
     textAlign: 'center',
   },
   categoryItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    padding: spacing(16),
+    borderRadius: 12,
+    marginBottom: spacing(12),
+    gap: spacing(12),
   },
   categoryImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
-    marginRight: 12,
+    width: wp(15),
+    height: wp(15),
+    borderRadius: 12,
+    backgroundColor: '#f3f4f6',
+  },
+  categoryIcon: {
+    width: wp(12),
+    height: wp(12),
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  categoryEmoji: {
+    fontSize: fs(24),
   },
   categoryInfo: {
     flex: 1,
   },
   categoryTitle: {
-    fontSize: 16,
+    fontSize: fs(15),
     fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
+    marginBottom: spacing(4),
   },
   categoryCount: {
-    fontSize: 14,
-    color: '#6b7280',
+    fontSize: fs(13),
+  },
+  resultsContent: {
+    padding: spacing(20),
+  },
+  resultsCount: {
+    fontSize: fs(14),
+    fontWeight: '500',
+    marginBottom: spacing(16),
+  },
+  resultItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: spacing(16),
+    borderRadius: 12,
+    marginBottom: spacing(12),
+    gap: spacing(12),
+  },
+  resultIcon: {
+    width: wp(12),
+    height: wp(12),
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  resultEmoji: {
+    fontSize: fs(24),
+  },
+  resultInfo: {
+    flex: 1,
+  },
+  resultName: {
+    fontSize: fs(16),
+    fontWeight: '600',
+    marginBottom: spacing(4),
+  },
+  resultDescription: {
+    fontSize: fs(13),
+    marginBottom: spacing(6),
+  },
+  resultCategory: {
+    fontSize: fs(12),
+    fontWeight: '600',
+  },
+  noResults: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: hp(10),
+  },
+  noResultsEmoji: {
+    fontSize: fs(64),
+    marginBottom: spacing(16),
+  },
+  noResultsText: {
+    fontSize: fs(18),
+    fontWeight: '600',
+    marginBottom: spacing(8),
+  },
+  noResultsSubtext: {
+    fontSize: fs(14),
+    textAlign: 'center',
+    paddingHorizontal: spacing(40),
+  },
+  serviceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing(16),
+    borderRadius: 12,
+    marginBottom: spacing(10),
+    gap: spacing(12),
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  serviceIconContainer: {
+    width: wp(11),
+    height: wp(11),
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(22, 163, 74, 0.2)',
+  },
+  serviceInfo: {
+    flex: 1,
+  },
+  serviceTitle: {
+    fontSize: fs(15),
+    fontWeight: '600',
+    marginBottom: spacing(3),
+  },
+  serviceDescription: {
+    fontSize: fs(13),
+    lineHeight: fs(18),
+  },
+  resultImage: {
+    width: wp(15),
+    height: wp(15),
+    borderRadius: 12,
+    backgroundColor: '#f3f4f6',
   },
 });

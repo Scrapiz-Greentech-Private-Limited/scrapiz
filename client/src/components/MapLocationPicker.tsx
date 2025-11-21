@@ -10,10 +10,11 @@ import {
   Modal,
   Keyboard,
   Platform,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import * as Location from 'expo-location';
-import { X, MapPin, Navigation, Search } from 'lucide-react-native';
+import { X, MapPin, Navigation, Search, Plus, Home, Building } from 'lucide-react-native';
 import {
   DEFAULT_MAP_STYLE,
   getIndiaBounds,
@@ -22,6 +23,7 @@ import {
   buildReverseGeocodingUrl,
   MAP_SETTINGS,
   DEFAULT_CENTER,
+  KRUTRIM_API_KEY,
 } from '../config/mapConfig';
 
 MapboxGL.setAccessToken(MAPBOX_API_KEY);
@@ -29,6 +31,8 @@ MapboxGL.setAccessToken(MAPBOX_API_KEY);
 interface KrutrimAutocompleteResult {
   place_id: string;
   description: string;
+  lat?: number;
+  lng?: number;
 }
 
 interface KrutrimAddressComponent {
@@ -57,6 +61,10 @@ interface MapLocationPickerProps {
   visible: boolean;
   onClose: () => void;
   onLocationSelect: (location: LocationResult) => void;
+  onUseCurrentLocation: () => void;
+  onAddManualAddress: () => void;
+  savedLocations: any[];
+  onSelectSavedLocation: (location: any) => void;
   initialLocation?: { latitude: number; longitude: number };
 }
 
@@ -64,6 +72,10 @@ export default function MapLocationPicker({
   visible,
   onClose,
   onLocationSelect,
+  onUseCurrentLocation,
+  onAddManualAddress,
+  savedLocations,
+  onSelectSavedLocation,
   initialLocation,
 }: MapLocationPickerProps) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -76,6 +88,7 @@ export default function MapLocationPicker({
   );
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [markerCoords, setMarkerCoords] = useState<[number, number]>(selectedCoords);
+  const [showActionMenu, setShowActionMenu] = useState(false);
 
   const cameraRef = useRef<MapboxGL.Camera>(null);
   const mapRef = useRef<MapboxGL.MapView>(null);
@@ -87,6 +100,9 @@ export default function MapLocationPicker({
       return () => clearTimeout(timer);
     } else {
       setIsMapReady(false);
+      setSearchQuery('');
+      setShowResults(false);
+      setShowActionMenu(false);
     }
   }, [visible]);
 
@@ -153,17 +169,47 @@ export default function MapLocationPicker({
     }
   };
 
-  const handleResultSelect = (result: KrutrimAutocompleteResult) => {
+  const getPlaceDetails = async (placeId: string): Promise<{ lat: number; lng: number } | null> => {
+    try {
+      const url = `https://api.olamaps.io/places/v1/details?place_id=${placeId}&api_key=${KRUTRIM_API_KEY}`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.result && data.result.geometry && data.result.geometry.location) {
+        return {
+          lat: data.result.geometry.location.lat,
+          lng: data.result.geometry.location.lng,
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Place details error:', error);
+      return null;
+    }
+  };
+
+  const handleResultSelect = async (result: KrutrimAutocompleteResult) => {
     setSearchQuery(result.description);
     setShowResults(false);
     Keyboard.dismiss();
-    console.warn(
-      "Krutrim Autocomplete selected. A 'Place Details' API call is needed to get coordinates."
-    );
+
+    // Get place details to get coordinates
+    const placeDetails = await getPlaceDetails(result.place_id);
+    
+    if (placeDetails) {
+      const coords: [number, number] = [placeDetails.lng, placeDetails.lat];
+      setSelectedCoords(coords);
+      setMarkerCoords(coords);
+      cameraRef.current?.flyTo(coords, MAP_SETTINGS.animationDuration);
+      await reverseGeocode(placeDetails.lat, placeDetails.lng);
+    } else {
+      console.warn('Could not get coordinates for selected place');
+    }
   };
 
   const handleUseCurrentLocation = async () => {
     setIsLoadingLocation(true);
+    setShowActionMenu(false);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -236,6 +282,11 @@ export default function MapLocationPicker({
     onClose();
   };
 
+  const dismissResults = () => {
+    setShowResults(false);
+    Keyboard.dismiss();
+  };
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.container}>
@@ -245,8 +296,74 @@ export default function MapLocationPicker({
             <X size={24} color="#111827" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Select Location</Text>
-          <View style={styles.placeholder} />
+          <TouchableOpacity 
+            onPress={() => setShowActionMenu(!showActionMenu)} 
+            style={styles.menuButton}
+          >
+            <View style={styles.menuDots}>
+              <View style={styles.dot} />
+              <View style={styles.dot} />
+              <View style={styles.dot} />
+            </View>
+          </TouchableOpacity>
         </View>
+
+        {/* Action Menu Dropdown */}
+        {showActionMenu && (
+          <View style={styles.actionMenu}>
+            <TouchableOpacity
+              style={styles.actionMenuItem}
+              onPress={handleUseCurrentLocation}
+              disabled={isLoadingLocation}
+            >
+              {isLoadingLocation ? (
+                <ActivityIndicator size="small" color="#16a34a" />
+              ) : (
+                <Navigation size={20} color="#16a34a" />
+              )}
+              <Text style={styles.actionMenuText}>Use Current Location</Text>
+            </TouchableOpacity>
+
+            {savedLocations.length > 0 && (
+              <>
+                <View style={styles.actionMenuDivider} />
+                <View style={styles.savedLocationsSection}>
+                  <Text style={styles.savedLocationsTitle}>Saved Locations</Text>
+                  {savedLocations.map((location) => (
+                    <TouchableOpacity
+                      key={location.id}
+                      style={styles.savedLocationItem}
+                      onPress={() => {
+                        onSelectSavedLocation(location);
+                        setShowActionMenu(false);
+                      }}
+                    >
+                      <MapPin size={16} color="#6b7280" />
+                      <View style={styles.savedLocationTextContainer}>
+                        <Text style={styles.savedLocationLabel}>{location.label}</Text>
+                        <Text style={styles.savedLocationAddress} numberOfLines={1}>
+                          {location.city}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
+
+            <View style={styles.actionMenuDivider} />
+            <TouchableOpacity
+              style={styles.actionMenuItem}
+              onPress={() => {
+                setShowActionMenu(false);
+                onAddManualAddress();
+              }}
+            >
+              <Plus size={20} color="#16a34a" />
+              <Text style={styles.actionMenuText}>Add Manual Address</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Search Bar */}
         <View style={styles.searchContainer}>
@@ -262,87 +379,78 @@ export default function MapLocationPicker({
             />
             {isSearching && <ActivityIndicator size="small" color="#16a34a" />}
           </View>
-          <TouchableOpacity
-            style={styles.gpsButton}
-            onPress={handleUseCurrentLocation}
-            disabled={isLoadingLocation}
-          >
-            {isLoadingLocation ? (
-              <ActivityIndicator size="small" color="#16a34a" />
-            ) : (
-              <Navigation size={20} color="#16a34a" />
-            )}
-          </TouchableOpacity>
         </View>
 
-        {/* Map Container - Now the results will push the map down */}
-        <View style={styles.mapWrapper}>
-          {/* Search Results - No longer absolute positioned */}
-          {showResults && searchResults.length > 0 && (
-            <View style={styles.resultsContainer}>
-              <FlatList
-                data={searchResults}
-                keyExtractor={(item) => item.place_id}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.resultItem}
-                    onPress={() => handleResultSelect(item)}
-                  >
-                    <View style={styles.resultIconContainer}>
-                      <MapPin size={18} color="#16a34a" />
-                    </View>
-                    <View style={styles.resultTextContainer}>
-                      <Text style={styles.resultText} numberOfLines={2}>
-                        {item.description}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                )}
-                style={styles.resultsList}
-                keyboardShouldPersistTaps="handled"
-              />
-            </View>
-          )}
-
-          {/* Map */}
-          <View style={styles.mapContainer}>
-            {isMapReady ? (
-              <MapboxGL.MapView
-                ref={mapRef}
-                style={styles.map}
-                styleURL={DEFAULT_MAP_STYLE}
-                onPress={handleMapPress}
-                logoEnabled={false}
-                attributionEnabled={true}
-                attributionPosition={{ bottom: 8, left: 8 }}
-              >
-                <MapboxGL.Camera
-                  ref={cameraRef}
-                  centerCoordinate={selectedCoords}
-                  zoomLevel={MAP_SETTINGS.defaultZoom}
-                  animationMode="flyTo"
-                  animationDuration={MAP_SETTINGS.animationDuration}
+        {/* Map Wrapper with TouchableWithoutFeedback to dismiss results */}
+        <TouchableWithoutFeedback onPress={dismissResults}>
+          <View style={styles.mapWrapper}>
+            {/* Search Results */}
+            {showResults && searchResults.length > 0 && (
+              <View style={styles.resultsContainer}>
+                <FlatList
+                  data={searchResults}
+                  keyExtractor={(item) => item.place_id}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={styles.resultItem}
+                      onPress={() => handleResultSelect(item)}
+                    >
+                      <View style={styles.resultIconContainer}>
+                        <MapPin size={18} color="#16a34a" />
+                      </View>
+                      <View style={styles.resultTextContainer}>
+                        <Text style={styles.resultText} numberOfLines={2}>
+                          {item.description}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                  style={styles.resultsList}
+                  keyboardShouldPersistTaps="handled"
                 />
-                <MapboxGL.PointAnnotation
-                  id="selected-location"
-                  coordinate={markerCoords}
-                >
-                  <View style={styles.markerContainer}>
-                    <View style={styles.marker}>
-                      <MapPin size={24} color="#ffffff" fill="#16a34a" />
-                    </View>
-                    <View style={styles.markerShadow} />
-                  </View>
-                </MapboxGL.PointAnnotation>
-              </MapboxGL.MapView>
-            ) : (
-              <View style={styles.mapLoadingContainer}>
-                <ActivityIndicator size="large" color="#16a34a" />
-                <Text style={styles.loadingText}>Loading map...</Text>
               </View>
             )}
+
+            {/* Map */}
+            <View style={styles.mapContainer}>
+              {isMapReady ? (
+                <MapboxGL.MapView
+                  ref={mapRef}
+                  style={styles.map}
+                  styleURL={DEFAULT_MAP_STYLE}
+                  onPress={handleMapPress}
+                  logoEnabled={false}
+                  attributionEnabled={true}
+                  attributionPosition={{ bottom: 8, left: 8 }}
+                >
+                  <MapboxGL.Camera
+                    ref={cameraRef}
+                    centerCoordinate={selectedCoords}
+                    zoomLevel={MAP_SETTINGS.defaultZoom}
+                    animationMode="flyTo"
+                    animationDuration={MAP_SETTINGS.animationDuration}
+                  />
+                  <MapboxGL.PointAnnotation
+                    id="selected-location"
+                    coordinate={markerCoords}
+                  >
+                    <View style={styles.markerContainer}>
+                      <View style={styles.marker}>
+                        <MapPin size={24} color="#ffffff" fill="#16a34a" />
+                      </View>
+                      <View style={styles.markerShadow} />
+                    </View>
+                  </MapboxGL.PointAnnotation>
+                </MapboxGL.MapView>
+              ) : (
+                <View style={styles.mapLoadingContainer}>
+                  <ActivityIndicator size="large" color="#16a34a" />
+                  <Text style={styles.loadingText}>Loading map...</Text>
+                </View>
+              )}
+            </View>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
 
         {/* Footer */}
         <View style={styles.footer}>
@@ -399,8 +507,80 @@ const styles = StyleSheet.create({
     color: '#111827',
     letterSpacing: -0.3,
   },
-  placeholder: {
-    width: 40,
+  menuButton: {
+    padding: 8,
+    borderRadius: 8,
+  },
+  menuDots: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  dot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#111827',
+  },
+  actionMenu: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 1000,
+  },
+  actionMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    gap: 12,
+  },
+  actionMenuText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#111827',
+  },
+  actionMenuDivider: {
+    height: 1,
+    backgroundColor: '#f3f4f6',
+  },
+  savedLocationsSection: {
+    paddingVertical: 8,
+  },
+  savedLocationsTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  savedLocationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  savedLocationTextContainer: {
+    flex: 1,
+  },
+  savedLocationLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  savedLocationAddress: {
+    fontSize: 12,
+    color: '#6b7280',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -427,16 +607,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
     color: '#111827',
-  },
-  gpsButton: {
-    width: 48,
-    height: 48,
-    backgroundColor: '#f0fdf4',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#16a34a',
   },
   mapWrapper: {
     flex: 1,

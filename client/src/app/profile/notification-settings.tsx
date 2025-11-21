@@ -328,10 +328,27 @@ export default function NotificationSystem(){
       {successMessage && <SuccessBanner message={successMessage} />}
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Manage Push Notifications Button */}
+        <TouchableOpacity
+          style={styles.managePushButton}
+          onPress={() => router.push('/profile/notification-permission')}
+        >
+          <View style={styles.managePushContent}>
+            <Bell size={20} color="#16a34a" />
+            <View style={styles.managePushText}>
+              <Text style={styles.managePushTitle}>Manage Push Notifications</Text>
+              <Text style={styles.managePushSubtitle}>
+                Enable or configure push notification permissions
+              </Text>
+            </View>
+          </View>
+          <ArrowLeft size={20} color="#9ca3af" style={{ transform: [{ rotate: '180deg' }] }} />
+        </TouchableOpacity>
+
         {/* Master Toggle */}
         <MasterToggleComponent
           enabled={settings.pushNotifications}
-          onToggle={handleMasterToggle}
+          onToggle={handleToggle}
           saving={saving}
         />
 
@@ -471,6 +488,37 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#166534',
     fontWeight: '500',
+  },
+  managePushButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f0fdf4',
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    borderRadius: 10,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  managePushContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  managePushText: {
+    flex: 1,
+  },
+  managePushTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#166534',
+    marginBottom: 2,
+  },
+  managePushSubtitle: {
+    fontSize: 12,
+    color: '#15803d',
   },
   masterToggle: {
     flexDirection: 'row',

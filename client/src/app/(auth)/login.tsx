@@ -73,14 +73,31 @@ export default function LoginScreen() {
 
   // Handle Google auth success
   useEffect(() => {
-    if (authSuccess) {
-      Toast.show({
-        type: 'success',
-        text1: t('common.success'),
-        text2: t('notifications.languageChanged'),
-      });
-      router.replace('/(tabs)/home');
-    }
+    const handleAuthSuccess = async () => {
+      if (authSuccess) {
+        Toast.show({
+          type: 'success',
+          text1: t('common.success'),
+          text2: t('notifications.languageChanged'),
+        });
+        
+        // First navigate to home
+        router.replace('/(tabs)/home');
+        
+        // Then check if we should show notification permission modal
+        const { hasShownNotificationPermission } = await import('../../utils/notificationPermission');
+        const hasShown = await hasShownNotificationPermission();
+        
+        if (!hasShown) {
+          // Small delay to ensure home is loaded first
+          setTimeout(() => {
+            router.push('/profile/notification-permission');
+          }, 500);
+        }
+      }
+    };
+    
+    handleAuthSuccess();
   }, [authSuccess, t]);
 
   const validateForm = () => {
@@ -130,7 +147,19 @@ export default function LoginScreen() {
         text2: t('notifications.languageChanged'),
       });
       
+      // First navigate to home
       router.replace('/(tabs)/home');
+      
+      // Then check if we should show notification permission modal
+      const { hasShownNotificationPermission } = await import('../../utils/notificationPermission');
+      const hasShown = await hasShownNotificationPermission();
+      
+      if (!hasShown) {
+        // Small delay to ensure home is loaded first
+        setTimeout(() => {
+          router.push('/profile/notification-permission');
+        }, 500);
+      }
     } catch (error: any) {
       Toast.show({
         type: 'error',

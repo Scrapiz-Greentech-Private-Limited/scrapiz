@@ -18,42 +18,52 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Gift, Users, IndianRupee, Share2, Copy, MessageCircle, Wallet, CheckCircle, Info, AlertCircle } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useReferral } from '../../context/ReferralContext';
-
-const { width } = Dimensions.get('window');
+import { useTheme } from '../../context/ThemeContext';
+import { wp, hp, fs, spacing } from '../../utils/responsive';
 
 // Loading Skeleton Components
-const ReferralCodeSkeleton = () => (
-  <View style={styles.codeCard}>
-    <View style={styles.codeLeft}>
-      <View style={[styles.skeleton, { width: 40, height: 12, marginBottom: 8 }]} />
-      <View style={[styles.skeleton, { width: 120, height: 24 }]} />
+const ReferralCodeSkeleton = () => {
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.codeCard, { backgroundColor: colors.card, borderColor: colors.primary }]}>
+      <View style={styles.codeLeft}>
+        <View style={[styles.skeleton, { width: 40, height: 12, marginBottom: 8 }]} />
+        <View style={[styles.skeleton, { width: 120, height: 24 }]} />
+      </View>
+      <View style={[styles.skeleton, { width: 60, height: 36, borderRadius: 10 }]} />
     </View>
-    <View style={[styles.skeleton, { width: 60, height: 36, borderRadius: 10 }]} />
-  </View>
-);
+  );
+};
 
-const StatsCardSkeleton = () => (
-  <View style={styles.statBox}>
-    <View style={[styles.skeleton, { width: 40, height: 40, borderRadius: 20, marginBottom: 10 }]} />
-    <View style={[styles.skeleton, { width: 30, height: 22, marginBottom: 4 }]} />
-    <View style={[styles.skeleton, { width: 60, height: 11 }]} />
-  </View>
-);
+const StatsCardSkeleton = () => {
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.statBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={[styles.skeleton, { width: 40, height: 40, borderRadius: 20, marginBottom: 10 }]} />
+      <View style={[styles.skeleton, { width: 30, height: 22, marginBottom: 4 }]} />
+      <View style={[styles.skeleton, { width: 60, height: 11 }]} />
+    </View>
+  );
+};
 
 // Error Screen Component
-const ErrorScreen = ({ error, onRetry }: { error: string; onRetry: () => void }) => (
-  <View style={styles.errorContainer}>
-    <AlertCircle size={48} color="#ef4444" />
-    <Text style={styles.errorTitle}>Oops! Something went wrong</Text>
-    <Text style={styles.errorMessage}>{error}</Text>
-    <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
-      <Text style={styles.retryButtonText}>Try Again</Text>
-    </TouchableOpacity>
-  </View>
-);
+const ErrorScreen = ({ error, onRetry }: { error: string; onRetry: () => void }) => {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.errorContainer}>
+      <AlertCircle size={48} color="#ef4444" />
+      <Text style={[styles.errorTitle, { color: colors.text }]}>Oops! Something went wrong</Text>
+      <Text style={[styles.errorMessage, { color: colors.textSecondary }]}>{error}</Text>
+      <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
+        <Text style={styles.retryButtonText}>Try Again</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
 
 export default function ReferFriendsScreen() {
   const router = useRouter();
+  const { colors, isDark } = useTheme();
   const { 
     referralCode,
     referralBalance,
@@ -103,7 +113,7 @@ export default function ReferFriendsScreen() {
     }
     
     Clipboard.setString(referralLink);
-    
+    Alert.alert('✅ Copied!', 'Referral link copied to clipboard', [{ text: 'OK' }]);
   };
 
   const handleWhatsAppShare = async () => {
@@ -113,19 +123,13 @@ export default function ReferFriendsScreen() {
     }
     
     try {
-      // URL encode the message
       const encodedMessage = encodeURIComponent(shareMessage);
-      
-      // WhatsApp URL scheme
       const whatsappURL = `whatsapp://send?text=${encodedMessage}`;
-      
-      // Check if WhatsApp is installed
       const canOpen = await Linking.canOpenURL(whatsappURL);
       
       if (canOpen) {
         await Linking.openURL(whatsappURL);
       } else {
-        // If WhatsApp is not installed, show options
         Alert.alert(
           'WhatsApp Not Found',
           'WhatsApp is not installed on your device. Would you like to share via other apps?',
@@ -154,7 +158,8 @@ export default function ReferFriendsScreen() {
   // Show loading state
   if (isLoading && !referralCode) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <StatusBar barStyle="light-content" />
         <LinearGradient
           colors={['#16a34a', '#15803d', '#166534']}
           start={{ x: 0, y: 0 }}
@@ -170,7 +175,7 @@ export default function ReferFriendsScreen() {
         
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#16a34a" />
-          <Text style={styles.loadingText}>Loading referral data...</Text>
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading referral data...</Text>
         </View>
       </View>
     );
@@ -179,7 +184,8 @@ export default function ReferFriendsScreen() {
   // Show error state
   if (error && !referralCode) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <StatusBar barStyle="light-content" />
         <LinearGradient
           colors={['#16a34a', '#15803d', '#166534']}
           start={{ x: 0, y: 0 }}
@@ -199,7 +205,8 @@ export default function ReferFriendsScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle="light-content" />
       {/* Header */}
       <LinearGradient
         colors={['#16a34a', '#15803d', '#166534']}
@@ -279,76 +286,76 @@ export default function ReferFriendsScreen() {
             </>
           ) : (
             <>
-              <View style={styles.statBox}>
-                <View style={styles.statIconContainer}>
-                  <Users size={20} color="#16a34a" />
+              <View style={[styles.statBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={[styles.statIconContainer, { backgroundColor: colors.primaryLight + '30' }]}>
+                  <Users size={20} color={colors.primary} />
                 </View>
-                <Text style={styles.statNumber}>{totalReferrals}</Text>
-                <Text style={styles.statLabel}>Total Referrals</Text>
+                <Text style={[styles.statNumber, { color: colors.text }]}>{totalReferrals}</Text>
+                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Total Referrals</Text>
               </View>
 
-              <View style={styles.statBox}>
-                <View style={styles.statIconContainer}>
-                  <CheckCircle size={20} color="#16a34a" />
+              <View style={[styles.statBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={[styles.statIconContainer, { backgroundColor: colors.primaryLight + '30' }]}>
+                  <CheckCircle size={20} color={colors.primary} />
                 </View>
-                <Text style={styles.statNumber}>{successfulReferrals}</Text>
-                <Text style={styles.statLabel}>Successful</Text>
+                <Text style={[styles.statNumber, { color: colors.text }]}>{successfulReferrals}</Text>
+                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Successful</Text>
               </View>
 
-              <View style={styles.statBox}>
-                <View style={styles.statIconContainer}>
-                  <IndianRupee size={20} color="#16a34a" />
+              <View style={[styles.statBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={[styles.statIconContainer, { backgroundColor: colors.primaryLight + '30' }]}>
+                  <IndianRupee size={20} color={colors.primary} />
                 </View>
-                <Text style={styles.statNumber}>₹20</Text>
-                <Text style={styles.statLabel}>Per Referral</Text>
+                <Text style={[styles.statNumber, { color: colors.text }]}>₹20</Text>
+                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Per Referral</Text>
               </View>
             </>
           )}
         </View>
 
         {/* How It Works */}
-        <View style={styles.howItWorksCard}>
+        <View style={[styles.howItWorksCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.sectionHeader}>
-            <Gift size={22} color="#16a34a" />
-            <Text style={styles.sectionTitle}>How It Works</Text>
+            <Gift size={22} color={colors.primary} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>How It Works</Text>
           </View>
 
           <View style={styles.stepsContainer}>
             <View style={styles.stepItem}>
-              <View style={styles.stepNumberBox}>
-                <Text style={styles.stepNumber}>1</Text>
+              <View style={[styles.stepNumberBox, { backgroundColor: colors.primaryLight + '30' }]}>
+                <Text style={[styles.stepNumber, { color: colors.primary }]}>1</Text>
               </View>
               <View style={styles.stepContent}>
-                <Text style={styles.stepTitle}>Share Your Code</Text>
-                <Text style={styles.stepDesc}>
+                <Text style={[styles.stepTitle, { color: colors.text }]}>Share Your Code</Text>
+                <Text style={[styles.stepDesc, { color: colors.textSecondary }]}>
                   Share your unique referral code with friends & family via WhatsApp, SMS or social media
                 </Text>
               </View>
             </View>
 
-            <View style={styles.stepConnector} />
+            <View style={[styles.stepConnector, { backgroundColor: colors.border }]} />
 
             <View style={styles.stepItem}>
-              <View style={styles.stepNumberBox}>
-                <Text style={styles.stepNumber}>2</Text>
+              <View style={[styles.stepNumberBox, { backgroundColor: colors.primaryLight + '30' }]}>
+                <Text style={[styles.stepNumber, { color: colors.primary }]}>2</Text>
               </View>
               <View style={styles.stepContent}>
-                <Text style={styles.stepTitle}>Friend Books Service</Text>
-                <Text style={styles.stepDesc}>
+                <Text style={[styles.stepTitle, { color: colors.text }]}>Friend Books Service</Text>
+                <Text style={[styles.stepDesc, { color: colors.textSecondary }]}>
                   Your friend signs up using your code & books a scrap pickup worth minimum ₹500
                 </Text>
               </View>
             </View>
 
-            <View style={styles.stepConnector} />
+            <View style={[styles.stepConnector, { backgroundColor: colors.border }]} />
 
             <View style={styles.stepItem}>
-              <View style={styles.stepNumberBox}>
-                <Text style={styles.stepNumber}>3</Text>
+              <View style={[styles.stepNumberBox, { backgroundColor: colors.primaryLight + '30' }]}>
+                <Text style={[styles.stepNumber, { color: colors.primary }]}>3</Text>
               </View>
               <View style={styles.stepContent}>
-                <Text style={styles.stepTitle}>Both Earn Rewards!</Text>
-                <Text style={styles.stepDesc}>
+                <Text style={[styles.stepTitle, { color: colors.text }]}>Both Earn Rewards!</Text>
+                <Text style={[styles.stepDesc, { color: colors.textSecondary }]}>
                   You get ₹20 in wallet • Your friend gets ₹5 on their first Pickup
                 </Text>
               </View>
@@ -358,24 +365,22 @@ export default function ReferFriendsScreen() {
 
         {/* Referral Code Section */}
         <View style={styles.codeSection}>
-          <Text style={styles.codeSectionTitle}>Your Referral Code</Text>
+          <Text style={[styles.codeSectionTitle, { color: colors.text }]}>Your Referral Code</Text>
           
           {isLoading ? (
             <ReferralCodeSkeleton />
           ) : (
             <>
-              <TouchableOpacity style={styles.codeCard} onPress={handleCopyCode} activeOpacity={0.7}>
+              <TouchableOpacity style={[styles.codeCard, { backgroundColor: colors.card, borderColor: colors.primary }]} onPress={handleCopyCode} activeOpacity={0.7}>
                 <View style={styles.codeLeft}>
-                  <Text style={styles.codeLabel}>CODE</Text>
-                  <Text style={styles.codeText}>{referralCode || 'Loading...'}</Text>
+                  <Text style={[styles.codeLabel, { color: colors.textSecondary }]}>CODE</Text>
+                  <Text style={[styles.codeText, { color: colors.text }]}>{referralCode || 'Loading...'}</Text>
                 </View>
-                <View style={styles.copyIconContainer}>
-                  <Copy size={20} color="#16a34a" />
-                  <Text style={styles.copyText}>Copy</Text>
+                <View style={[styles.copyIconContainer, { backgroundColor: colors.primaryLight + '20' }]}>
+                  <Copy size={20} color={colors.primary} />
+                  <Text style={[styles.copyText, { color: colors.primary }]}>Copy</Text>
                 </View>
               </TouchableOpacity>
-
-
             </>
           )}
         </View>
@@ -394,18 +399,21 @@ export default function ReferFriendsScreen() {
             </LinearGradient>
           </TouchableOpacity>
 
- 
+          <TouchableOpacity style={[styles.whatsappButton, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={handleWhatsAppShare} activeOpacity={0.8}>
+            <MessageCircle size={20} color="#25D366" />
+            <Text style={[styles.whatsappText, { color: colors.text }]}>WhatsApp</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Benefits Section */}
-        <View style={styles.benefitsCard}>
+        <View style={[styles.benefitsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.benefitRow}>
             <View style={styles.benefitIcon}>
               <Text style={styles.benefitEmoji}>💰</Text>
             </View>
             <View style={styles.benefitContent}>
-              <Text style={styles.benefitTitle}>Smart Savings</Text>
-              <Text style={styles.benefitDesc}>
+              <Text style={[styles.benefitTitle, { color: colors.text }]}>Smart Savings</Text>
+              <Text style={[styles.benefitDesc, { color: colors.textSecondary }]}>
                 Your ₹20 earnings auto-redeem on next order (min ₹120 balance) - no manual redemption needed!
               </Text>
             </View>
@@ -416,8 +424,8 @@ export default function ReferFriendsScreen() {
               <Text style={styles.benefitEmoji}>♻️</Text>
             </View>
             <View style={styles.benefitContent}>
-              <Text style={styles.benefitTitle}>Win-Win-Win</Text>
-              <Text style={styles.benefitDesc}>
+              <Text style={[styles.benefitTitle, { color: colors.text }]}>Win-Win-Win</Text>
+              <Text style={[styles.benefitDesc, { color: colors.textSecondary }]}>
                 You earn • Friend saves • Environment benefits from more recycling!
               </Text>
             </View>
@@ -428,8 +436,8 @@ export default function ReferFriendsScreen() {
               <Text style={styles.benefitEmoji}>🎯</Text>
             </View>
             <View style={styles.benefitContent}>
-              <Text style={styles.benefitTitle}>No Limits</Text>
-              <Text style={styles.benefitDesc}>
+              <Text style={[styles.benefitTitle, { color: colors.text }]}>No Limits</Text>
+              <Text style={[styles.benefitDesc, { color: colors.textSecondary }]}>
                 Refer unlimited friends and keep earning ₹20 per successful referral
               </Text>
             </View>
@@ -437,13 +445,13 @@ export default function ReferFriendsScreen() {
         </View>
 
         {/* Important Info */}
-        <View style={styles.infoCard}>
+        <View style={[styles.infoCard, { backgroundColor: colors.primaryLight + '20', borderColor: colors.primaryLight }]}>
           <View style={styles.infoHeader}>
-            <Info size={18} color="#16a34a" />
-            <Text style={styles.infoTitle}>Important Points</Text>
+            <Info size={18} color={colors.primary} />
+            <Text style={[styles.infoTitle, { color: colors.text }]}>Important Points</Text>
           </View>
           <View style={styles.infoContent}>
-            <Text style={styles.infoText}>
+            <Text style={[styles.infoText, { color: colors.textSecondary }]}>
               ✓ Friend must use your code during signup{'\n'}
               ✓ First order must be minimum ₹500{'\n'}
               ✓ You earn ₹20, friend gets ₹5 after pickup verification{'\n'}
@@ -455,8 +463,8 @@ export default function ReferFriendsScreen() {
         </View>
 
         {/* Footer Note */}
-        <View style={styles.footerNote}>
-          <Text style={styles.footerText}>
+        <View style={[styles.footerNote, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.footerText, { color: colors.textSecondary }]}>
             🌱 As a bootstrapped startup, we're building Scrapiz sustainably. Every referral helps us grow while keeping our service cost-effective for you!
           </Text>
         </View>

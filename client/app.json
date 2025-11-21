@@ -4,25 +4,39 @@
     "slug": "scrapiz-client",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/scrapiz.png",
+    "icon": "./assets/images/app.png",
     "scheme": "com.scrapiz.app",
     "userInterfaceStyle": "automatic",
+    "splash":{
+      "image":"./assets/images/app.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.scrapiz.app",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "NSLocationWhenInUseUsageDescription": "Scrapiz needs your location to check service availability and provide accurate scrap pickup rates in your area.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Scrapiz needs your location to check service availability and provide accurate scrap pickup rates in your area."
+      },
+      "splash": {
+        "image": "./assets/images/App-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff"
       }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/scrapiz.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/images/app.png",
+        "backgroundColor": "#16a34a"
       },
       "splash": {
-        "image": "./assets/images/scrapiz.png",
+        "image": "./assets/images/app.png",
         "resizeMode": "contain",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#ffffff",
+        "mdpi":"./assets/images/app.png",
+        "hdpi":"./assets/images/app.png",
+        "xhdpi":"./assets/images/app.png"
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -33,13 +47,13 @@
         "android.permission.RECORD_AUDIO"
       ],
       "package": "com.scrapiz.app",
-      "googleServicesFile":"./scrapiz-592a0-firebase-adminsdk-fbsvc-9952d166e1.json",
-      "versionCode": 12
+      "googleServicesFile":"./google-services.json",
+      "versionCode": 14
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/scrapiz.png"
+      "favicon": "./assets/images/app.png"
     },
     "plugins": [
       "expo-router",
@@ -53,7 +67,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/scrapiz.png",
+          "image": "./assets/images/app.png",
           "resizeMode": "cover",
           "backgroundColor": "#ffffff",
           "enableFullScreenImage_legacy": true

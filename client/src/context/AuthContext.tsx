@@ -63,15 +63,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const authenticated = await AuthService.isAuthenticated();
       setIsAuthenticated(authenticated);
       
-      // Register for push notifications if user is already authenticated
-      if (authenticated) {
-        try {
-          await registerForPushNotifications();
-        } catch (notifError) {
-          // Don't fail auth check if push notification registration fails
-          console.error('Failed to register push notifications on app launch:', notifError);
-        }
-      }
+      // Don't auto-register for push notifications here
+      // Let the user decide via the notification permission screen
     } catch (error) {
       console.error('Error checking auth status:', error);
     } finally {
@@ -84,13 +77,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await AuthService.login({ email, password });
       setIsAuthenticated(true);
       
-      // Register for push notifications after successful login
-      try {
-        await registerForPushNotifications();
-      } catch (notifError) {
-        // Don't fail login if push notification registration fails
-        console.error('Failed to register push notifications:', notifError);
-      }
+      // Don't auto-register for push notifications here
+      // Let the user decide via the notification permission screen
     } catch (error) {
       throw error;
     }
@@ -133,13 +121,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await AuthService.verifyOtp({ email, otp });
       setIsAuthenticated(true);
       
-      // Register for push notifications after successful OTP verification
-      try {
-        await registerForPushNotifications();
-      } catch (notifError) {
-        // Don't fail OTP verification if push notification registration fails
-        console.error('Failed to register push notifications:', notifError);
-      }
+      // Don't auto-register for push notifications here
+      // Let the user decide via the notification permission screen
     } catch (error) {
       throw error;
     }

@@ -19,9 +19,11 @@ import {
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
+import { wp, hp, fs } from '../../utils/responsive';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../../context/ThemeContext';
 import { AuthService, CategorySummary, ProductSummary } from '../../api/apiService';
 
-const { width } = Dimensions.get('window');
 
 const getImageForProduct = (productName: string) => {
   const name = productName.toLowerCase();
@@ -60,6 +62,9 @@ const getCategoryIcon = (categoryName: string) => {
 
 export default function RatesScreen(){
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+
   const [categories, setCategories] = useState<CategorySummary[]>([]);
   const [products, setProducts] = useState<ProductSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,7 +122,7 @@ export default function RatesScreen(){
     return(
       <View key={category.id} style={styles.categorySection}>
         <LinearGradient
-          colors={['#16a34a', '#15803d']}
+          colors={isDark ? ['#22c55e', '#16a34a'] : ['#16a34a', '#15803d']}
           style={styles.categoryHeader}
         >
           <Text style={styles.categoryTitle}>{category.name}</Text>
@@ -127,20 +132,28 @@ export default function RatesScreen(){
           {categoryProducts.map((item) => {
             const productImage = getImageForProduct(item.name);
             return (
-              <View key={item.id} style={styles.rateItem}>
-                <View style={styles.itemIcon}>
+              <View key={index} style={[styles.rateItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View style={[
+                styles.itemIcon, 
+                item.image ? { 
+                  backgroundColor: isDark ? colors.surface : '#ffffff',
+                  borderWidth: 2,
+                  borderColor: colors.border,
+                  overflow: 'hidden'
+                } : { backgroundColor: category.color }
+              ]}>
                   {productImage ? (
                     <Image source={productImage} style={styles.itemImage} />
                   ) : (
                     <Text style={styles.itemEmoji}>{categoryIcon}</Text>
                   )}
                 </View>
-                <Text style={styles.itemName}>{item.name}</Text>
-                <Text style={styles.itemRate}>
+                <Text style={[styles.itemName, { color: colors.text }]}>{item.name}</Text>
+                <Text style={[styles.itemRate, { color: colors.primary }]}>
                   ₹{item.min_rate}-{item.max_rate}
                 </Text>
-                <Text style={styles.itemUnit}>Per {item.unit}</Text>
-                <Text style={styles.itemDescription} numberOfLines={2}>
+                <Text style={[styles.itemUnit, { color: colors.textSecondary }]}>Per {item.unit}</Text>
+                <Text style={[styles.itemDescription, { color: colors.textSecondary }]}>
                   {item.description}
                 </Text>
               </View>
@@ -152,16 +165,19 @@ export default function RatesScreen(){
   }
 if (loading && categories.length === 0) {
     return (
-      <View style={styles.container}>
-        <StatusBar barStyle="light-content" />
-        <LinearGradient colors={['#16a34a', '#15803d']} style={styles.header}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+        <LinearGradient
+        colors={isDark ? ['#22c55e', '#16a34a'] : ['#16a34a', '#15803d']}
+        style={styles.header}
+      >
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <ArrowLeft size={24} color="white" />
+            <ArrowLeft size={fs(24)} color="white" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Scrap Rates</Text>
           <View style={styles.headerRight}>
-            <TrendingUp size={24} color="white" />
-          </View>
+          <TrendingUp size={fs(24)} color="white" />
+        </View>
         </LinearGradient>
         <View style={[styles.content, styles.centerContent]}>
           <ActivityIndicator size="large" color="#16a34a" />
@@ -173,16 +189,19 @@ if (loading && categories.length === 0) {
 
 if (error && categories.length === 0) {
     return (
-      <View style={styles.container}>
-        <StatusBar barStyle="light-content" />
-        <LinearGradient colors={['#16a34a', '#15803d']} style={styles.header}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+        <LinearGradient
+        colors={isDark ? ['#22c55e', '#16a34a'] : ['#16a34a', '#15803d']}
+        style={styles.header}
+      >
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <ArrowLeft size={24} color="white" />
-          </TouchableOpacity>
+            <ArrowLeft size={fs(24)} color="white" />
+        </TouchableOpacity>
           <Text style={styles.headerTitle}>Scrap Rates</Text>
           <View style={styles.headerRight}>
-            <TrendingUp size={24} color="white" />
-          </View>
+            <TrendingUp size={fs(24)} color="white" />
+        </View>
         </LinearGradient>
         <View style={[styles.content, styles.centerContent]}>
           <AlertCircle size={64} color="#dc2626" />
@@ -197,17 +216,20 @@ if (error && categories.length === 0) {
   }
 
   return(
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
       
       {/* Header */}
-      <LinearGradient colors={['#16a34a', '#15803d']} style={styles.header}>
+      <LinearGradient
+        colors={isDark ? ['#22c55e', '#16a34a'] : ['#16a34a', '#15803d']}
+        style={styles.header}
+      >
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color="white" />
+          <ArrowLeft size={fs(24)} color="white" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Scrap Rates</Text>
         <View style={styles.headerRight}>
-          <TrendingUp size={24} color="white" />
+          <TrendingUp size={fs(24)} color="white" />
         </View>
       </LinearGradient>
 
@@ -219,32 +241,32 @@ if (error && categories.length === 0) {
         }
       >
         {/* Disclaimer */}
-        <View style={styles.disclaimerCard}>
+        <View style={[styles.disclaimerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.disclaimerHeader}>
-            <AlertCircle size={20} color="#16a34a" />
-            <Text style={styles.disclaimerTitle}>Important Note</Text>
+             <AlertCircle size={fs(20)} color={colors.primary} />
+            <Text style={[styles.disclaimerTitle, { color: colors.text }]}>Important Note</Text><Text style={styles.disclaimerTitle}>Important Note</Text>
           </View>
-          <Text style={styles.disclaimerText}>
+          <Text style={[styles.disclaimerText, { color: colors.textSecondary }]}>
             The prices shown are for reference only. Actual rates may vary based on:
           </Text>
           <View style={styles.disclaimerList}>
-            <Text style={styles.disclaimerItem}>• Current market conditions</Text>
-            <Text style={styles.disclaimerItem}>• Quality and quantity of materials</Text>
-            <Text style={styles.disclaimerItem}>• Location and transportation costs</Text>
-            <Text style={styles.disclaimerItem}>• Seasonal demand fluctuations</Text>
+            <Text style={[styles.disclaimerItem, { color: colors.textSecondary }]}>• Current market conditions</Text>
+            <Text style={[styles.disclaimerItem, { color: colors.textSecondary }]}>• Quality and quantity of materials</Text>
+            <Text style={[styles.disclaimerItem, { color: colors.textSecondary }]}>• Location and transportation costs</Text>
+            <Text style={[styles.disclaimerItem, { color: colors.textSecondary }]}>• Seasonal demand fluctuations</Text>
           </View>
-          <Text style={styles.disclaimerFooter}>
+          <Text style={[styles.disclaimerFooter, { color: colors.textSecondary }]}>
             Contact us for accurate pricing based on your specific materials.
           </Text>
         </View>
 
         {/* Last Updated */}
-        <View style={styles.lastUpdated}>
-          <Text style={styles.lastUpdatedText}>
-            Last updated: {new Date().toLocaleDateString('en-IN', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
+        <View style={[styles.lastUpdated, { backgroundColor: colors.card }]}>
+          <Text style={[styles.lastUpdatedText, { color: colors.textSecondary }]}>
+            Last updated: {new Date().toLocaleDateString('en-IN', { 
+              day: 'numeric', 
+              month: 'long', 
+              year: 'numeric' 
             })}
           </Text>
         </View>
@@ -261,11 +283,11 @@ if (error && categories.length === 0) {
         {/* Market Trends */}
         {products.length > 0 && (
           <View style={styles.trendsSection}>
-            <Text style={styles.trendsTitle}>Market Trends</Text>
-            <View style={styles.trendsCard}>
+            <Text style={[styles.trendsTitle, { color: colors.text }]}>Market Trends</Text>
+            <View style={[styles.trendsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <View style={styles.trendItem}>
                 <View style={[styles.trendIndicator, { backgroundColor: '#16a34a' }]} />
-                <Text style={styles.trendText}>
+                <Text style={[styles.trendText, { color: colors.textSecondary }]}>
                   {products.length} products available
                 </Text>
               </View>
@@ -281,14 +303,14 @@ if (error && categories.length === 0) {
         )}
 
         {/* Contact Section */}
-        <View style={styles.contactSection}>
-          <Text style={styles.contactTitle}>Need Accurate Pricing?</Text>
-          <Text style={styles.contactText}>
+        <View style={[styles.contactSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.contactTitle, { color: colors.text }]}>Need Accurate Pricing?</Text>
+          <Text style={[styles.contactText, { color: colors.textSecondary }]}>
             Get real-time quotes for your specific materials by scheduling a pickup.
           </Text>
-          <TouchableOpacity
+          <TouchableOpacity 
             style={styles.contactButton}
-            onPress={() => router.push('/(tabs)/sell' as any)}
+            onPress={() => router.push('/sell')}
           >
             <Text style={styles.contactButtonText}>Schedule Pickup</Text>
           </TouchableOpacity>
