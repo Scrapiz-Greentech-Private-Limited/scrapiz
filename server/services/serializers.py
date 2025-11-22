@@ -14,6 +14,8 @@ class ServiceBookingSerializer(serializers.ModelSerializer):
             'preferred_datetime',
             'notes',
             'status',
+            'meeting_link',
+            'meeting_event_id',
             'created_at',
         ]
-        read_only_fields = ['id', 'status', 'created_at']
+        read_only_fields = ['id', 'status', 'meeting_link', 'meeting_event_id', 'created_at']

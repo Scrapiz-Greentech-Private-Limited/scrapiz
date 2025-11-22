@@ -18,6 +18,8 @@ class ServiceBooking(models.Model):
     preferred_datetime = models.CharField(max_length=120)
     notes = models.TextField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    meeting_link = models.URLField(blank=True, null=True)
+    meeting_event_id = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

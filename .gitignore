@@ -24,6 +24,7 @@ yarn-debug.log*
 yarn-error.log*
 /ios/build
 /android/build
+server/service-credentials.json
 /android/.gradle
 /web-build
 

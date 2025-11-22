@@ -229,3 +229,9 @@ PUSH_NOTIFICATION_ENABLED = os.getenv('PUSH_NOTIFICATION_ENABLED', 'true').lower
 EXPO_ACCESS_TOKEN = os.getenv('EXPO_ACCESS_TOKEN')
 PUSH_NOTIFICATION_BATCH_SIZE = int(os.getenv('PUSH_NOTIFICATION_BATCH_SIZE', '100'))
 PUSH_NOTIFICATION_MAX_RETRIES = int(os.getenv('PUSH_NOTIFICATION_MAX_RETRIES', '3'))
+
+# ----------------------
+# Google Calendar/Meet Configuration
+# ----------------------
+GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE')
+ADMIN_CALENDAR_ID = os.getenv('ADMIN_CALENDAR_ID', 'primary')

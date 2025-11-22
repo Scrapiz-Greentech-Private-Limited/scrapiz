@@ -113,6 +113,8 @@ export interface ServiceBooking {
   address: string;
   preferred_datetime: string;
   status: string;
+  meeting_link?: string | null;
+  meeting_event_id?: string | null;
   created_at: string;
   notes?: string | null;
 }
