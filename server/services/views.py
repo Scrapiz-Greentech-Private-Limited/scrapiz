@@ -23,10 +23,21 @@ class ServiceBookingAPIView(APIView):
 
         if serializer.is_valid():
             booking = serializer.save(user=user)
+            print(f"✅ Booking created: ID={booking.id}, Service={booking.service}")
             
-            # Create Google Meet link if configured
+            # Create Google Meet link if configured and fields exist
+            meeting_created = False
             try:
-                if hasattr(settings, 'GOOGLE_SERVICE_ACCOUNT_FILE') and settings.GOOGLE_SERVICE_ACCOUNT_FILE:
+                print(f"🔍 Checking Google Meet configuration...")
+                print(f"   - Has GOOGLE_SERVICE_ACCOUNT_FILE setting: {hasattr(settings, 'GOOGLE_SERVICE_ACCOUNT_FILE')}")
+                print(f"   - GOOGLE_SERVICE_ACCOUNT_FILE value: {getattr(settings, 'GOOGLE_SERVICE_ACCOUNT_FILE', None)}")
+                print(f"   - Booking has meeting_link field: {hasattr(booking, 'meeting_link')}")
+                
+                if (hasattr(settings, 'GOOGLE_SERVICE_ACCOUNT_FILE') and 
+                    settings.GOOGLE_SERVICE_ACCOUNT_FILE and
+                    hasattr(booking, 'meeting_link')):
+                    
+                    print(f"📅 Creating Google Meet for booking {booking.id}...")
                     meet_service = GoogleMeetService()
                     meeting_info = meet_service.create_meeting(
                         summary=f"Scrap Inspection: {booking.service} - {booking.name}",
@@ -40,16 +51,37 @@ class ServiceBookingAPIView(APIView):
                     booking.meeting_link = meeting_info['meeting_url']
                     booking.meeting_event_id = meeting_info['event_id']
                     booking.save()
+                    meeting_created = True
+                    print(f"✅ Google Meet created: {meeting_info['meeting_url']}")
+                else:
+                    print(f"⚠️  Google Meet not configured or migration not run")
+                    
             except Exception as e:
-                print(f"Failed to create Google Meet: {str(e)}")
+                print(f"❌ Failed to create Google Meet: {str(e)}")
+                import traceback
+                traceback.print_exc()
                 # Continue without meeting link - don't fail the booking
             
             # Send confirmation email
+            email_sent = False
             try:
-                send_booking_confirmation_email(booking)
+                print(f"📧 Sending confirmation email to {user.email}...")
+                result = send_booking_confirmation_email(booking)
+                email_sent = result
+                if result:
+                    print(f"✅ Email sent successfully")
+                else:
+                    print(f"⚠️  Email sending returned False")
             except Exception as e:
-                print(f"Failed to send confirmation email: {str(e)}")
+                print(f"❌ Failed to send confirmation email: {str(e)}")
+                import traceback
+                traceback.print_exc()
                 # Continue - don't fail the booking
+            
+            print(f"📊 Booking Summary:")
+            print(f"   - Booking ID: {booking.id}")
+            print(f"   - Meeting Created: {meeting_created}")
+            print(f"   - Email Sent: {email_sent}")
             
             response_data = ServiceBookingSerializer(booking).data
             return Response(

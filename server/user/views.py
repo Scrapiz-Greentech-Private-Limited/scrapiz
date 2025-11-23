@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed
 from .serializers import AddressSerializer, NotificationPreferenceSerializer
-from .models import AddressModel, NotificationPreference, PushToken
+from .models import AddressModel, NotificationPreference
 from authentication.models import User
 
 
@@ -153,6 +153,9 @@ class RegisterPushTokenAPIView(AuthenticatedAPIView):
         
         # Create or update token
         try:
+            # Import here to avoid circular import issues
+            from .models import PushToken
+            
             push_token, created = PushToken.objects.update_or_create(
                 token=token,
                 defaults={
@@ -204,6 +207,9 @@ class UnregisterPushTokenAPIView(AuthenticatedAPIView):
             )
         
         try:
+            # Import here to avoid circular import issues
+            from .models import PushToken
+            
             deleted_count = PushToken.objects.filter(
                 user=user,
                 token=token

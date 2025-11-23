@@ -48,7 +48,9 @@ class NotificationManager:
                 self.push = PushNotificationService()
                 logger.info("Push notification service initialized")
             except Exception as e:
-                logger.error(f"Failed to initialize push service: {str(e)}")
+                logger.error(f"Failed to initialize push service: {str(e)}", exc_info=True)
+                # Set to None so we know it failed
+                self.push = None
     
     def send_order_notifications(self, order_id: int) -> Dict[str, bool]:
         """Send notifications for a new order across all enabled channels"""
@@ -221,9 +223,13 @@ class NotificationManager:
         Returns:
             Dict with success status and delivery statistics
         """
-        if 'push' not in self.channels or not self.push:
-            logger.error("Push notification service not available")
-            return {'success': False, 'error': 'Push service not enabled'}
+        if 'push' not in self.channels:
+            logger.error("Push notification channel not enabled in NOTIFICATION_CHANNELS")
+            return {'success': False, 'error': 'Push channel not in NOTIFICATION_CHANNELS'}
+        
+        if not self.push:
+            logger.error("Push notification service not initialized")
+            return {'success': False, 'error': 'Push service failed to initialize'}
         
         try:
             logger.info(f"Sending admin push notification: title='{title}', category='{category}'")

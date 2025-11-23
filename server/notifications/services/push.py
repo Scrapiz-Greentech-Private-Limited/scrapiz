@@ -19,7 +19,7 @@ class PushNotificationService:
         self.batch_size = getattr(settings, 'PUSH_NOTIFICATION_BATCH_SIZE', 100)
         
         if not self.access_token:
-            logger.warning("EXPO_ACCESS_TOKEN not configured. Push notifications will not work.")
+            logger.warning("EXPO_ACCESS_TOKEN not configured. Using Expo free tier (limited to 600 notifications/day)")
     
     def validate_token_format(self, token: str) -> bool:
         """
@@ -163,7 +163,8 @@ class PushNotificationService:
                 query = query.filter(user_id__in=user_ids)
             
             # Build user filter based on category and preferences
-            user_filter = Q(push_notification_enabled=True)
+            # Note: These fields are on the User model, so we use user__ prefix
+            user_filter = Q(user__push_notification_enabled=True)
             
             # Map category to user preference field
             category_field_map = {
@@ -246,7 +247,24 @@ class PushNotificationService:
             
             # Add validated image if available
             if validated_image_url:
+                # Store in data for custom handling
                 expo_message["data"]["image"] = validated_image_url
+                
+                # For Android: Use FCM's image field (big picture style)
+                expo_message["android"] = {
+                    "imageUrl": validated_image_url,
+                    "priority": "high",
+                    "sound": "default",
+                    "channelId": "default"
+                }
+                
+                # For iOS: Use attachments
+                expo_message["ios"] = {
+                    "sound": "default",
+                    "attachments": [{
+                        "url": validated_image_url
+                    }]
+                }
             
             messages.append(expo_message)
         
@@ -264,12 +282,9 @@ class PushNotificationService:
             Dict with response data from Expo API
         """
         if not self.access_token:
-            logger.error("Cannot send push notifications: EXPO_ACCESS_TOKEN not configured")
-            return {
-                'success': False,
-                'error': 'EXPO_ACCESS_TOKEN not configured',
-                'data': []
-            }
+            logger.warning("EXPO_ACCESS_TOKEN not configured. Using Expo free tier (limited to 600 notifications/day)")
+            # Expo allows sending without token for free tier
+            # Continue without returning error
         
         all_responses = []
         
@@ -282,9 +297,12 @@ class PushNotificationService:
                 
                 headers = {
                     'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'Authorization': f'Bearer {self.access_token}'
+                    'Content-Type': 'application/json'
                 }
+                
+                # Add authorization header only if token is available
+                if self.access_token:
+                    headers['Authorization'] = f'Bearer {self.access_token}'
                 
                 response = requests.post(
                     self.EXPO_PUSH_URL,
