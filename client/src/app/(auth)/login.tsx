@@ -81,18 +81,16 @@ export default function LoginScreen() {
           text2: t('notifications.languageChanged'),
         });
         
-        // First navigate to home
-        router.replace('/(tabs)/home');
-        
-        // Then check if we should show notification permission modal
+        // Check if we should show notification permission screen
         const { hasShownNotificationPermission } = await import('../../utils/notificationPermission');
         const hasShown = await hasShownNotificationPermission();
         
         if (!hasShown) {
-          // Small delay to ensure home is loaded first
-          setTimeout(() => {
-            router.push('/profile/notification-permission');
-          }, 500);
+          // Navigate to notification permission screen first
+          router.replace('/notification-permission');
+        } else {
+          // Navigate directly to home
+          router.replace('/(tabs)/home');
         }
       }
     };
@@ -147,18 +145,16 @@ export default function LoginScreen() {
         text2: t('notifications.languageChanged'),
       });
       
-      // First navigate to home
-      router.replace('/(tabs)/home');
-      
-      // Then check if we should show notification permission modal
+      // Check if we should show notification permission screen
       const { hasShownNotificationPermission } = await import('../../utils/notificationPermission');
       const hasShown = await hasShownNotificationPermission();
       
       if (!hasShown) {
-        // Small delay to ensure home is loaded first
-        setTimeout(() => {
-          router.push('/profile/notification-permission');
-        }, 500);
+        // Navigate to notification permission screen first
+        router.replace('/notification-permission');
+      } else {
+        // Navigate directly to home
+        router.replace('/(tabs)/home');
       }
     } catch (error: any) {
       Toast.show({

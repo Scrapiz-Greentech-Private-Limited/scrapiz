@@ -11,6 +11,7 @@ import {
   Image,
   Keyboard,
   ActivityIndicator,
+  Platform
 } from 'react-native';
 import { Search, X, ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';

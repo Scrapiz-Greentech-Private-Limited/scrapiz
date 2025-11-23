@@ -8,7 +8,6 @@ import {
   StatusBar,
   Image,
   ActivityIndicator,
-  Dimensions,
   RefreshControl,
 } from 'react-native';
 import {
@@ -129,7 +128,7 @@ export default function RatesScreen(){
         </LinearGradient>
 
         <View style={styles.itemsGrid}>
-          {categoryProducts.map((item) => {
+          {categoryProducts.map((item, index) => {
             const productImage = getImageForProduct(item.name);
             return (
               <View key={index} style={[styles.rateItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -473,7 +472,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 16,
     padding: 16,
-    width: (width - 52) / 2,
+    width: '48%',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },

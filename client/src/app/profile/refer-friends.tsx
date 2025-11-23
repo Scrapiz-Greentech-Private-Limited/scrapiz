@@ -9,6 +9,7 @@ import {
   Alert,
   Clipboard,
   Dimensions,
+  StatusBar,
   ActivityIndicator,
   RefreshControl,
   Linking,

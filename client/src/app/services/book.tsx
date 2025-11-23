@@ -125,6 +125,15 @@ export default function BookingScreen() {
       setSubmitting(true);
 
       const preferredDateTime = buildPreferredDateTime();
+      
+      console.log('📅 Booking Details:', {
+        service: selectedService.id,
+        name: name.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+        preferredDateTime,
+        notes: notes.trim() || undefined,
+      });
 
       const payload: ServiceBookingPayload = {
         service: selectedService.id,
@@ -135,7 +144,10 @@ export default function BookingScreen() {
         notes: notes.trim() || undefined,
       };
 
-      await AuthService.createServiceBooking(payload);
+      console.log('🚀 Sending booking request...');
+      const result = await AuthService.createServiceBooking(payload);
+      console.log('✅ Booking successful:', result);
+      
       setSuccessMessage('Booking Confirmed! Meeting details have been sent to your email.');
       
       // Redirect to services page after 3 seconds
@@ -144,7 +156,18 @@ export default function BookingScreen() {
       }, 3000);
       
     } catch (error: any) {
-      Alert.alert('Booking Failed', error?.message || 'Something went wrong.');
+      console.error('❌ Booking error:', error);
+      console.error('Error details:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+      });
+      
+      const errorMessage = error?.response?.data?.error 
+        || error?.message 
+        || 'Network error. Please check your connection and try again.';
+      
+      Alert.alert('Booking Failed', errorMessage);
     } finally {
       setSubmitting(false);
     }

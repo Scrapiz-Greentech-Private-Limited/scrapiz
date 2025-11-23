@@ -157,7 +157,7 @@ const shouldShowSessionExpired = (currentRoute: string | null): boolean => {
     '/service-unavailable',
     '/oauthredirect',
     '/',
-    '/index',
+    
   ];
   
   // Check if current route matches any excluded route
@@ -636,6 +636,17 @@ export class AuthService {
 
   static async createServiceBooking(payload: ServiceBookingPayload): Promise<ServiceBooking> {
     try {
+      console.log('📡 API Call - Creating service booking');
+      console.log('Endpoint:', API_CONFIG.BASE_URL + API_CONFIG.ENDPOINTS.SERVICE_BOOKINGS);
+      console.log('Payload:', {
+        service: payload.service,
+        name: payload.name,
+        phone: payload.phone,
+        address: payload.address,
+        preferred_datetime: payload.preferredDateTime,
+        notes: payload.notes,
+      });
+      
       const response = await apiClient.post(API_CONFIG.ENDPOINTS.SERVICE_BOOKINGS, {
         service: payload.service,
         name: payload.name,
@@ -644,9 +655,14 @@ export class AuthService {
         preferred_datetime: payload.preferredDateTime,
         notes: payload.notes,
       });
+      
+      console.log('📡 API Response:', response.data);
       return response.data?.booking as ServiceBooking;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to submit service booking');
+      console.error('📡 API Error:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      throw new Error(error.response?.data?.error || error.message || 'Failed to submit service booking');
     }
   }
 

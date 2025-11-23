@@ -5,24 +5,27 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Platform,
   Switch,
   Alert,
   ActivityIndicator,
   StatusBar,
   Image,
 } from 'react-native';
-import { User, MapPin, Bell, Shield, CircleHelp as HelpCircle, Star, Gift, ChevronRight, Award, LogOut, Phone, Mail, Package, Clock, CheckCircle, Trash2, Globe } from 'lucide-react-native';
+import { User, MapPin, Bell, Sun, Camera, Moon, Shield, CircleHelp as HelpCircle, X, Star, Gift, ChevronRight, Award, LogOut, Phone, Mail, Package, Clock, CheckCircle, Trash2, Globe } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import { wp, hp, fs, spacing, responsiveValue, MIN_TOUCH_SIZE } from '../../utils/responsive';
 import { LinearGradient } from 'expo-linear-gradient';
-
-import {AuthService, UserProfile, OrderSummary, ProductSummary, DeletionFeedback} from '../../api/apiService'
+import { useTheme } from '../../context/ThemeContext';
+import { AuthService, UserProfile, OrderSummary, ProductSummary, DeletionFeedback } from '../../api/apiService'
 import { useEnvironmentalImpact } from '../../hooks/useImpact';
 import DeleteAccountFeedbackModal from '../../components/DeleteAccountFeedbackModal';
 import { useAuth } from '../../context/AuthContext';
 import { useLocalization } from '../../context/LocalizationContext';
 import LanguageChangeModal from '../../components/LanguageChangeModal';
 import { SUPPORTED_LANGUAGES } from '../../localization/languages';
-
+import Toast from 'react-native-toast-message';
 
 type MenuItem = {
   icon: any;
@@ -34,12 +37,10 @@ type MenuItem = {
   onSwitchChange?: (value: boolean) => void;
 };
 
-
 type MenuSection = {
   section: string;
   items: MenuItem[];
 };
-
 
 export default function Profile() {
   const router = useRouter();
@@ -47,6 +48,8 @@ export default function Profile() {
   const { currentLanguage, changeLanguage, t } = useLocalization();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [updatingImage, setUpdatingImage] = useState(false);
+  const { theme, setThemeMode, isDark, colors } = useTheme();
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<string | null>(null);
   const [products, setProducts] = useState<ProductSummary[]>([]);
@@ -58,44 +61,45 @@ export default function Profile() {
 
   const loadUserProfile = useCallback(async () => {
     try {
-        setLoading(true);
-        setErrors(null);
-        const [userData , productsData] = await Promise.all([
-            AuthService.getUser(),
-            AuthService.getProducts()
-        ]);
-        setUser(userData);
-        setProducts(productsData);
-        setLoading(false);
+      setLoading(true);
+      setErrors(null);
+      const [userData, productsData] = await Promise.all([
+        AuthService.getUser(),
+        AuthService.getProducts()
+      ]);
+      setUser(userData);
+      setProducts(productsData);
+      setLoading(false);
     } catch (error) {
-        setErrors("Failed to load user profile");
-        setLoading(false);
-    }finally{
-        setLoading(false);
+      setErrors("Failed to load user profile");
+      setLoading(false);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
-  // Reload data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       loadUserProfile();
     }, [loadUserProfile])
   );
+
   const environmentalImpact = useEnvironmentalImpact(user?.orders || []);
+  
   const totalEarnings = useMemo(() => {
     if (!user?.orders || !products.length) return 0;
     return user.orders.reduce((total, order) => {
-        const totalOrder = order.orders.reduce((orderTotal, item) => {
-            const product = products.find(p => p.id === item.product.id);
-            const rate = product ? (product.max_rate + product.min_rate) / 2 : 0;
-            const quantity = parseFloat(item.quantity) || 0;
-            return orderTotal + (rate * quantity);
-        }, 0)
-        return total + totalOrder;
-    },0)
-  },[user?.orders, products])
+      const totalOrder = order.orders.reduce((orderTotal, item) => {
+        const product = products.find(p => p.id === item.product.id);
+        const rate = product ? (product.max_rate + product.min_rate) / 2 : 0;
+        const quantity = parseFloat(item.quantity) || 0;
+        return orderTotal + (rate * quantity);
+      }, 0)
+      return total + totalOrder;
+    }, 0)
+  }, [user?.orders, products])
 
-    const getInitials = (name: string): string => {
+  const getInitials = (name: string): string => {
     return name
       .split(' ')
       .map(word => word[0])
@@ -104,6 +108,116 @@ export default function Profile() {
       .slice(0, 2);
   };
 
+  const handlePickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert(
+          t('alerts.titles.permissionRequired'),
+          t('alerts.permissions.cameraRollRequired'),
+          [{ text: t('alerts.buttons.ok') }]
+        );
+        return;
+      }
+      
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const newImageUri = result.assets[0].uri;
+        await updateProfileImage(newImageUri);
+      }
+    } catch (error) {
+      Alert.alert(t('alerts.titles.error'), t('toasts.error.imagePickerFailed'));
+      console.error('Image picker error:', error);
+    }
+  };
+
+  const updateProfileImage = async (imageUri: string) => {
+    try {
+      setUpdatingImage(true);
+      
+      const updateData = {
+        profile_image: imageUri
+      };
+      
+      const updatedUser = await AuthService.updateUserProfile(updateData);
+      
+      setUser(prevUser => ({
+        ...prevUser!,
+        profile_image: updatedUser.profile_image || ''
+      }));
+      
+      setImageError(false);
+      
+      Toast.show({
+        type: 'success',
+        text1: t('toasts.success.profileImageUpdated') || 'Profile image updated successfully',
+        text2: '',
+      });
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: t('alerts.titles.error'),
+        text2: error.message || t('toasts.error.updateProfileImage'),
+      });
+      console.error('Update image error:', error);
+    } finally {
+      setUpdatingImage(false);
+    }
+  };
+  
+  const handleRemoveImage = () => {
+    Alert.alert(
+      t('alerts.titles.removeProfilePicture'),
+      t('alerts.confirmations.removeProfilePicture'),
+      [
+        { text: t('alerts.buttons.cancel'), style: 'cancel' },
+        {
+          text: t('alerts.buttons.remove'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setUpdatingImage(true);
+              
+              const updateData = {
+                profile_image: null
+              };
+              
+              const updatedUser = await AuthService.updateUserProfile(updateData);
+              
+              setUser(prevUser => ({
+                ...prevUser!,
+                profile_image: ''
+              }));
+              
+              setImageError(false);
+              
+              Toast.show({
+                type: 'success',
+                text1: t('toasts.success.profileImageRemoved') || 'Profile image removed successfully',
+                text2: '',
+              });
+            } catch (error: any) {
+              Toast.show({
+                type: 'error',
+                text1: t('alerts.titles.error'),
+                text2: error.message || t('toasts.error.removeProfileImage'),
+              });
+              console.error('Remove image error:', error);
+            } finally {
+              setUpdatingImage(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const formatJoinDate = (orders: OrderSummary[]): string => {
     if (!orders.length) return 'Recently joined';
@@ -115,23 +229,26 @@ export default function Profile() {
     
     return oldestOrder.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
+
   const handleNavigation = (screen: string) => {
     router.push(screen as any);
   }
+
   const handleAddresses = () => {
     router.push('/profile/addresses');
   };
 
-   const handleNotifications = () => {
+  const handleNotifications = () => {
     router.push('/profile/notification-settings');
   };
+
   const handleEditProfile = () => {
     router.push('/profile/edit-profile');
   };
-  const handlePrivacySettings = () =>{
+
+  const handlePrivacySettings = () => {
     router.push('/profile/privacy-security');
   }
-
 
   const handleHelpSupport = () => {
     router.push('/profile/help-support');
@@ -143,8 +260,8 @@ export default function Profile() {
       'Would you like to rate our app on the App Store?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Rate Now', 
+        {
+          text: 'Rate Now',
           onPress: () => {
             Alert.alert('Thank you!', 'This would open the app store in a real app.');
           }
@@ -152,6 +269,7 @@ export default function Profile() {
       ]
     );
   };
+
   const handleReferFriends = () => {
     router.push('/profile/refer-friends');
   };
@@ -174,15 +292,14 @@ export default function Profile() {
       t('profile.logoutConfirmMessage'),
       [
         { text: t('common.cancel'), style: 'cancel' },
-        { 
-          text: t('profile.logout'), 
+        {
+          text: t('profile.logout'),
           style: 'destructive',
           onPress: async () => {
             try {
               await AuthService.logout();
               router.replace('/(auth)/login');
             } catch (err: any) {
-              // Even if logout API fails, navigate to login
               console.error('Logout error:', err);
               router.replace('/(auth)/login');
             }
@@ -197,10 +314,8 @@ export default function Profile() {
   };
 
   const handleFeedbackSubmit = (feedback: DeletionFeedback) => {
-    // Close the feedback modal
     setFeedbackModalVisible(false);
 
-    // Show confirmation dialog
     Alert.alert(
       t('profile.deleteAccountConfirmTitle'),
       t('profile.deleteAccountConfirmMessage'),
@@ -209,7 +324,6 @@ export default function Profile() {
           text: t('common.cancel'),
           style: 'cancel',
           onPress: () => {
-            // Reopen feedback modal if user cancels
             setFeedbackModalVisible(true);
           }
         },
@@ -225,36 +339,29 @@ export default function Profile() {
   const confirmDeletion = async (feedback: DeletionFeedback) => {
     try {
       setDeletingAccount(true);
-
-      // Call API to delete account with feedback
       await AuthService.deleteUserWithFeedback(feedback);
-
-      // Clear authentication state using AuthContext
       await clearAuthState();
 
-      // Show success message
       Alert.alert(
         t('profile.accountDeleted'),
         t('profile.accountDeletedMessage'),
         [{ text: 'OK' }]
       );
 
-      // Redirect to login screen after 3 seconds
       setTimeout(() => {
         router.replace('/(auth)/login');
       }, 3000);
 
     } catch (err: any) {
       setDeletingAccount(false);
-      
-      // Show error message
+
       Alert.alert(
         t('profile.deletionFailed'),
         err.message || t('profile.deletionFailedMessage'),
         [
           { text: t('common.cancel'), style: 'cancel' },
-          { 
-            text: t('profile.retry'), 
+          {
+            text: t('profile.retry'),
             onPress: () => confirmDeletion(feedback)
           }
         ]
@@ -266,11 +373,15 @@ export default function Profile() {
     router.push('/profile/orders');
   };
 
+  const toggleTheme = async () => {
+    const newTheme = isDark ? 'light' : 'dark';
+    await setThemeMode(newTheme);
+  };
+
   const handleOrderPress = (orderId: string) => {
     router.push(`/profile/orders/${orderId}`);
   };
 
-  // Show loading state
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -291,8 +402,11 @@ export default function Profile() {
     );
   }
 
-  // Get current language display name
   const currentLanguageDisplay = SUPPORTED_LANGUAGES.find(lang => lang.code === currentLanguage)?.nativeName || 'English';
+
+  const handleNotificationPermission = () => {
+    router.push('/notification-permission');
+  };
 
   const menuItems: MenuSection[] = [
     {
@@ -306,6 +420,7 @@ export default function Profile() {
     {
       section: t('profile.sections.preferences'),
       items: [
+        { icon: Bell, title: t('profile.notifications'), subtitle: t('profile.notificationsSubtitle'), action: handleNotificationPermission },
         { icon: Globe, title: t('profile.languageSupport'), subtitle: currentLanguageDisplay, action: handleLanguageSettings },
       ]
     },
@@ -325,23 +440,56 @@ export default function Profile() {
   ]
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <StatusBar barStyle="light-content" />
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
       <LinearGradient
-        colors={['#16a34a', '#15803d']}
+        colors={isDark ? ['#22c55e', '#16a34a'] : ['#16a34a', '#15803d']}
         style={styles.header}
       >
-        <View style={styles.profileContainer}>
-          <View style={styles.avatar}>
-            {user.profile_image && !imageError ? (
-              <Image
-                source={{ uri: user.profile_image }}
-                style={styles.avatarImage}
-                onError={() => setImageError(true)}
-              />
+        <TouchableOpacity
+          style={styles.themeToggleButton}
+          onPress={toggleTheme}
+          activeOpacity={0.7}
+        >
+          <View style={styles.themeToggleIcon}>
+            {isDark ? (
+              <Sun size={fs(20)} color="#ffffff" strokeWidth={2.5} />
             ) : (
-              <Text style={styles.avatarText}>{getInitials(user.name)}</Text>
+              <Moon size={fs(20)} color="#ffffff" strokeWidth={2.5} />
             )}
+          </View>
+        </TouchableOpacity>
+        <View style={styles.profileContainer}>
+          <View style={styles.avatarWrapper}>
+            <View style={styles.avatar}>
+              {updatingImage ? (
+                <ActivityIndicator size="large" color="#ffffff" />
+              ) : user.profile_image && !imageError ? (
+                <>
+                  <Image
+                    source={{ uri: user.profile_image }}
+                    style={styles.avatarImage}
+                    onError={() => setImageError(true)}
+                  />
+                  <TouchableOpacity
+                    style={styles.removeImageButton}
+                    onPress={handleRemoveImage}
+                    disabled={updatingImage}
+                  >
+                    <X size={16} color="white" />
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <Text style={styles.avatarText}>{getInitials(user.name)}</Text>
+              )}
+            </View>
+            <TouchableOpacity
+              style={styles.cameraButton}
+              onPress={handlePickImage}
+              disabled={updatingImage}
+            >
+              <Camera size={18} color="white" />
+            </TouchableOpacity>
           </View>
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{user.name}</Text>
@@ -350,33 +498,34 @@ export default function Profile() {
         </View>
       </LinearGradient>
 
-      {/* Menu Sections */}
       {menuItems.map((section, sectionIndex) => (
         <View key={sectionIndex} style={styles.section}>
-          <Text style={styles.sectionTitle}>{section.section}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{section.section}</Text>
           {section.items.map((item, itemIndex) => (
-            <TouchableOpacity 
-              key={itemIndex} 
+            <TouchableOpacity
+              key={itemIndex}
               style={[
                 styles.menuItem,
-                item.title === 'Delete Account' && styles.deleteAccountMenuItem
+                { backgroundColor: colors.surface },
+                item.title === t('profile.deleteAccount') && styles.deleteAccountMenuItem
               ]}
               onPress={item.action}
-              disabled={item.title === 'Delete Account' && deletingAccount}
+              disabled={item.title === t('profile.deleteAccount') && deletingAccount}
             >
               <View style={styles.menuItemLeft}>
                 <View style={[
                   styles.menuItemIcon,
-                  item.title === 'Delete Account' && styles.deleteAccountIcon
+                  item.title === t('profile.deleteAccount') && styles.deleteAccountIcon
                 ]}>
-                  <item.icon size={20} color={item.title === 'Delete Account' ? '#dc2626' : '#6b7280'} />
+                  <item.icon size={20} color={item.title === t('profile.deleteAccount') ? '#dc2626' : '#6b7280'} />
                 </View>
                 <View style={styles.menuItemInfo}>
                   <Text style={[
                     styles.menuItemTitle,
-                    item.title === 'Delete Account' && styles.deleteAccountTitle
+                    { color: colors.text },
+                    item.title === t('profile.deleteAccount') && styles.deleteAccountTitle
                   ]}>{item.title}</Text>
-                  <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>
+                  <Text style={[styles.menuItemSubtitle, { color: colors.textSecondary }]}>{item.subtitle}</Text>
                 </View>
               </View>
               <View style={styles.menuItemRight}>
@@ -387,7 +536,7 @@ export default function Profile() {
                     trackColor={{ false: '#e5e7eb', true: '#bbf7d0' }}
                     thumbColor={item.switchValue ? '#16a34a' : '#f3f4f6'}
                   />
-                ) : item.title === 'Delete Account' && deletingAccount ? (
+                ) : item.title === t('profile.deleteAccount') && deletingAccount ? (
                   <ActivityIndicator size="small" color="#dc2626" />
                 ) : (
                   <ChevronRight size={16} color="#d1d5db" />
@@ -398,32 +547,30 @@ export default function Profile() {
         </View>
       ))}
 
-      {/* Environmental Impact */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>{t('profile.sections.environmentalImpact')}</Text>
-        <View style={styles.impactCard}>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{t('profile.sections.environmentalImpact')}</Text>
+        <View style={[styles.impactCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={styles.impactEmoji}>🌱</Text>
           <View style={styles.impactContent}>
-            <Text style={styles.impactTitle}>{t('profile.impactGreatJob')}</Text>
-            <Text style={styles.impactDescription}>
+            <Text style={[styles.impactTitle, { color: colors.text }]}>{t('profile.impactGreatJob')}</Text>
+            <Text style={[styles.impactDescription, { color: colors.textSecondary }]}>
               {t('profile.impactDescription', { weight: Math.round(environmentalImpact.totalWeight) })}
             </Text>
             <View style={styles.impactStats}>
-              <Text style={styles.impactStat}>{t('profile.impactTreesSaved', { count: environmentalImpact.treesSaved })}</Text>
-              <Text style={styles.impactStat}>{t('profile.impactCO2Reduced', { amount: environmentalImpact.co2Reduced })}</Text>
+              <Text style={[styles.impactStat, { color: colors.text }]}>{t('profile.impactTreesSaved', { count: environmentalImpact.treesSaved })}</Text>
+              <Text style={[styles.impactStat, { color: colors.text }]}>{t('profile.impactCO2Reduced', { amount: environmentalImpact.co2Reduced })}</Text>
             </View>
           </View>
         </View>
       </View>
 
-      {/* Logout */}
       <View style={styles.section}>
-        <TouchableOpacity 
-          style={styles.logoutButton}
+        <TouchableOpacity
+          style={[styles.logoutButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
           onPress={handleLogout}
         >
-          <LogOut size={20} color="#dc2626" />
-          <Text style={styles.logoutText}>{t('profile.logout')}</Text>
+          <LogOut size={fs(20)} color="#dc2626" />
+          <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
       </View>
 
@@ -431,7 +578,6 @@ export default function Profile() {
         <Text style={styles.footerText}>{t('profile.version')}</Text>
       </View>
 
-      {/* Delete Account Feedback Modal */}
       <DeleteAccountFeedbackModal
         visible={feedbackModalVisible}
         onClose={() => setFeedbackModalVisible(false)}
@@ -439,7 +585,6 @@ export default function Profile() {
         loading={deletingAccount}
       />
 
-      {/* Language Change Modal */}
       <LanguageChangeModal
         visible={languageModalVisible}
         currentLanguage={currentLanguage}
@@ -448,119 +593,190 @@ export default function Profile() {
       />
     </ScrollView>
   );
-
 }
-
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f3f4f6',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f3f4f6',
+  header: {
+    paddingTop: Platform.select({ ios: hp(8.5), android: hp(7.5) }), // Reduced from 9.8/8.6
+    paddingHorizontal: spacing(18), // Reduced from 20
+    paddingBottom: spacing(16), // Reduced from 20
+    borderBottomLeftRadius: spacing(24),
+    borderBottomRightRadius: spacing(24),
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 16,
+    marginTop: spacing(2),
+    fontSize: fs(15),
     color: '#6b7280',
-    fontFamily: 'Inter-Regular',
+    fontWeight: '500',
+  },
+  themeToggleButton: {
+    position: 'absolute',
+    top: Platform.select({ ios: hp(6.5), android: hp(5.2) }), // Moved down from 7/5.5
+    right: spacing(18), // Adjusted from 20
+    zIndex: 10,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f3f4f6',
-    paddingHorizontal: 20,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: spacing(4),
   },
   errorText: {
-    fontSize: 16,
+    fontSize: fs(16),
     color: '#dc2626',
-    fontFamily: 'Inter-Regular',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: spacing(3),
+    fontWeight: '500',
   },
-  retryButton: {
-    backgroundColor: '#16a34a',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
   },
-  retryButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontFamily: 'Inter-Medium',
-  },
-  header: {
-    paddingTop: 80,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+  themeToggleIcon: {
+    width: spacing(38), // Reduced from 42
+    height: spacing(38), // Reduced from 42
+    borderRadius: spacing(19), // Reduced from 21
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   profileContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  avatarWrapper: {
+    position: 'relative',
+    marginRight: spacing(14), // Reduced from 16
+  },
   avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: wp(28),
+    height: wp(28),
+    borderRadius: wp(14),
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
-    borderWidth: 2,
-    borderColor: 'white',
+    borderWidth: 4,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
   },
+
   avatarImage: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  avatarText: {
+    fontSize: fs(32),
+    fontWeight: '700',
+    color: '#ffffff',
+    letterSpacing: 1,
+    textAlign: 'center',
+  },
+  cameraButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#16a34a',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+
+  // Remove Image Button (Top Right of Avatar)
+  removeImageButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#dc2626',
+    borderRadius: 14,
+    width: 28,
+    height: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    shadowColor: '#dc2626',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  plusIconContainer: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: wp(5.5), // Reduced from 6.4
+    height: wp(5.5), // Reduced from 6.4
+    borderRadius: wp(2.75), // Reduced from 3.2
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#16a34a',
   },
   avatarText: {
     color: 'white',
-    fontSize: 24,
+    fontSize: fs(22), // Reduced from 24
     fontFamily: 'Inter-Bold',
   },
   profileInfo: {
     flex: 1,
   },
   profileName: {
-    fontSize: 22,
+    fontSize: fs(20), // Reduced from 22
     fontWeight: 'bold',
     fontFamily: 'Inter-Bold',
     color: 'white',
   },
   profileEmail: {
-    fontSize: 14,
+    fontSize: fs(13), // Reduced from 14
     fontFamily: 'Inter-Regular',
     color: 'rgba(255,255,255,0.8)',
-    marginTop: 2,
+    marginTop: spacing(2),
   },
   section: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: spacing(20),
+    paddingVertical: spacing(16),
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: fs(16),
     fontWeight: '600',
     color: '#111827',
     fontFamily: 'Inter-SemiBold',
-    marginBottom: 12,
+    marginBottom: spacing(12),
   },
   menuItem: {
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
+    borderRadius: spacing(12),
+    padding: spacing(16),
+    marginBottom: spacing(8),
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    minHeight: MIN_TOUCH_SIZE,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -573,36 +789,36 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   menuItemIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: wp(10.6),
+    height: wp(10.6),
+    borderRadius: wp(5.3),
     backgroundColor: '#f8fafc',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: spacing(12),
   },
   menuItemInfo: {
     flex: 1,
   },
   menuItemTitle: {
-    fontSize: 16,
+    fontSize: fs(16),
     fontWeight: '500',
     color: '#111827',
     fontFamily: 'Inter-Medium',
-    marginBottom: 2,
+    marginBottom: spacing(2),
   },
   menuItemSubtitle: {
-    fontSize: 12,
+    fontSize: fs(12),
     color: '#6b7280',
     fontFamily: 'Inter-Regular',
   },
   menuItemRight: {
-    marginLeft: 12,
+    marginLeft: spacing(12),
   },
   impactCard: {
     backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: spacing(16),
+    padding: spacing(20),
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
@@ -612,97 +828,63 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   impactEmoji: {
-    fontSize: 48,
-    marginRight: 16,
+    fontSize: fs(48),
+    marginRight: spacing(16),
   },
   impactContent: {
     flex: 1,
   },
   impactTitle: {
-    fontSize: 16,
+    fontSize: fs(16),
     fontWeight: '600',
     color: '#111827',
     fontFamily: 'Inter-SemiBold',
-    marginBottom: 4,
+    marginBottom: spacing(4),
   },
   impactDescription: {
-    fontSize: 14,
+    fontSize: fs(14),
     color: '#6b7280',
     fontFamily: 'Inter-Regular',
-    marginBottom: 8,
+    marginBottom: spacing(8),
   },
   impactStats: {
     flexDirection: 'row',
-    gap: 16,
+    gap: spacing(16),
     flexWrap: 'wrap',
   },
   impactStat: {
-    fontSize: 12,
+    fontSize: fs(12),
     color: '#16a34a',
     fontFamily: 'Inter-Medium',
   },
   logoutButton: {
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: spacing(12),
+    padding: spacing(16),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: MIN_TOUCH_SIZE,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 1,
-    marginBottom: 12,
   },
   logoutText: {
-    fontSize: 16,
+    fontSize: fs(16),
     fontWeight: '500',
     color: '#dc2626',
     fontFamily: 'Inter-Medium',
-    marginLeft: 8,
-  },
-  deleteAccountButton: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-    borderWidth: 1,
-    borderColor: '#fecaca',
-  },
-  deleteAccountText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#dc2626',
-    fontFamily: 'Inter-Medium',
-    marginLeft: 8,
-  },
-  deleteAccountMenuItem: {
-    borderWidth: 1,
-    borderColor: '#fecaca',
-  },
-  deleteAccountIcon: {
-    backgroundColor: '#fee2e2',
-  },
-  deleteAccountTitle: {
-    color: '#dc2626',
+    marginLeft: spacing(8),
   },
   footer: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: spacing(20),
   },
   footerText: {
-    fontSize: 12,
+    fontSize: fs(12),
     color: '#9ca3af',
     fontFamily: 'Inter-Regular',
   },
-})
-
-
+});

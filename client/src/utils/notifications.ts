@@ -9,6 +9,9 @@ Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
     shouldSetBadge: true,
   }),
 });
@@ -28,18 +31,19 @@ export interface DeepLinkData {
  * Handle notification response when user taps on a notification
  * 
  * @param response - The notification response from Expo
- * @param navigation - React Navigation instance
+ * @param router - Expo Router instance
  */
 export const handleNotificationResponse = (
   response: Notifications.NotificationResponse,
-  navigation: any
+  router: any
 ): void => {
   try {
     const data = response.notification.request.content.data as DeepLinkData;
     
     if (!data || !data.type) {
-      // No deep link data, navigate to default screen
-      console.log('No deep link data in notification');
+      // No deep link data, navigate to home
+      console.log('No deep link data in notification, navigating to home');
+      router.push('/(tabs)/home');
       return;
     }
     
@@ -49,21 +53,40 @@ export const handleNotificationResponse = (
       case 'order_detail':
         // Navigate to order detail screen with order ID
         if (data.orderId) {
-          navigation.navigate('OrderDetail', { 
-            orderId: data.orderId,
-            orderNumber: data.orderNumber 
+          router.push({
+            pathname: '/order-detail',
+            params: { 
+              orderId: data.orderId,
+              orderNumber: data.orderNumber 
+            }
           });
         } else {
           console.warn('order_detail type but no orderId provided');
+          router.push('/(tabs)/home');
         }
         break;
       
       case 'screen':
         // Navigate to a specific screen in the app
         if (data.value) {
-          navigation.navigate(data.value);
+          // Map screen names to Expo Router paths
+          const screenMap: Record<string, string> = {
+            'home': '/(tabs)/home',
+            'Home': '/(tabs)/home',
+            'orders': '/(tabs)/orders',
+            'Orders': '/(tabs)/orders',
+            'services': '/(tabs)/services',
+            'Services': '/(tabs)/services',
+            'profile': '/(tabs)/profile',
+            'Profile': '/(tabs)/profile',
+          };
+          
+          const route = screenMap[data.value] || `/(tabs)/${data.value.toLowerCase()}`;
+          console.log(`Navigating to screen: ${route}`);
+          router.push(route);
         } else {
           console.warn('screen type but no value provided');
+          router.push('/(tabs)/home');
         }
         break;
       
@@ -80,9 +103,12 @@ export const handleNotificationResponse = (
       
       default:
         console.warn('Unknown deep link type:', data.type);
+        router.push('/(tabs)/home');
     }
   } catch (error) {
     console.error('Error handling notification response:', error);
+    // Fallback to home on error
+    router.push('/(tabs)/home');
   }
 };
 
@@ -90,11 +116,11 @@ export const handleNotificationResponse = (
  * Set up notification response listener
  * Call this in your root App component
  * 
- * @param navigation - React Navigation instance
+ * @param router - Expo Router instance
  * @returns Subscription object to clean up on unmount
  */
-export const setupNotificationListener = (navigation: any) => {
+export const setupNotificationListener = (router: any) => {
   return Notifications.addNotificationResponseReceivedListener((response) => {
-    handleNotificationResponse(response, navigation);
+    handleNotificationResponse(response, router);
   });
 };

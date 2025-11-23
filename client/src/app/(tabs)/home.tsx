@@ -79,7 +79,7 @@ export default function HomeScreen() {
   const { colors, isDark } = useTheme();
   const { user, products, categories, orders, loading, error, refetch } = useHomeData();
   const scrapCategories = useScrapCategories(products || [], categories || []);
-  const { treesSaved, co2Reduced } = useEnvironmentalImpact(orders || []);
+  const { treesSaved = 0, co2Reduced = 0 } = useEnvironmentalImpact(orders || []);
   const [refreshing, setRefreshing] = useState(false);
   const [imageError, setImageError] = useState(false);
   const insets = useSafeAreaInsets();
@@ -230,13 +230,13 @@ v          <View style={styles.decorativeCircle1} />
                 {user?.profile_image && !imageError ? (
                   <Image
                     source={{ uri: user.profile_image }}
-                    className='w-full h-full'
+                    style={styles.profileImage}
                     onError={() => setImageError(true)}
                   />
                 ) : user?.name ? (
-                  <View className='w-full h-full justify-center items-center bg-green-100'>
+                  <View style={styles.profileInitials}>
                     <Text className='text-sm font-bold text-green-700'>
-                      {getInitials(user.name)}
+                      {getInitials(user.name) || 'U'}
                     </Text>
                   </View>
                 ) : (
@@ -319,13 +319,13 @@ v          <View style={styles.decorativeCircle1} />
             style={styles.ratesScrollView}
           >
             {scrapCategories.length > 0 ? (
-              scrapCategories.slice(0, 4).map((category) => (
+              scrapCategories.slice(0, 4).map((category, index) => (
                 <TouchableOpacity
                   key={category.id}
                   style={[
                   styles.rateCard,
                   { backgroundColor: colors.surface, borderColor: colors.border },
-                index === homeRateItems.length - 1 && { marginRight: 0 }
+                index === 3 && { marginRight: 0 }
               ]}
                   onPress={() => handleNavigate('/(tabs)/rates')}
                 >
@@ -481,8 +481,7 @@ v          <View style={styles.decorativeCircle1} />
             <View style={styles.brandingDivider} />
             
             <View style={styles.brandingLogoContainer}>
-              <Image 
-                source={require('../../../assets/images/LogoWithoutS.png')}
+              <Image source={require('../../../assets/images/LogowithoutS.png')}
                 style={styles.brandingLogoImage}
                 resizeMode="contain"
                 fadeDuration={0}
@@ -606,6 +605,20 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(22, 163, 74, 0.15)',
     marginLeft: wp(1.1), // 4
+    overflow: 'hidden',
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: wp(5),
+  },
+  profileInitials: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#dcfce7',
+    borderRadius: wp(5),
   },
   profileIconWrapper: {
     width: '100%',
@@ -918,6 +931,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 6,
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   referCardGradient: {
     borderRadius: 20,

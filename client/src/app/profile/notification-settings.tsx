@@ -12,6 +12,7 @@ import {
 import Toast from 'react-native-toast-message';
 import { ArrowLeft, Bell, Truck, IndianRupee, MessageCircle, Zap, AlertCircle } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthService, NotificationSettings } from '../../api/apiService';
 import { useLocalization } from '../../context/LocalizationContext';
 
@@ -162,6 +163,7 @@ const SavingIndicatorComponent: React.FC = () => (
 
 export default function NotificationSystem(){
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { t } = useLocalization();
     const [settings, setSettings] = useState<NotificationSettings | null>(null);
     const [loading, setLoading] = useState(true);
@@ -308,7 +310,7 @@ export default function NotificationSystem(){
    ]
    if(loading){
      return (
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
         <HeaderComponent onBackPress={() => router.back()} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#16a34a" />
@@ -318,7 +320,7 @@ export default function NotificationSystem(){
     );
    }
    return(
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <HeaderComponent onBackPress={() => router.back()} />
 
       {/* Error Banner */}
@@ -386,11 +388,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
-    marginTop: 8,
   },
   backButton: {
     padding: 8,

@@ -4,7 +4,7 @@ import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef } from "react";
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View, Platform } from 'react-native';
 import '@/global.css';
 import React from "react";
 import Toast from 'react-native-toast-message';
@@ -28,6 +28,16 @@ SplashScreen.preventAutoHideAsync();
  * Handles loading states for fonts and i18n initialization
  * Wrapped by LocalizationProvider to access localization context
  */
+export async function setupAndroidChannel() {
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'Default',
+      importance: Notifications.AndroidImportance.MAX, // <--- MAX is required for heads-up alerts
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF231F7C',
+    });
+  }
+}
 
 function AppContent() {
   const [fontsLoaded] = useFonts({
@@ -50,6 +60,14 @@ function AppContent() {
   // Set up notification response listener
   useEffect(() => {
     // Set up listener for when user taps on a notification
+    const initNotifications = async() =>{
+      try{
+        await setupAndroidChannel();
+      }catch(error){
+        console.error("Failed to set up notification channel:", error);
+      }
+    }
+    initNotifications(); 
     notificationListener.current = setupNotificationListener(router);
 
     // Cleanup on unmount
@@ -80,6 +98,14 @@ function AppContent() {
                 <Stack.Screen name="(auth)" options={{ headerShown: false }} />
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                 <Stack.Screen name="profile" options={{ headerShown: false }} />
+                <Stack.Screen 
+                  name="notification-permission" 
+                  options={{ 
+                    headerShown: false,
+                    presentation: 'modal',
+                    animation: 'slide_from_bottom'
+                  }} 
+                />
                 <Stack.Screen name="+not-found" />
               </Stack>
               <Toast />

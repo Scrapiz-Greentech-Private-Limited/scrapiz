@@ -20,7 +20,7 @@
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Scrapiz needs your location to check service availability and provide accurate scrap pickup rates in your area."
       },
       "splash": {
-        "image": "./assets/images/App-icon.png",
+        "image": "./assets/images/app.png",
         "resizeMode": "contain",
         "backgroundColor": "#ffffff"
       }
@@ -48,7 +48,12 @@
       ],
       "package": "com.scrapiz.app",
       "googleServicesFile":"./google-services.json",
-      "versionCode": 14
+      "versionCode": 15,
+      "useNextNotificationsApi": true
+    },
+    "notification": {
+      "icon": "./assets/images/app.png",
+      "color": "#16a34a"
     },
     "web": {
       "bundler": "metro",

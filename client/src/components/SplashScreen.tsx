@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Image, Platform } from 'react-native';
 import { wp, hp, fs } from '../utils/responsive';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '../context/ThemeContext';
 
 interface SplashScreenProps {
   onFinish: () => void;
@@ -230,7 +230,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
           ]}
         >
           <Image 
-            source={require('../assets/images/s.png')}
+            source={require('../../assets/images/s.png')}
             style={styles.icon}
             resizeMode="contain"
             fadeDuration={0}

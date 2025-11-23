@@ -1,8 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, StatusBar } from 'react-native';
 import { Hammer, Wrench, Building, Trash2, ChevronRight, FileText } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { wp, hp, fs, spacing, responsiveValue } from '../../utils/responsive';
+import { useTheme } from '../../context/ThemeContext';
 
 export const services = [
   { id: 'demolition', title: 'Demolition Service', description: 'Building and structure demolition', icon: Hammer, color: '#16a34a', bgColor: '#f0fdf4' },
@@ -14,22 +16,28 @@ export const services = [
 
 export default function ServicesScreen() {
   const router = useRouter();
+  const { colors, isDark } = useTheme();
 
   const handleServiceSelect = (service: typeof services[0]) => {
     router.push(`/services/${service.id}`);
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
       <LinearGradient
-        colors={['#16a34a', '#15803d']}
+        colors={isDark ? ['#22c55e', '#16a34a'] : ['#16a34a', '#15803d']}
         style={styles.header}
       >
         <Text style={styles.headerTitle}>Our Services</Text>
         <Text style={styles.headerSubtitle}>Professional services for all your needs</Text>
       </LinearGradient>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
         <View style={styles.servicesList}>
           {services.map((service) => (
             <LinearGradient
@@ -45,26 +53,26 @@ export default function ServicesScreen() {
                 activeOpacity={0.8}
               >
                 <View style={[styles.serviceIcon, { backgroundColor: 'white' }]}>
-                  <service.icon size={24} color={service.color} strokeWidth={2.5} />
+                  <service.icon size={fs(24)} color={service.color} strokeWidth={2.5} />
                 </View>
                 <View style={styles.serviceTextContainer}>
                   <Text style={styles.serviceTitle}>{service.title}</Text>
                   <Text style={styles.serviceDescription}>{service.description}</Text>
                 </View>
-                <ChevronRight size={22} color="rgba(255, 255, 255, 0.9)" strokeWidth={2.5} />
+                <ChevronRight size={fs(22)} color="rgba(255, 255, 255, 0.9)" strokeWidth={2.5} />
               </TouchableOpacity>
             </LinearGradient>
           ))}
         </View>
 
-        <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>Why Choose Us?</Text>
+        <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.infoTitle, { color: colors.text }]}>Why Choose Us?</Text>
           <View style={styles.infoList}>
-            <Text style={styles.infoItem}>✓ Professional & Experienced Team</Text>
-            <Text style={styles.infoItem}>✓ Competitive & Transparent Pricing</Text>
-            <Text style={styles.infoItem}>✓ Eco-Friendly Disposal Methods</Text>
-            <Text style={styles.infoItem}>✓ Fully Insured & Licensed</Text>
-            <Text style={styles.infoItem}>✓ Quick Response & Flexible Scheduling</Text>
+            <Text style={[styles.infoItem, { color: colors.textSecondary }]}>✓ Professional & Experienced Team</Text>
+            <Text style={[styles.infoItem, { color: colors.textSecondary }]}>✓ Competitive & Transparent Pricing</Text>
+            <Text style={[styles.infoItem, { color: colors.textSecondary }]}>✓ Eco-Friendly Disposal Methods</Text>
+            <Text style={[styles.infoItem, { color: colors.textSecondary }]}>✓ Fully Insured & Licensed</Text>
+            <Text style={[styles.infoItem, { color: colors.textSecondary }]}>✓ Quick Response & Flexible Scheduling</Text>
           </View>
         </View>
       </ScrollView>
@@ -78,36 +86,39 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc' 
   },
   header: { 
-    paddingTop: 60, 
-    paddingHorizontal: 24, 
-    paddingBottom: 24, 
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingTop: Platform.select({ ios: hp(6.5), android: hp(5.5) }), // Reduced from 7.4/6.2
+    paddingHorizontal: spacing(20), // Reduced from 24
+    paddingBottom: spacing(20), // Reduced from 24
+    borderBottomLeftRadius: spacing(24),
+    borderBottomRightRadius: spacing(24),
   },
   headerTitle: { 
-    fontSize: 24, 
+    fontSize: fs(22), // Reduced from 24
     fontWeight: 'bold',
     color: 'white', 
     fontFamily: 'Inter-Bold', 
     textAlign: 'center', 
-    marginBottom: 4 
+    marginBottom: spacing(4) 
   },
   headerSubtitle: { 
-    fontSize: 15, 
+    fontSize: fs(14), // Reduced from 15
     color: '#a7f3d0', 
     fontFamily: 'Inter-Regular', 
     textAlign: 'center' 
   },
   content: { 
     flex: 1, 
-    padding: 16 
+    padding: spacing(14) // Reduced from 16
+  },
+  scrollContent: {
+    paddingBottom: Platform.OS === 'android' ? spacing(100) : spacing(80),
   },
   servicesList: { 
-    marginBottom: 24 
+    marginBottom: spacing(24) 
   },
   serviceCard: { 
-    borderRadius: 16,
-    marginBottom: 14,
+    borderRadius: spacing(16),
+    marginBottom: spacing(12), // Reduced from 14
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
@@ -118,15 +129,40 @@ const styles = StyleSheet.create({
   serviceCardTouchable: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 18,
+    padding: spacing(15), // Reduced from 18
+    minHeight: responsiveValue({
+      small: hp(7.5), // Reduced from 8
+      medium: hp(8), // Reduced from 8.8
+      large: hp(8.5), // Reduced from 9
+      tablet: hp(10),
+      default: hp(8), // Reduced from 8.8
+    }),
   },
   serviceIcon: { 
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: responsiveValue({
+      small: wp(10),   // Reduced from 11
+      medium: wp(11),  // Reduced from 12.8
+      large: wp(11),   // Reduced from 12.8
+      tablet: wp(9),
+      default: wp(11), // Reduced from 12.8
+    }),
+    height: responsiveValue({
+      small: wp(10),   // Reduced from 11
+      medium: wp(11),  // Reduced from 12.8
+      large: wp(11),   // Reduced from 12.8
+      tablet: wp(9),
+      default: wp(11), // Reduced from 12.8
+    }),
+    borderRadius: responsiveValue({
+      small: wp(5),    // Reduced from 5.5
+      medium: wp(5.5), // Reduced from 6.4
+      large: wp(5.5),  // Reduced from 6.4
+      tablet: wp(4.5),
+      default: wp(5.5), // Reduced from 6.4
+    }),
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: spacing(14), // Reduced from 16
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -135,43 +171,43 @@ const styles = StyleSheet.create({
   },
   serviceTextContainer: {
     flex: 1,
-    marginRight: 12
+    marginRight: spacing(10) // Reduced from 12
   },
   serviceTitle: { 
-    fontSize: 16, 
+    fontSize: fs(15), // Reduced from 16
     fontWeight: '600', 
     color: 'white', 
     fontFamily: 'Inter-SemiBold',
-    marginBottom: 3
+    marginBottom: spacing(3)
   },
   serviceDescription: { 
-    fontSize: 13, 
+    fontSize: fs(12), // Reduced from 13
     color: 'white', 
     fontFamily: 'Inter-Regular',
-    lineHeight: 18
+    lineHeight: fs(16) // Reduced from 18
   },
   infoCard: { 
     backgroundColor: '#ffffff', 
-    borderRadius: 16, 
-    padding: 20, 
-    marginBottom: 20,
+    borderRadius: spacing(16), 
+    padding: spacing(16), // Reduced from 20
+    marginBottom: spacing(16), // Reduced from 20
     borderWidth: 1,
     borderColor: '#e5e7eb'
   },
   infoTitle: { 
-    fontSize: 17, 
+    fontSize: fs(16), // Reduced from 17
     fontWeight: '600', 
     color: '#111827', 
     fontFamily: 'Inter-SemiBold', 
-    marginBottom: 16 
+    marginBottom: spacing(14) // Reduced from 16
   },
   infoList: { 
-    gap: 10 
+    gap: spacing(8) // Reduced from 10
   },
   infoItem: { 
-    fontSize: 14, 
+    fontSize: fs(13), // Reduced from 14
     color: '#374151', 
     fontFamily: 'Inter-Regular', 
-    lineHeight: 20 
+    lineHeight: fs(18) // Reduced from 20
   },
 });

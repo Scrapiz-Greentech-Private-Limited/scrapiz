@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import * as Location from 'expo-location';
-import { X, MapPin, Navigation, Search, Plus, Home, Building } from 'lucide-react-native';
+import { X, MapPin, Navigation, Search, Plus, Crosshair } from 'lucide-react-native';
 import {
   DEFAULT_MAP_STYLE,
   getIndiaBounds,
@@ -24,6 +24,7 @@ import {
   MAP_SETTINGS,
   DEFAULT_CENTER,
   KRUTRIM_API_KEY,
+  MAP_STYLES,
 } from '../config/mapConfig';
 
 MapboxGL.setAccessToken(MAPBOX_API_KEY);
@@ -89,6 +90,7 @@ export default function MapLocationPicker({
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [markerCoords, setMarkerCoords] = useState<[number, number]>(selectedCoords);
   const [showActionMenu, setShowActionMenu] = useState(false);
+  const [currentUserLocation, setCurrentUserLocation] = useState<[number, number] | null>(null);
 
   const cameraRef = useRef<MapboxGL.Camera>(null);
   const mapRef = useRef<MapboxGL.MapView>(null);
@@ -97,6 +99,8 @@ export default function MapLocationPicker({
   useEffect(() => {
     if (visible) {
       const timer = setTimeout(() => setIsMapReady(true), 300);
+      // Get user's current location for search bias
+      getCurrentUserLocation();
       return () => clearTimeout(timer);
     } else {
       setIsMapReady(false);
@@ -105,6 +109,20 @@ export default function MapLocationPicker({
       setShowActionMenu(false);
     }
   }, [visible]);
+
+  const getCurrentUserLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        const position = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        setCurrentUserLocation([position.coords.longitude, position.coords.latitude]);
+      }
+    } catch (error) {
+      console.log('Could not get user location for search bias:', error);
+    }
+  };
 
   useEffect(() => {
     if (searchQuery.trim().length < MAP_SETTINGS.searchMinCharacters) {
@@ -127,11 +145,15 @@ export default function MapLocationPicker({
     if (!query.trim()) return;
     setIsSearching(true);
     try {
+      // Use current user location or marker location for proximity bias
+      const proximityCoords = currentUserLocation || markerCoords;
+      
       const url = buildGeocodingUrl(query, {
-        proximity: selectedCoords,
+        proximity: proximityCoords,
         limit: 5,
         bbox: getIndiaBounds(),
       });
+      
       const response = await fetch(url);
       const data = await response.json();
 
@@ -228,6 +250,7 @@ export default function MapLocationPicker({
 
       setSelectedCoords(coords);
       setMarkerCoords(coords);
+      setCurrentUserLocation(coords);
 
       cameraRef.current?.flyTo(coords, MAP_SETTINGS.animationDuration);
       await reverseGeocode(coords[1], coords[0]);
@@ -246,6 +269,10 @@ export default function MapLocationPicker({
       setSelectedCoords(coords);
       await reverseGeocode(coords[1], coords[0]);
     }
+  };
+
+  const handleRecenterToMarker = () => {
+    cameraRef.current?.flyTo(markerCoords, MAP_SETTINGS.animationDuration);
   };
 
   const handleConfirmLocation = async () => {
@@ -414,34 +441,57 @@ export default function MapLocationPicker({
             {/* Map */}
             <View style={styles.mapContainer}>
               {isMapReady ? (
-                <MapboxGL.MapView
-                  ref={mapRef}
-                  style={styles.map}
-                  styleURL={DEFAULT_MAP_STYLE}
-                  onPress={handleMapPress}
-                  logoEnabled={false}
-                  attributionEnabled={true}
-                  attributionPosition={{ bottom: 8, left: 8 }}
-                >
-                  <MapboxGL.Camera
-                    ref={cameraRef}
-                    centerCoordinate={selectedCoords}
-                    zoomLevel={MAP_SETTINGS.defaultZoom}
-                    animationMode="flyTo"
-                    animationDuration={MAP_SETTINGS.animationDuration}
-                  />
-                  <MapboxGL.PointAnnotation
-                    id="selected-location"
-                    coordinate={markerCoords}
+                <>
+                  <MapboxGL.MapView
+                    ref={mapRef}
+                    style={styles.map}
+                    styleURL={MAP_STYLES.streets}
+                    onPress={handleMapPress}
+                    logoEnabled={false}
+                    attributionEnabled={true}
+                    attributionPosition={{ bottom: 8, left: 8 }}
                   >
-                    <View style={styles.markerContainer}>
-                      <View style={styles.marker}>
-                        <MapPin size={24} color="#ffffff" fill="#16a34a" />
+                    <MapboxGL.Camera
+                      ref={cameraRef}
+                      centerCoordinate={selectedCoords}
+                      zoomLevel={MAP_SETTINGS.defaultZoom}
+                      animationMode="flyTo"
+                      animationDuration={MAP_SETTINGS.animationDuration}
+                    />
+                    <MapboxGL.PointAnnotation
+                      id="selected-location"
+                      coordinate={markerCoords}
+                    >
+                      <View style={styles.markerContainer}>
+                        <View style={styles.marker}>
+                          <MapPin size={24} color="#ffffff" fill="#16a34a" />
+                        </View>
+                        <View style={styles.markerShadow} />
                       </View>
-                      <View style={styles.markerShadow} />
-                    </View>
-                  </MapboxGL.PointAnnotation>
-                </MapboxGL.MapView>
+                    </MapboxGL.PointAnnotation>
+                  </MapboxGL.MapView>
+                  
+                  {/* Recenter Button - Red Navigation Button */}
+                  <TouchableOpacity
+                    style={styles.recenterButton}
+                    onPress={handleUseCurrentLocation}
+                    disabled={isLoadingLocation}
+                  >
+                    {isLoadingLocation ? (
+                      <ActivityIndicator size="small" color="#ffffff" />
+                    ) : (
+                      <Navigation size={22} color="#ffffff" fill="#ef4444" />
+                    )}
+                  </TouchableOpacity>
+
+                  {/* Crosshair Button - Navigate to marker */}
+                  <TouchableOpacity
+                    style={styles.crosshairButton}
+                    onPress={handleRecenterToMarker}
+                  >
+                    <Crosshair size={22} color="#111827" />
+                  </TouchableOpacity>
+                </>
               ) : (
                 <View style={styles.mapLoadingContainer}>
                   <ActivityIndicator size="large" color="#16a34a" />
@@ -653,6 +703,7 @@ const styles = StyleSheet.create({
   },
   mapContainer: {
     flex: 1,
+    position: 'relative',
   },
   mapLoadingContainer: {
     flex: 1,
@@ -696,6 +747,40 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: '#000',
     opacity: 0.2,
+  },
+  recenterButton: {
+    position: 'absolute',
+    bottom: 100,
+    right: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#ef4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  crosshairButton: {
+    position: 'absolute',
+    bottom: 30,
+    right: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
   footer: {
     padding: 16,
