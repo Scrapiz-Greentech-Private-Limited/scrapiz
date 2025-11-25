@@ -1,7 +1,3 @@
-"""
-Notifications app models
-Uses proxy models to show user-related models under Notifications section
-"""
 from user.models import PushToken as UserPushToken
 
 

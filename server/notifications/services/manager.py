@@ -5,6 +5,7 @@ from .email import EmailNotificationService
 from .whatsapp import WhatsappNotification
 from .dashboard import DashboardNotification
 from ..config import NotificationConfig
+
 from inventory.models import OrderNo
 
 logger = logging.getLogger(__name__)
@@ -37,20 +38,20 @@ class NotificationManager:
         
         if 'dashboard' in self.channels:
             try:
+                from ..tasks import send_user_confirmation_email_task
                 self.dashboard = DashboardNotification()
                 logger.info("Dashboard service initialized")
             except Exception as e:
                 logger.error(f"Failed to initialize dashboard service: {str(e)}")
-        
         if 'push' in self.channels:
-            try:
-                from .push import PushNotificationService
-                self.push = PushNotificationService()
-                logger.info("Push notification service initialized")
-            except Exception as e:
-                logger.error(f"Failed to initialize push service: {str(e)}", exc_info=True)
-                # Set to None so we know it failed
-                self.push = None
+          try:
+            from .push import PushNotificationService
+            self.push = PushNotificationService()
+            logger.info("Push notification service initialized")
+          except Exception as e:
+            logger.error(f"Failed to initialize push service: {str(e)}", exc_info=True)
+            self.push = None
+          
     
     def send_order_notifications(self, order_id: int) -> Dict[str, bool]:
         """Send notifications for a new order across all enabled channels"""
@@ -80,7 +81,6 @@ class NotificationManager:
             if 'dashboard' in self.channels and self.dashboard:
                 results['dashboard'] = self.dashboard_notification(order_no)
             try:
-              from ..tasks import send_user_confirmation_email_task
               delay_seconds = self.config.get_user_email_delay()
               send_user_confirmation_email_task.apply_async(
                 args=[order_id],
@@ -199,129 +199,85 @@ class NotificationManager:
         except Exception as e:
             logger.error(f"Error retrying notification {notification_id}: {str(e)}", exc_info=True)
             return False
-    
     def send_admin_push_notification(
-        self,
-        title: str,
-        message: str,
-        category: str,
-        deep_link_data: Optional[Dict] = None,
-        image_url: Optional[str] = None,
-        admin_user_id: Optional[int] = None
+      self,
+      title:str,
+      message:str,
+      category:str,
+      deep_link_data: Optional[Dict] = None,
+      image_url: Optional[str] = None,
+      admin_user_id: Optional[int] = None    
     ) -> Dict[str, any]:
-        """
-        Send push notification from admin dashboard
-        
-        Args:
-            title: Notification title
-            message: Notification body
-            category: Notification category (order_updates, promotions, announcements, general)
-            deep_link_data: Optional deep link data for navigation
-            image_url: Optional image URL for rich notifications
-            admin_user_id: ID of admin who triggered the notification
-        
-        Returns:
-            Dict with success status and delivery statistics
-        """
-        if 'push' not in self.channels:
-            logger.error("Push notification channel not enabled in NOTIFICATION_CHANNELS")
-            return {'success': False, 'error': 'Push channel not in NOTIFICATION_CHANNELS'}
-        
-        if not self.push:
-            logger.error("Push notification service not initialized")
-            return {'success': False, 'error': 'Push service failed to initialize'}
-        
-        try:
-            logger.info(f"Sending admin push notification: title='{title}', category='{category}'")
-            
-            result = self.push.send_push_notification(
-                title=title,
-                message=message,
-                category=category,
-                deep_link_data=deep_link_data,
-                image_url=image_url
-            )
-            
-            # Create notification record in Supabase
-            if self.dashboard:
-                self._create_push_notification_record(
-                    title=title,
-                    message=message,
-                    category=category,
-                    result=result,
-                    deep_link_data=deep_link_data,
-                    image_url=image_url,
-                    admin_user_id=admin_user_id
-                )
-            
-            return result
-        except Exception as e:
-            logger.error(f"Error sending admin push notification: {str(e)}", exc_info=True)
-            return {'success': False, 'error': str(e)}
-    
+      if 'push' not in self.channels :
+        logger.error("Push notification channel not enabled in NOTIFICATION_CHANNELS")
+        return {'success': False, 'error': 'Push channel not in NOTIFICATION_CHANNELS'}
+      if not self.push:
+        logger.error("Push notification service not initialized")
+        return {'success': False, 'error': 'Push service failed to initialize'}
+      try:
+        logger.info(f"Sending admin push notification: title='{title}', category='{category}'")
+        result = self.push.send_push_notification(
+          title=title,
+          message=message,
+          category=category,
+          deep_link_data=deep_link_data,
+          image_url=image_url
+        )
+        if self.dashboard:
+          self._create_push_notification_record(
+            title=title,
+            message=message,
+            category=category,
+            result=result,
+            deep_link_data=deep_link_data,
+            image_url=image_url,
+            admin_user_id=admin_user_id
+          )
+        return result
+      except Exception as e:
+        logger.error(f"Error sending admin push notification: {str(e)}", exc_info=True)
+        return {'success': False, 'error': str(e)}
     def _create_push_notification_record(
-        self,
-        title: str,
-        message: str,
-        category: str,
-        result: Dict,
-        deep_link_data: Optional[Dict] = None,
-        image_url: Optional[str] = None,
-        admin_user_id: Optional[int] = None
+      self,
+      title:str,
+      message:str,
+      category:str,
+      result:Dict,
+      deep_link_data: Optional[Dict] = None,
+      image_url: Optional[str] = None,
+      admin_user_id: Optional[int] = None
     ) -> None:
-        """
-        Create notification record in Supabase for tracking
-        
-        Args:
-            title: Notification title
-            message: Notification body
-            category: Notification category
-            result: Result dict from push notification service
-            deep_link_data: Optional deep link data
-            image_url: Optional image URL
-            admin_user_id: ID of admin who triggered the notification
-        """
-        try:
-            # Determine status based on result
-            status = 'SENT' if result.get('success') and result.get('sent_count', 0) > 0 else 'FAILED'
-            
-            # Build metadata
-            metadata = {
-                'title': title,
-                'message': message,
-                'category': category,
-                'sent_count': result.get('sent_count', 0),
-                'failed_count': result.get('failed_count', 0),
-                'invalid_token_count': result.get('invalid_token_count', 0),
-                'total_tokens': result.get('total_tokens', 0)
-            }
-            
-            if deep_link_data:
-                metadata['deep_link_data'] = deep_link_data
-            
-            if image_url:
-                metadata['image_url'] = image_url
-            
-            if admin_user_id:
-                metadata['admin_user_id'] = admin_user_id
-            
-            if not result.get('success'):
-                metadata['error'] = result.get('error', 'Unknown error')
-            
-            # Create notification record
-            data = {
-                'notification_type': 'PUSH',
-                'status': status,
-                'recipient': 'mobile_users',
-                'metadata': metadata
-            }
-            
-            notification_record = self.dashboard.client.create_notification(data)
-            
-            if notification_record:
-                logger.info(f"Push notification record created: {notification_record.get('id')}")
-            else:
-                logger.warning("Failed to create push notification record in Supabase")
-                
-        except Exception as e:
-            logger.error(f"Error creating push notification record: {str(e)}", exc_info=True)
+      try:
+        status = 'SENT' if result.get('success') and result.get('sent_count', 0) > 0 else 'FAILED'
+        metadata = {
+          'title': title,
+          'message': message,
+          'category': category,
+          'sent_count': result.get('sent_count', 0),
+          'failed_count': result.get('failed_count', 0),
+          'invalid_token_count': result.get('invalid_token_count', 0),
+          'total_tokens': result.get('total_tokens', 0)
+        }
+        if deep_link_data:
+          metadata['deep_link_data'] = deep_link_data
+        if image_url:
+          metadata['image_url'] = image_url
+        if admin_user_id:
+          metadata['admin_user_id'] = admin_user_id
+        if not result.get('success'):
+          metadata['error'] = result.get('error', 'Unknown error')
+        data = {
+          'notification_type': 'PUSH',
+          'status': status,
+          'recipient': 'mobile_users',
+          'metadata': metadata
+        }
+        notification_record = self.dashboard.client.create_notification(data)
+        if notification_record:
+          logger.info(f"Push notification record created: {notification_record.get('id')}")
+        else:
+          logger.warning("Failed to create push notification record in Supabase")
+      except Exception as e:
+        logger.error(f"Error creating push notification record: {str(e)}", exc_info=True)  
+          
+          

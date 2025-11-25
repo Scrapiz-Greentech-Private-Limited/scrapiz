@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  // Removed unused StyleSheet import
+  StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
@@ -24,12 +24,14 @@ import {
   Trash2,
   X,
   Navigation,
-} from 'lucide-react-native'; // Assuming lucide-react-native
-import clsx from 'clsx'; // For conditional class names
+} from 'lucide-react-native';
 
 // --- Contexts and Services ---
 import { useLocation, SavedLocation } from '../../context/LocationContext';
-import { AuthService } from '../../api/apiService'; // Assumed path
+import { AuthService } from '../../api/apiService';
+import MapLocationPicker from '../../components/MapLocationPicker';
+import { populateFormFromLocation, LocationResult } from '../../utils/addressHelpers';
+import { useTheme } from '../../context/ThemeContext';
 
 // --- Placeholder Types (add your actual types) ---
 type AddressSummary = {
@@ -87,11 +89,12 @@ const emptyFormData: AddressFormData = {
 
 export default function AddressesScreen() {
   const router = useRouter();
+  const { colors, isDark } = useTheme();
   const [addresses, setAddresses] = useState<AddressSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const { saveLocation, removeLocation, getCurrentLocation, currentLocation, isLoading: locationLoading } = useLocation();
+  const { saveLocation, removeLocation, getCurrentLocation, currentLocation, isLoading: locationLoading, reloadAddresses } = useLocation();
 
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -99,6 +102,7 @@ export default function AddressesScreen() {
   const [saving, setSaving] = useState(false);
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
   const [addressType, setAddressType] = useState<'home' | 'office' | 'other'>('other');
+  const [showMapPicker, setShowMapPicker] = useState(false);
 
   // --- Input Refs ---
   const phoneInputRef = useRef<TextInput>(null);
@@ -120,9 +124,19 @@ export default function AddressesScreen() {
       setError(null);
       const addressdata = await AuthService.getAddresses();
       setAddresses(addressdata);
-    } catch (error) {
-      setError('Failed to load addresses. Please try again.');
+    } catch (error: any) {
       console.error('Error fetching addresses:', error);
+      
+      // Provide user-friendly error message
+      let errorMessage = 'Failed to load addresses. Please try again.';
+      
+      if (error.message?.includes('Network request failed') || error.message?.includes('network')) {
+        errorMessage = 'Network error. Please check your internet connection.';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -146,8 +160,9 @@ export default function AddressesScreen() {
               await AuthService.deleteAddress(id);
               
               setAddresses((prev) => prev.filter((addr) => addr.id !== id));
-              // Also remove from context
-              removeLocation(id.toString());
+              
+              // Reload addresses in LocationContext to ensure synchronization
+              await reloadAddresses();
               
               Toast.show({
                 type: 'success',
@@ -338,6 +353,10 @@ export default function AddressesScreen() {
       if (editingId !== null) {
         const updated = await AuthService.updateAddress(editingId, payload);
         setAddresses(addresses.map((addr) => (addr.id === updated.id ? updated : addr)));
+        
+        // Reload addresses in LocationContext to sync changes
+        await reloadAddresses();
+        
         Toast.show({
           type: 'success',
           text1: 'Success',
@@ -347,20 +366,8 @@ export default function AddressesScreen() {
         const newAddress = await AuthService.createAddress(payload);
         setAddresses([newAddress, ...addresses]);
 
-        // Also save to Location Context for quick access
-        const savedLoc: SavedLocation = {
-          id: newAddress.id.toString(),
-          type: addressType,
-          label: newAddress.name,
-          latitude: 0, // Note: You'll need to geocode this address if you need lat/lng
-          longitude: 0,
-          address: `${newAddress.room_number}, ${newAddress.street}`,
-          city: newAddress.city,
-          state: newAddress.state,
-          pincode: newAddress.pincode.toString(),
-          area: newAddress.area,
-        };
-        saveLocation(savedLoc);
+        // Reload addresses in LocationContext to ensure synchronization
+        await reloadAddresses();
 
         Toast.show({
           type: 'success',
@@ -370,10 +377,26 @@ export default function AddressesScreen() {
       }
       handleClose();
     } catch (error: any) {
+      console.error('Address save error:', error);
+      
+      // Extract error message from response or use default
+      let errorMessage = 'Failed to save address. Please try again.';
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      // Check for network errors
+      if (error.message?.includes('Network request failed') || error.message?.includes('network')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      }
+      
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: error.message || 'Failed to save address',
+        text2: errorMessage,
       });
     } finally {
       setSaving(false);
@@ -381,44 +404,47 @@ export default function AddressesScreen() {
   };
 
   const handleUseCurrentLocation = async () => {
+    // Open map picker instead of directly getting location
+    setShowMapPicker(true);
+  };
+
+  const handleMapLocationSelect = (location: LocationResult) => {
     try {
-      await getCurrentLocation();
-      if (currentLocation) {
-        setFormData({
-          ...formData,
-          area: currentLocation.area || '',
-          city: currentLocation.city || '',
-          state: currentLocation.state || '',
-          pincode: currentLocation.pincode || '',
-          street: currentLocation.street || '',
-          room_number: formData.room_number || '', // Keep existing fields
-          name: formData.name || '',
-          phone_number: formData.phone_number || '',
-        });
-        Toast.show({
-          type: 'success',
-          text1: 'Success',
-          text2: 'Location details filled',
-        });
-      }
-    } catch (error) {
+      // Populate form fields with location data using helper function
+      const updatedFormData = populateFormFromLocation(formData, location);
+      setFormData(updatedFormData);
+      
+      // Close map picker - state cleanup will be handled by MapLocationPicker's useEffect
+      setShowMapPicker(false);
+      
+      Toast.show({
+        type: 'success',
+        text1: 'Location Selected',
+        text2: 'Address fields have been populated',
+      });
+    } catch (error: any) {
+      console.error('Error populating form from location:', error);
+      
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Failed to get current location',
+        text2: 'Failed to populate address fields. Please try again.',
       });
+      
+      // Close map picker even on error - state cleanup will be handled by MapLocationPicker's useEffect
+      setShowMapPicker(false);
     }
   };
 
   const getAddressIcon = (name: string) => {
     const lowerName = name.toLowerCase();
     if (lowerName.includes('home') || lowerName.includes('house')) {
-      return <Home size={20} color="#16a34a" />;
+      return <Home size={20} color={colors.primary} />;
     }
     if (lowerName.includes('office') || lowerName.includes('work')) {
-      return <Building size={20} color="#3b82f6" />;
+      return <Building size={20} color={colors.info} />;
     }
-    return <MapPin size={20} color="#6b7280" />;
+    return <MapPin size={20} color={colors.textSecondary} />;
   };
 
   const formatAddress = (addr: AddressSummary) => {
@@ -439,17 +465,17 @@ export default function AddressesScreen() {
   // --- LOADING STATE ---
   if (loading) {
     return (
-      <View className='flex-1 bg-slate-50'>
-        <View className='bg-white pt-[60px] px-5 pb-5 flex-row items-center justify-between shadow-lg shadow-black/10'>
-          <TouchableOpacity className='w-10 h-10 rounded-full bg-gray-100 justify-center items-center' onPress={() => router.back()}>
-            <ArrowLeft size={24} color="#111827" />
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { backgroundColor: colors.surface }]}>
+          <TouchableOpacity style={[styles.iconButton, { backgroundColor: colors.card }]} onPress={() => router.back()}>
+            <ArrowLeft size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text className='text-xl font-semibold text-gray-900 font-inter-semibold'>Addresses</Text>
-          <View className='w-10 h-10' />
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Addresses</Text>
+          <View style={styles.iconButton} />
         </View>
-        <View className='flex-1 justify-center items-center'>
-          <ActivityIndicator size="large" color="#16a34a" />
-          <Text className='mt-3 text-base text-gray-500 font-inter-regular'>Loading addresses...</Text>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading addresses...</Text>
         </View>
       </View>
     );
@@ -457,97 +483,97 @@ export default function AddressesScreen() {
 
   // --- MAIN RENDER ---
   return (
-    <View className='flex-1 bg-slate-50'>
-      <View className='bg-white pt-[60px] px-5 pb-5 flex-row items-center justify-between shadow-lg shadow-black/10'>
-        <TouchableOpacity className='w-10 h-10 rounded-full bg-gray-100 justify-center items-center' onPress={() => router.back()}>
-          <ArrowLeft size={24} color="#111827" />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.surface }]}>
+        <TouchableOpacity style={[styles.iconButton, { backgroundColor: colors.card }]} onPress={() => router.back()}>
+          <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text className='text-xl font-semibold text-gray-900 font-inter-semibold'>Addresses</Text>
-        <TouchableOpacity className='w-10 h-10 rounded-full bg-green-50 justify-center items-center' onPress={handleOpenAddModal}>
-          <Plus size={20} color="#16a34a" />
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Addresses</Text>
+        <TouchableOpacity style={[styles.iconButton, { backgroundColor: isDark ? '#064e3b' : '#f0fdf4' }]} onPress={handleOpenAddModal}>
+          <Plus size={20} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
-      <ScrollView className="flex-1 p-5" showsVerticalScrollIndicator={false}>
-        <TouchableOpacity className='bg-white rounded-2xl p-5 flex-row items-center mb-6 border-2 border-gray-200 border-dashed' onPress={handleOpenAddModal}>
-          <View className='w-12 h-12 rounded-full bg-green-50 justify-center items-center mr-4'>
-            <Plus size={24} color="#16a34a" />
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <TouchableOpacity style={[styles.addNewCard, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={handleOpenAddModal}>
+          <View style={[styles.addIconContainer, { backgroundColor: isDark ? '#064e3b' : '#f0fdf4' }]}>
+            <Plus size={24} color={colors.primary} />
           </View>
-          <View className='flex-1'>
-            <Text className='text-base font-semibold text-gray-900 font-inter-semibold mb-1'>Add New Address</Text>
-            <Text className="text-sm text-gray-500 font-inter-regular">Add a new pickup location</Text>
+          <View style={styles.flex1}>
+            <Text style={[styles.addNewTitle, { color: colors.text }]}>Add New Address</Text>
+            <Text style={[styles.addNewSubtitle, { color: colors.textSecondary }]}>Add a new pickup location</Text>
           </View>
         </TouchableOpacity>
 
         {error && (
-          <View className='bg-red-50 rounded-2xl p-5 flex-row items-center justify-between mb-4'>
-            <Text className='text-red-700 font-semibold flex-1'>{error}</Text>
-            <TouchableOpacity className='bg-red-100 p-2 rounded-lg ml-2' onPress={loadAddresses}>
-              <Text className='text-red-700 font-semibold text-sm'>Retry</Text>
+          <View style={[styles.errorCard, { backgroundColor: isDark ? '#7f1d1d' : '#fef2f2' }]}>
+            <Text style={[styles.errorText, { color: isDark ? '#fecaca' : '#b91c1c' }]}>{error}</Text>
+            <TouchableOpacity style={[styles.retryButton, { backgroundColor: isDark ? '#991b1b' : '#fee2e2' }]} onPress={loadAddresses}>
+              <Text style={[styles.retryText, { color: isDark ? '#fecaca' : '#b91c1c' }]}>Retry</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {addresses.length === 0 && !error ? (
-          <View className='items-center p-10 my-5'>
-            <MapPin size={48} color="#d1d5db" />
-            <Text className='text-lg font-semibold text-gray-700 mt-4 mb-2'>No addresses yet</Text>
-            <Text className='text-sm text-gray-500 text-center leading-5'>
+          <View style={styles.emptyState}>
+            <MapPin size={48} color={colors.border} />
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>No addresses yet</Text>
+            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
               Add your first pickup address to get started
             </Text>
           </View>
         ) : (
-          <View className='mb-6'>
+          <View style={styles.addressList}>
             {addresses.map((address) => (
-              <View key={address.id} className='bg-white rounded-2xl p-5 mb-4 shadow-md shadow-black/10'>
-                <View className='flex-row justify-between items-start mb-3'>
-                  <View className='flex-row items-center flex-1'>
+              <View key={address.id} style={[styles.addressCard, { backgroundColor: colors.surface }]}>
+                <View style={styles.addressHeader}>
+                  <View style={styles.addressTitleRow}>
                     {getAddressIcon(address.name)}
-                    <Text className='text-base font-semibold text-gray-900 ml-2'>{address.name}</Text>
+                    <Text style={[styles.addressName, { color: colors.text }]}>{address.name}</Text>
                     {isDefaultAddress(address.id) && (
-                      <View className='bg-green-100 rounded-xl px-2 py-1 ml-3'>
-                        <Text className='text-[10px] font-semibold text-green-600'>Default</Text>
+                      <View style={[styles.defaultBadge, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
+                        <Text style={[styles.defaultText, { color: colors.primary }]}>Default</Text>
                       </View>
                     )}
                   </View>
-                  <View className='flex-row gap-2'>
+                  <View style={styles.actionButtons}>
                     <TouchableOpacity
-                      className='w-8 h-8 rounded-full bg-gray-100 justify-center items-center'
+                      style={[styles.actionButton, { backgroundColor: colors.card }]}
                       onPress={() => handleOpenEditModal(address)}
                     >
-                      <Edit size={16} color="#6b7280" />
+                      <Edit size={16} color={colors.textSecondary} />
                     </TouchableOpacity>
                     <TouchableOpacity
-                      className='w-8 h-8 rounded-full bg-gray-100 justify-center items-center'
+                      style={[styles.actionButton, { backgroundColor: colors.card }]}
                       onPress={() => handleDeleteAddress(address.id)}
                       disabled={deletingId === address.id}
                     >
                       {deletingId === address.id ? (
-                        <ActivityIndicator size="small" color="#dc2626" />
+                        <ActivityIndicator size="small" color={colors.error} />
                       ) : (
-                        <Trash2 size={16} color="#dc2626" />
+                        <Trash2 size={16} color={colors.error} />
                       )}
                     </TouchableOpacity>
                   </View>
                 </View>
 
-                <Text className='text-sm text-gray-500 leading-5 mb-3'>{formatAddress(address)}</Text>
+                <Text style={[styles.addressText, { color: colors.textSecondary }]}>{formatAddress(address)}</Text>
 
                 {address.phone_number && (
-                  <Text className='text-sm text-gray-700 font-medium mb-3'>📞 {address.phone_number}</Text>
+                  <Text style={[styles.phoneText, { color: colors.text }]}>📞 {address.phone_number}</Text>
                 )}
 
                 {address.delivery_suggestion && (
-                  <Text className='text-sm text-blue-600 italic'>Note: {address.delivery_suggestion}</Text>
+                  <Text style={[styles.noteText, { color: colors.info }]}>Note: {address.delivery_suggestion}</Text>
                 )}
               </View>
             ))}
           </View>
         )}
 
-        <View className='bg-green-50 rounded-2xl p-5 border border-green-200'>
-          <Text className='text-base font-semibold text-green-600 mb-2'>About Addresses</Text>
-          <Text className='text-sm text-green-800 leading-5'>
+        <View style={[styles.infoCard, { backgroundColor: isDark ? '#064e3b' : '#f0fdf4', borderColor: isDark ? '#16a34a' : '#bbf7d0' }]}>
+          <Text style={[styles.infoTitle, { color: colors.primary }]}>About Addresses</Text>
+          <Text style={[styles.infoText, { color: isDark ? '#dcfce7' : '#166534' }]}>
             • You can save multiple pickup addresses for convenience{'\n'}
             • The first address in the list is your default address{'\n'}
             • Edit or delete addresses anytime{'\n'}
@@ -560,21 +586,21 @@ export default function AddressesScreen() {
       <Modal
         visible={open}
         animationType="slide"
-        transparent={false} // Full screen modal
+        transparent={false}
         onRequestClose={handleClose}
       >
         <KeyboardAvoidingView
-          className='flex-1 bg-white'
+          style={[styles.modalContainer, { backgroundColor: colors.background }]}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <View className='flex-row justify-between items-center px-5 py-4 border-b border-gray-100 pt-[55px]'>
-            <TouchableOpacity onPress={handleClose} className="p-2">
-              <X size={24} color="#111827" />
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+              <X size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text className='text-xl font-bold text-gray-900'>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
               {editingId ? 'Edit Address' : 'Add New Address'}
             </Text>
-            <View className="w-10" />
+            <View style={styles.closeButton} />
           </View>
 
           <ScrollView 
@@ -897,8 +923,235 @@ export default function AddressesScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Map Location Picker */}
+      <MapLocationPicker
+        visible={showMapPicker}
+        onClose={() => setShowMapPicker(false)}
+        onLocationSelect={handleMapLocationSelect}
+        mode="form-populate"
+        autoOpenGPS={true}
+        initialLocation={currentLocation ? {
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude
+        } : undefined}
+      />
+
       <Toast />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+  },
+  addNewCard: {
+    borderRadius: 16,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+  },
+  addIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  flex1: {
+    flex: 1,
+  },
+  addNewTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+    marginBottom: 4,
+  },
+  addNewSubtitle: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+  },
+  errorCard: {
+    borderRadius: 16,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  errorText: {
+    fontWeight: '600',
+    flex: 1,
+    fontSize: 14,
+  },
+  retryButton: {
+    padding: 8,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  retryText: {
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: 40,
+    marginVertical: 20,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  addressList: {
+    marginBottom: 24,
+  },
+  addressCard: {
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  addressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  addressTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  addressName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  defaultBadge: {
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginLeft: 12,
+  },
+  defaultText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addressText: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  phoneText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 12,
+  },
+  noteText: {
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+  infoCard: {
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+  },
+  infoTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  infoText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    paddingTop: 55,
+  },
+  closeButton: {
+    padding: 8,
+    width: 40,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+});
 

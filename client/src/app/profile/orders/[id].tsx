@@ -16,11 +16,13 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { AuthService, OrderSummary, ProductSummary, AddressSummary } from '../../../api/apiService';
 import { useLocalization } from '../../../context/LocalizationContext';
 import { RemoteImage } from '../../../components/RemoteImage';
+import { useTheme } from '../../../context/ThemeContext';
 
 export default function OrderDetails(){
     const router = useRouter();
     const {id} = useLocalSearchParams();
     const { t } = useLocalization();
+    const { colors, isDark } = useTheme();
     const [order, setOrder] = useState<OrderSummary | null>(null);
     const [products , setProducts] = useState<ProductSummary[]>([]);
     const [address, setAddress] = useState<AddressSummary | null>(null);
@@ -282,19 +284,19 @@ const handleCancelOrder = () => {
 
 if (loading) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { backgroundColor: colors.surface }]}>
           <TouchableOpacity
-            style={styles.backButton}
+            style={[styles.backButton, { backgroundColor: colors.card }]}
             onPress={() => router.back()}
           >
-            <ArrowLeft size={24} color="#111827" />
+            <ArrowLeft size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Loading...</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Loading...</Text>
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#16a34a" />
-          <Text style={styles.loadingText}>Loading order details...</Text>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading order details...</Text>
         </View>
       </View>
     );
@@ -302,19 +304,19 @@ if (loading) {
 
 if (error || !order) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { backgroundColor: colors.surface }]}>
           <TouchableOpacity
-            style={styles.backButton}
+            style={[styles.backButton, { backgroundColor: colors.card }]}
             onPress={() => router.back()}
           >
-            <ArrowLeft size={24} color="#111827" />
+            <ArrowLeft size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Order Not Found</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Order Not Found</Text>
         </View>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error || 'Order not found'}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadDetails}>
+          <Text style={[styles.errorText, { color: colors.textSecondary }]}>{error || 'Order not found'}</Text>
+          <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={loadDetails}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -324,32 +326,32 @@ if (error || !order) {
 
 
   return (
-<View style={styles.container}>
+<View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.surface }]}>
         <TouchableOpacity
-          style={styles.backButton}
+          style={[styles.backButton, { backgroundColor: colors.card }]}
           onPress={() => router.back()}
         >
-          <ArrowLeft size={24} color="#111827" />
+          <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Order Details</Text>
-          <Text style={styles.headerSubtitle}>#{order.order_number}</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Order Details</Text>
+          <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>#{order.order_number}</Text>
         </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Order Status */}
-        <View style={styles.statusCard}>
+        <View style={[styles.statusCard, { backgroundColor: colors.surface }]}>
           <View style={styles.statusHeader}>
             {getStatusIcon(order.status)}
-            <Text style={styles.statusTitle}>Order Status</Text>
+            <Text style={[styles.statusTitle, { color: colors.text }]}>Order Status</Text>
           </View>
           <View
             style={[
               styles.statusBadge,
-              { backgroundColor: getStatusColor(order.status) + '20' },
+              { backgroundColor: getStatusColor(order.status) + (isDark ? '40' : '20') },
             ]}
           >
             <Text
@@ -365,8 +367,8 @@ if (error || !order) {
 
         {/* Order Items */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Items ({order.orders.length})</Text>
-          <View style={styles.itemsCard}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Items ({order.orders.length})</Text>
+          <View style={[styles.itemsCard, { backgroundColor: colors.surface }]}>
             {order.orders.map((item, index) => {
               const product = products.find((p) => p.id === item.product.id);
               const rate = product ? (product.max_rate + product.min_rate) / 2 : 0;
@@ -382,45 +384,45 @@ if (error || !order) {
                       style={styles.itemIconImage}
                     />
                     <View style={styles.itemInfo}>
-                      <Text style={styles.itemName}>{item.product.name}</Text>
-                      <Text style={styles.itemRate}>
+                      <Text style={[styles.itemName, { color: colors.text }]}>{item.product.name}</Text>
+                      <Text style={[styles.itemRate, { color: colors.textSecondary }]}>
                         ₹{Math.round(rate)}/{item.product.unit}
                       </Text>
                     </View>
                   </View>
                   <View style={styles.itemRight}>
-                    <Text style={styles.itemQuantity}>
+                    <Text style={[styles.itemQuantity, { color: colors.textSecondary }]}>
                       {quantity}
                       {item.product.unit}
                     </Text>
-                    <Text style={styles.itemTotal}>₹{Math.round(itemTotal)}</Text>
+                    <Text style={[styles.itemTotal, { color: colors.primary }]}>₹{Math.round(itemTotal)}</Text>
                   </View>
                 </View>
               );
             })}
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Estimated Order Value</Text>
+            <View style={[styles.totalRow, { borderTopColor: colors.border }]}>
+              <Text style={[styles.totalLabel, { color: colors.text }]}>Estimated Order Value</Text>
               <View style={styles.totalAmount}>
-                <IndianRupee size={18} color="#6b7280" />
-                <Text style={styles.totalValue}>₹{totalAmount.toFixed(2)}</Text>
+                <IndianRupee size={18} color={colors.textSecondary} />
+                <Text style={[styles.totalValue, { color: colors.text }]}>₹{totalAmount.toFixed(2)}</Text>
               </View>
             </View>
             {referralBonus > 0 && (
               <View style={styles.bonusRow}>
-                <Text style={styles.bonusLabel}>Referral Bonus Applied</Text>
+                <Text style={[styles.bonusLabel, { color: colors.primary }]}>Referral Bonus Applied</Text>
                 <View style={styles.bonusAmount}>
-                  <Text style={styles.bonusPrefix}>+</Text>
-                  <IndianRupee size={16} color="#16a34a" />
-                  <Text style={styles.bonusValue}>₹{referralBonus.toFixed(2)}</Text>
+                  <Text style={[styles.bonusPrefix, { color: colors.primary }]}>+</Text>
+                  <IndianRupee size={16} color={colors.primary} />
+                  <Text style={[styles.bonusValue, { color: colors.primary }]}>₹{referralBonus.toFixed(2)}</Text>
                 </View>
               </View>
             )}
             {referralBonus > 0 && (
-              <View style={styles.finalTotalRow}>
-                <Text style={styles.finalTotalLabel}>Total Payout</Text>
+              <View style={[styles.finalTotalRow, { borderTopColor: colors.primary }]}>
+                <Text style={[styles.finalTotalLabel, { color: colors.text }]}>Total Payout</Text>
                 <View style={styles.finalTotalAmount}>
-                  <IndianRupee size={20} color="#16a34a" />
-                  <Text style={styles.finalTotalValue}>₹{totalPayoutAmount.toFixed(2)}</Text>
+                  <IndianRupee size={20} color={colors.primary} />
+                  <Text style={[styles.finalTotalValue, { color: colors.primary }]}>₹{totalPayoutAmount.toFixed(2)}</Text>
                 </View>
               </View>
             )}
@@ -429,22 +431,22 @@ if (error || !order) {
 
         {/* Pickup Details */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Pickup Details</Text>
-          <View style={styles.detailsCard}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Pickup Details</Text>
+          <View style={[styles.detailsCard, { backgroundColor: colors.surface }]}>
             <View style={styles.detailRow}>
-              <Calendar size={20} color="#6b7280" />
+              <Calendar size={20} color={colors.textSecondary} />
               <View style={styles.detailInfo}>
-                <Text style={styles.detailLabel}>Order Date</Text>
-                <Text style={styles.detailValue}>
+                <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Order Date</Text>
+                <Text style={[styles.detailValue, { color: colors.text }]}>
                   {formatDate(order.created_at)}
                 </Text>
               </View>
             </View>
             <View style={styles.detailRow}>
-              <Clock size={20} color="#6b7280" />
+              <Clock size={20} color={colors.textSecondary} />
               <View style={styles.detailInfo}>
-                <Text style={styles.detailLabel}>Status Updated</Text>
-                <Text style={styles.detailValue}>
+                <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Status Updated</Text>
+                <Text style={[styles.detailValue, { color: colors.text }]}>
                   {formatDate(order.created_at)}
                 </Text>
               </View>
@@ -455,26 +457,29 @@ if (error || !order) {
         {/* Address Details */}
         {address && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Pickup Address</Text>
-            <View style={styles.addressCard}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Pickup Address</Text>
+            <View style={[styles.addressCard, { backgroundColor: colors.surface }]}>
               <View style={styles.addressHeader}>
-                <MapPin size={20} color="#111827" />
-                <Text style={styles.addressTitle}>{address.name}</Text>
+                <MapPin size={20} color={colors.text} />
+                <Text style={[styles.addressTitle, { color: colors.text }]}>{address.name}</Text>
               </View>
-              <Text style={styles.addressText}>
+              <Text style={[styles.addressText, { color: colors.textSecondary }]}>
                 {address.room_number}, {address.street}, {address.area},{' '}
                 {address.city}, {address.state} - {address.pincode}
               </Text>
               {address.delivery_suggestion && (
-                <View style={styles.notesCard}>
-                  <Text style={styles.notesText}>
+                <View style={[styles.notesCard, { 
+                  backgroundColor: isDark ? 'rgba(251, 191, 36, 0.15)' : '#fef9f0',
+                  borderColor: isDark ? 'rgba(251, 191, 36, 0.4)' : '#fbbf24'
+                }]}>
+                  <Text style={[styles.notesText, { color: colors.text }]}>
                     Note: {address.delivery_suggestion}
                   </Text>
                 </View>
               )}
-              <View style={styles.addressContactRow}>
-                <Phone size={16} color="#6b7280" />
-                <Text style={styles.addressContact}>{address.phone_number}</Text>
+              <View style={[styles.addressContactRow, { borderTopColor: colors.border }]}>
+                <Phone size={16} color={colors.textSecondary} />
+                <Text style={[styles.addressContact, { color: colors.text }]}>{address.phone_number}</Text>
               </View>
             </View>
           </View>
@@ -482,13 +487,13 @@ if (error || !order) {
 
         {/* Order Timeline */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Order Timeline</Text>
-          <View style={styles.timelineCard}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Order Timeline</Text>
+          <View style={[styles.timelineCard, { backgroundColor: colors.surface }]}>
             <View style={styles.timelineItem}>
-              <View style={[styles.timelineDot, { backgroundColor: '#16a34a' }]} />
+              <View style={[styles.timelineDot, { backgroundColor: colors.primary }]} />
               <View style={styles.timelineContent}>
-                <Text style={styles.timelineTitle}>Order Placed</Text>
-                <Text style={styles.timelineDate}>
+                <Text style={[styles.timelineTitle, { color: colors.text }]}>Order Placed</Text>
+                <Text style={[styles.timelineDate, { color: colors.textSecondary }]}>
                   {formatDate(order.created_at)}
                 </Text>
               </View>
@@ -501,10 +506,10 @@ if (error || !order) {
                 ]}
               />
               <View style={styles.timelineContent}>
-                <Text style={styles.timelineTitle}>
+                <Text style={[styles.timelineTitle, { color: colors.text }]}>
                   {getStatusText(order.status)}
                 </Text>
-                <Text style={styles.timelineDate}>
+                <Text style={[styles.timelineDate, { color: colors.textSecondary }]}>
                   {formatDate(order.created_at)}
                 </Text>
               </View>
@@ -516,11 +521,14 @@ if (error || !order) {
         {canCancelOrder && (
           <View style={styles.actionsSection}>
             <TouchableOpacity
-              style={styles.cancelButton}
+              style={[styles.cancelButton, { 
+                backgroundColor: colors.surface,
+                borderColor: colors.error 
+              }]}
               onPress={handleCancelOrder}
             >
-              <X size={20} color="#dc2626" />
-              <Text style={styles.cancelButtonText}>Cancel Order</Text>
+              <X size={20} color={colors.error} />
+              <Text style={[styles.cancelButtonText, { color: colors.error }]}>Cancel Order</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -535,7 +543,6 @@ if (error || !order) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
   },
   loadingContainer: {
     flex: 1,
@@ -545,11 +552,9 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#6b7280',
     fontFamily: 'Inter-Regular',
   },
   header: {
-    backgroundColor: 'white',
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 20,
@@ -565,7 +570,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -576,13 +580,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#111827',
     fontFamily: 'Inter-SemiBold',
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: '#6b7280',
     fontFamily: 'Inter-Regular',
   },
   content: {
@@ -603,6 +605,19 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  statusCard: {
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
   statusHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -610,7 +625,6 @@ const styles = StyleSheet.create({
   statusTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
     fontFamily: 'Inter-SemiBold',
     marginLeft: 8,
   },
@@ -630,12 +644,10 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
     fontFamily: 'Inter-SemiBold',
     marginBottom: 12,
   },
   itemsCard: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     shadowColor: '#000',
@@ -667,13 +679,11 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#111827',
     fontFamily: 'Inter-Medium',
     marginBottom: 2,
   },
   itemRate: {
     fontSize: 14,
-    color: '#6b7280',
     fontFamily: 'Inter-Regular',
   },
   itemRight: {
@@ -681,14 +691,12 @@ const styles = StyleSheet.create({
   },
   itemQuantity: {
     fontSize: 14,
-    color: '#6b7280',
     fontFamily: 'Inter-Regular',
     marginBottom: 2,
   },
   itemTotal: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#16a34a',
     fontFamily: 'Inter-SemiBold',
   },
   totalRow: {
@@ -697,12 +705,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
   },
   totalLabel: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#374151',
     fontFamily: 'Inter-Medium',
   },
   totalAmount: {
@@ -712,7 +718,6 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#374151',
     fontFamily: 'Inter-SemiBold',
     marginLeft: 4,
   },
@@ -725,7 +730,6 @@ const styles = StyleSheet.create({
   bonusLabel: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#16a34a',
     fontFamily: 'Inter-Medium',
   },
   bonusAmount: {
@@ -735,14 +739,12 @@ const styles = StyleSheet.create({
   bonusPrefix: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#16a34a',
     fontFamily: 'Inter-SemiBold',
     marginRight: 2,
   },
   bonusValue: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#16a34a',
     fontFamily: 'Inter-SemiBold',
     marginLeft: 4,
   },
@@ -753,12 +755,10 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     marginTop: 12,
     borderTopWidth: 2,
-    borderTopColor: '#16a34a',
   },
   finalTotalLabel: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
     fontFamily: 'Inter-SemiBold',
   },
   finalTotalAmount: {
@@ -768,12 +768,10 @@ const styles = StyleSheet.create({
   finalTotalValue: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#16a34a',
     fontFamily: 'Inter-Bold',
     marginLeft: 4,
   },
   detailsCard: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     shadowColor: '#000',
@@ -793,18 +791,15 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 14,
-    color: '#6b7280',
     fontFamily: 'Inter-Regular',
     marginBottom: 2,
   },
   detailValue: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#111827',
     fontFamily: 'Inter-Medium',
   },
   addressCard: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     shadowColor: '#000',
@@ -821,13 +816,11 @@ const styles = StyleSheet.create({
   addressTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
     fontFamily: 'Inter-SemiBold',
     marginLeft: 8,
   },
   addressText: {
     fontSize: 14,
-    color: '#374151',
     fontFamily: 'Inter-Regular',
     lineHeight: 20,
     marginBottom: 12,
@@ -837,31 +830,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
   },
   addressContact: {
     fontSize: 14,
-    color: '#111827',
     fontFamily: 'Inter-Medium',
     marginLeft: 8,
   },
   notesCard: {
-    backgroundColor: '#fef9f0',
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#fbbf24',
   },
   notesText: {
     fontSize: 13,
-    color: '#374151',
     fontFamily: 'Inter-Regular',
     lineHeight: 18,
     fontStyle: 'italic',
   },
   timelineCard: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     shadowColor: '#000',
@@ -887,13 +874,11 @@ const styles = StyleSheet.create({
   timelineTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#111827',
     fontFamily: 'Inter-Medium',
     marginBottom: 2,
   },
   timelineDate: {
     fontSize: 14,
-    color: '#6b7280',
     fontFamily: 'Inter-Regular',
   },
   actionsSection: {
@@ -901,14 +886,12 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   cancelButton: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#dc2626',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -918,7 +901,6 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#dc2626',
     fontFamily: 'Inter-SemiBold',
     marginLeft: 8,
   },
@@ -930,13 +912,11 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 18,
-    color: '#6b7280',
     fontFamily: 'Inter-Regular',
     textAlign: 'center',
     marginBottom: 16,
   },
   retryButton: {
-    backgroundColor: '#16a34a',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,

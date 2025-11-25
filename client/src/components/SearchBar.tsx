@@ -504,6 +504,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(16),
     paddingTop: Platform.OS === 'ios' ? spacing(50) : spacing(16),
     paddingBottom: spacing(12),
+    marginTop:spacing(15),
     borderBottomWidth: 1,
     gap: spacing(12),
   },

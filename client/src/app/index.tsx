@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthService } from '../api/apiService';
 import { useLocation } from '../context/LocationContext';
 import { useLocalization } from '../context/LocalizationContext';
+import { useTheme } from '../context/ThemeContext';
 import SplashScreen from '../components/SplashScreen';
 
 
@@ -13,6 +14,7 @@ export default function IndexScreen(){
   const router = useRouter();
   const {currentLocation, locationSet, serviceAvailable, checkServiceAvailability} = useLocation();
   const {isLanguageSet, isLoading: isLanguageLoading} = useLocalization();
+  const { colors, isDark } = useTheme();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthCheckDone, setIsAuthCheckDone] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
@@ -113,8 +115,8 @@ export default function IndexScreen(){
 if(showSplash) return <SplashScreen onFinish={handleSplashFinish} />;
 
 return (
-    <View className='flex-1 bg-slate-50'>
-      <StatusBar style="auto" />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar style={isDark ? "light" : "dark"} />
     </View>
 )
 }

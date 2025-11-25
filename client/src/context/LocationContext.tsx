@@ -43,6 +43,7 @@ interface LocationContextType {
   requestLocationPermission: () => Promise<boolean>;
   validatePincode: (pincode: string) => boolean;
   setLocationFromPincode: (pincode: string) => Promise<boolean>;
+  reloadAddresses: () => Promise<void>;
 }
 
 
@@ -277,6 +278,53 @@ export function LocationProvider({ children }: { children: React.ReactNode }){
     );
   };
 
+  const reloadAddresses = async () => {
+    try {
+      // Import AuthService dynamically to avoid circular dependencies
+      const { AuthService } = await import('../api/apiService');
+      
+      // Fetch addresses from backend
+      const addresses = await AuthService.getAddresses();
+      
+      // Convert backend addresses to SavedLocation format
+      const savedLocs: SavedLocation[] = addresses.map((addr) => {
+        // Determine address type from name
+        const lowerName = addr.name.toLowerCase();
+        let type: 'home' | 'office' | 'other' = 'other';
+        if (lowerName.includes('home') || lowerName.includes('house')) {
+          type = 'home';
+        } else if (lowerName.includes('office') || lowerName.includes('work')) {
+          type = 'office';
+        }
+        
+        return {
+          id: addr.id.toString(),
+          type,
+          label: addr.name,
+          latitude: 0, // Backend doesn't store coordinates yet
+          longitude: 0,
+          address: `${addr.room_number}, ${addr.street}, ${addr.area}`,
+          city: addr.city,
+          state: addr.state,
+          pincode: addr.pincode.toString(),
+          area: addr.area,
+        };
+      });
+      
+      // Update state and storage
+      setSavedLocations(savedLocs);
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.SAVED_LOCATIONS,
+        JSON.stringify(savedLocs)
+      );
+      
+      console.log('✅ Reloaded addresses from backend:', savedLocs.length);
+    } catch (error) {
+      console.error('Failed to reload addresses:', error);
+      // Don't throw - just log the error
+    }
+  };
+
 
   return (
     <LocationContext.Provider
@@ -296,6 +344,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }){
         requestLocationPermission,
         validatePincode,
         setLocationFromPincode,
+        reloadAddresses,
       }}
     >
       {children}

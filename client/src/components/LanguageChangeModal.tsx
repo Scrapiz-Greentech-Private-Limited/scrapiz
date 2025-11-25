@@ -11,6 +11,7 @@ import {
 import { X } from 'lucide-react-native';
 import { Language, LanguageOption, SUPPORTED_LANGUAGES } from '../localization/languages';
 import { useLocalization } from '../context/LocalizationContext';
+import { useTheme } from '../context/ThemeContext';
 
 /**
  * Props for the LanguageChangeModal component
@@ -34,6 +35,7 @@ export default function LanguageChangeModal({
   onLanguageChange,
 }: LanguageChangeModalProps) {
   const { t } = useLocalization();
+  const { colors, isDark } = useTheme();
   
   // State for selected language (initialized with current language)
   const [selectedLanguage, setSelectedLanguage] = useState<Language>(currentLanguage);
@@ -103,11 +105,11 @@ export default function LanguageChangeModal({
     >
       <View style={styles.container}>
         <View style={styles.overlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { borderBottomColor: colors.border }]}>
               <View style={styles.headerTextContainer}>
-                <Text style={styles.title}>{t('languageSelection.title')}</Text>
+                <Text style={[styles.title, { color: colors.text }]}>{t('languageSelection.title')}</Text>
               </View>
               <TouchableOpacity
                 onPress={handleCancel}
@@ -117,7 +119,7 @@ export default function LanguageChangeModal({
                 accessibilityRole="button"
                 accessibilityHint="Closes the modal without saving changes"
               >
-                <X size={24} color="#6b7280" />
+                <X size={24} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
@@ -135,7 +137,8 @@ export default function LanguageChangeModal({
                       key={language.code}
                       style={[
                         styles.languageOption,
-                        isSelected && styles.languageOptionSelected,
+                        { backgroundColor: colors.card, borderColor: colors.border },
+                        isSelected && { backgroundColor: isDark ? '#064e3b' : '#f0fdf4', borderColor: colors.primary },
                       ]}
                       onPress={() => handleLanguageSelect(language.code)}
                       activeOpacity={0.7}
@@ -148,15 +151,16 @@ export default function LanguageChangeModal({
                         <Text
                           style={[
                             styles.languageNativeName,
-                            isSelected && styles.languageNativeNameSelected,
+                            { color: colors.text },
+                            isSelected && { color: colors.primary, fontWeight: '600' },
                           ]}
                         >
                           {language.nativeName}
                         </Text>
                       </View>
-                      <View style={styles.radioButton}>
+                      <View style={[styles.radioButton, { borderColor: isSelected ? colors.primary : colors.border }]}>
                         {isSelected && (
-                          <View style={styles.radioButtonInner} />
+                          <View style={[styles.radioButtonInner, { backgroundColor: colors.primary }]} />
                         )}
                       </View>
                     </TouchableOpacity>
@@ -166,22 +170,23 @@ export default function LanguageChangeModal({
             </ScrollView>
 
             {/* Action Buttons */}
-            <View style={styles.footer}>
+            <View style={[styles.footer, { borderTopColor: colors.border }]}>
               <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
+                style={[styles.button, styles.cancelButton, { backgroundColor: colors.card, borderColor: colors.border }]}
                 onPress={handleCancel}
                 disabled={isLoading}
                 accessibilityLabel="Cancel"
                 accessibilityRole="button"
                 accessibilityHint="Closes the modal without changing language"
               >
-                <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
+                <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>{t('common.cancel')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[
                   styles.button,
                   styles.applyButton,
+                  { backgroundColor: colors.primary },
                   isLoading && styles.applyButtonDisabled,
                 ]}
                 onPress={handleApply}
@@ -212,7 +217,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '70%',
@@ -226,7 +230,6 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
   },
   headerTextContainer: {
     flex: 1,
@@ -235,7 +238,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#111827',
   },
   closeButton: {
     padding: 4,
@@ -253,16 +255,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 16,
     paddingHorizontal: 16,
-    backgroundColor: '#f9fafb',
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
     marginBottom: 12,
     minHeight: 64,
-  },
-  languageOptionSelected: {
-    backgroundColor: '#f0fdf4',
-    borderColor: '#16a34a',
   },
   languageInfo: {
     flexDirection: 'row',
@@ -278,18 +274,12 @@ const styles = StyleSheet.create({
   languageNativeName: {
     fontSize: 18,
     fontWeight: '500',
-    color: '#374151',
-  },
-  languageNativeNameSelected: {
-    color: '#16a34a',
-    fontWeight: '600',
   },
   radioButton: {
     width: 22,
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: '#d1d5db',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 12,
@@ -298,7 +288,6 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#16a34a',
   },
   footer: {
     flexDirection: 'row',
@@ -306,7 +295,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
   },
   button: {
     flex: 1,
@@ -317,17 +305,13 @@ const styles = StyleSheet.create({
     minHeight: 52,
   },
   cancelButton: {
-    backgroundColor: '#f3f4f6',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
   },
   cancelButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#6b7280',
   },
   applyButton: {
-    backgroundColor: '#16a34a',
   },
   applyButtonDisabled: {
     opacity: 0.6,

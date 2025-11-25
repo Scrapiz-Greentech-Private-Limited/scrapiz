@@ -8,6 +8,7 @@ import {
   TextInput,
   Alert,
   Dimensions,
+  StatusBar,
   Image,
   Modal,
   KeyboardAvoidingView,
@@ -37,10 +38,11 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
-import { AuthService, ProductSummary, AddressSummary } from '../../api/apiService';
+import { AuthService, ProductSummary, AddressSummary, CategorySummary } from '../../api/apiService';
 import { useReferral } from '../../context/ReferralContext';
 import {useOrderCalculationStore} from '../../store/orderCalculationStore';
 import { RemoteImage } from '../../components/RemoteImage';
+import { useTheme } from '../../context/ThemeContext';
 const { width, height } = Dimensions.get('window');
 
 type SelectedItem = {
@@ -124,9 +126,10 @@ const getFallbackImageForProduct = (productName: string) => {
 
 export default function SellScreen() {
   const router = useRouter();
+  const { colors, isDark } = useTheme();
   
- 
   const [products, setProducts] = useState<ProductSummary[]>([]);
+  const [categories, setCategories] = useState<CategorySummary[]>([]);
   const [addresses, setAddresses] = useState<AddressSummary[]>([]);
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState('');
@@ -198,11 +201,13 @@ export default function SellScreen() {
   const loadData = async () => {
     setLoadingData(true);
     try {
-      const [prods, addrs] = await Promise.all([
+      const [prods, cats, addrs] = await Promise.all([
         AuthService.getProducts(),
+        AuthService.getCategories(),
         AuthService.getAddresses()
       ]);
       setProducts(prods);
+      setCategories(cats);
       setAddresses(addrs);
       
       if (addrs.length > 0) {
@@ -566,6 +571,12 @@ export default function SellScreen() {
     return acc;
   }, {} as Record<number, ProductSummary[]>);
 
+  // Helper to get category name by ID
+  const getCategoryName = (categoryId: number): string => {
+    const category = categories.find(cat => cat.id === categoryId);
+    return category?.name || 'Items';
+  };
+
   const renderStepIndicator = () => (
     <View style={styles.stepIndicator}>
       {[1, 2, 3, 4].map((step) => (
@@ -576,7 +587,7 @@ export default function SellScreen() {
           ]}>
             {currentStep >= step ? (
               <LinearGradient
-                colors={['#16a34a', '#15803d']}
+                colors={isDark ? ['#22c55e', '#16a34a'] : ['#16a34a', '#15803d']}
                 style={styles.stepGradient}
               >
                 <Text style={styles.stepNumberActive}>
@@ -584,7 +595,7 @@ export default function SellScreen() {
                 </Text>
               </LinearGradient>
             ) : (
-              <Text style={styles.stepNumber}>
+              <Text style={[styles.stepNumber, { color: colors.textSecondary }]}>
                 {step}
               </Text>
             )}
@@ -602,13 +613,13 @@ export default function SellScreen() {
 
   const renderStep1 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Select Items to Sell</Text>
-      <Text style={styles.stepSubtitle}>Choose the scrap materials you want to sell</Text>
+      <Text style={[styles.stepTitle, { color: colors.text }]}>Select Items to Sell</Text>
+      <Text style={[styles.stepSubtitle, { color: colors.textSecondary }]}>Choose the scrap materials you want to sell</Text>
       
       {loadingData ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#16a34a" />
-          <Text style={styles.loadingText}>Loading products...</Text>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading products...</Text>
         </View>
       ) : (
         <ScrollView 
@@ -620,11 +631,11 @@ export default function SellScreen() {
           {Object.entries(groupedProducts).map(([categoryId, categoryProducts]) => (
             <View key={categoryId} style={styles.categorySection}>
               <LinearGradient
-                colors={['#16a34a', '#15803d']}
+                colors={isDark ? ['#22c55e', '#16a34a'] : ['#16a34a', '#15803d']}
                 style={styles.categoryHeaderSell}
               >
                 <Text style={styles.categoryTitleSell}>
-                  {categoryProducts[0]?.name.split(' ')[0] || 'Items'}
+                  {getCategoryName(Number(categoryId))}
                 </Text>
               </LinearGradient>
               
@@ -635,7 +646,7 @@ export default function SellScreen() {
                   return (
                     <TouchableOpacity
                       key={product.id}
-                      style={styles.itemCard}
+                      style={[styles.itemCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
                       onPress={() => addItem(product)}
                     >
                       <View style={styles.itemLeft}>
@@ -648,16 +659,16 @@ export default function SellScreen() {
                           />
                         )}
                         <View style={styles.itemInfo}>
-                          <Text style={styles.itemName}>{product.name}</Text>
-                          <Text style={styles.itemRate}>
+                          <Text style={[styles.itemName, { color: colors.text }]}>{product.name}</Text>
+                          <Text style={[styles.itemRate, { color: colors.primary }]}>
                             ₹{product.min_rate}-{product.max_rate}/{product.unit}
                           </Text>
-                          <Text style={styles.itemDescription} numberOfLines={1}>
+                          <Text style={[styles.itemDescription, { color: colors.textSecondary }]} numberOfLines={1}>
                             {product.description}
                           </Text>
                         </View>
                       </View>
-                      <View style={styles.addButton}>
+                      <View style={[styles.addButton, { backgroundColor: colors.primary }]}>
                         <Plus size={16} color="white" />
                       </View>
                     </TouchableOpacity>
@@ -671,11 +682,11 @@ export default function SellScreen() {
 
       {selectedItems.length > 0 && (
         <View style={styles.selectedItems}>
-          <Text style={styles.selectedItemsTitle}>Selected Items ({selectedItems.length})</Text>
+          <Text style={[styles.selectedItemsTitle, { color: colors.text }]}>Selected Items ({selectedItems.length})</Text>
           {selectedItems.map((item) => {
             const fallbackImage = getFallbackImageForProduct(item.name);
             return (
-              <View key={item.id} style={styles.selectedItemCard}>
+              <View key={item.id} style={[styles.selectedItemCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <View style={styles.selectedItemLeft}>
                   {item.image && (
                     <RemoteImage 
@@ -686,8 +697,8 @@ export default function SellScreen() {
                     />
                   )}
                   <View>
-                    <Text style={styles.selectedItemName}>{item.name}</Text>
-                    <Text style={styles.selectedItemRate}>
+                    <Text style={[styles.selectedItemName, { color: colors.text }]}>{item.name}</Text>
+                    <Text style={[styles.selectedItemRate, { color: colors.primary }]}>
                       ₹{Math.round(item.rate)}/{item.unit}
                     </Text>
                   </View>
@@ -727,11 +738,11 @@ export default function SellScreen() {
 
   const renderStep2 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Schedule Pickup</Text>
-      <Text style={styles.stepSubtitle}>Choose your preferred date and time</Text>
+      <Text style={[styles.stepTitle, { color: colors.text }]}>Schedule Pickup</Text>
+      <Text style={[styles.stepSubtitle, { color: colors.textSecondary }]}>Choose your preferred date and time</Text>
       
       <View style={styles.dateSection}>
-        <Text style={styles.sectionLabel}>Select Date</Text>
+        <Text style={[styles.sectionLabel, { color: colors.text }]}>Select Date</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.datesScroll}>
           {Array.from({ length: 7 }, (_, i) => {
             const date = new Date();
@@ -746,13 +757,15 @@ export default function SellScreen() {
                 key={i}
                 style={[
                   styles.dateCard,
-                  selectedDate === dateStr && styles.dateCardSelected
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                  selectedDate === dateStr && { backgroundColor: isDark ? '#064e3b' : '#f0fdf4', borderColor: colors.primary }
                 ]}
                 onPress={() => setSelectedDate(dateStr)}
               >
                 <Text style={[
                   styles.dateText,
-                  selectedDate === dateStr && styles.dateTextSelected
+                  { color: colors.textSecondary },
+                  selectedDate === dateStr && { color: colors.primary }
                 ]}>
                   {dateStr}
                 </Text>
@@ -763,19 +776,21 @@ export default function SellScreen() {
       </View>
 
       <View style={styles.timeSection}>
-        <Text style={styles.sectionLabel}>Select Time Slot</Text>
+        <Text style={[styles.sectionLabel, { color: colors.text }]}>Select Time Slot</Text>
         {timeSlots.map((slot) => (
           <TouchableOpacity
             key={slot}
             style={[
               styles.timeSlot,
-              selectedTime === slot && styles.timeSlotSelected
+              { backgroundColor: colors.surface, borderColor: colors.border },
+              selectedTime === slot && { backgroundColor: isDark ? '#064e3b' : '#f0fdf4', borderColor: colors.primary }
             ]}
             onPress={() => setSelectedTime(slot)}
           >
             <Text style={[
               styles.timeSlotText,
-              selectedTime === slot && styles.timeSlotTextSelected
+              { color: colors.textSecondary },
+              selectedTime === slot && { color: colors.primary }
             ]}>
               {slot}
             </Text>
@@ -791,22 +806,23 @@ export default function SellScreen() {
 
   const renderStep3 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Contact & Address</Text>
-      <Text style={styles.stepSubtitle}>Provide your contact details and pickup address</Text>
+      <Text style={[styles.stepTitle, { color: colors.text }]}>Contact & Address</Text>
+      <Text style={[styles.stepSubtitle, { color: colors.textSecondary }]}>Provide your contact details and pickup address</Text>
       
       {/* Contact Information */}
-      <View style={styles.contactCard}>
+      <View style={[styles.contactCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View style={styles.contactHeader}>
-          <User size={20} color="#111827" />
-          <Text style={styles.contactHeaderTitle}>Contact Information</Text>
+          <User size={20} color={colors.text} />
+          <Text style={[styles.contactHeaderTitle, { color: colors.text }]}>Contact Information</Text>
         </View>
         
         <View style={styles.contactForm}>
           <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Full Name <Text style={styles.required}>*</Text></Text>
+            <Text style={[styles.formLabel, { color: colors.text }]}>Full Name <Text style={styles.required}>*</Text></Text>
             <TextInput
-              style={[styles.formInput, errors.name && styles.formInputError]}
+              style={[styles.formInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }, errors.name && styles.formInputError]}
               placeholder="Enter your full name"
+              placeholderTextColor={colors.textSecondary}
               value={contactForm.name}
               onChangeText={(text) => {
                 setContactForm(prev => ({ ...prev, name: text }));
@@ -817,12 +833,13 @@ export default function SellScreen() {
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Mobile Number <Text style={styles.required}>*</Text></Text>
-            <View style={styles.mobileInputContainer}>
-              <Phone size={16} color="#6b7280" style={styles.mobileIcon} />
+            <Text style={[styles.formLabel, { color: colors.text }]}>Mobile Number <Text style={styles.required}>*</Text></Text>
+            <View style={[styles.mobileInputContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Phone size={16} color={colors.textSecondary} style={styles.mobileIcon} />
               <TextInput
-                style={[styles.mobileInput, errors.mobile && styles.formInputError]}
+                style={[styles.mobileInput, { color: colors.text }, errors.mobile && styles.formInputError]}
                 placeholder="+91 98765 43210"
+                placeholderTextColor={colors.textSecondary}
                 value={contactForm.mobile}
                 onChangeText={(text) => {
                   setContactForm(prev => ({ ...prev, mobile: text }));
@@ -837,15 +854,25 @@ export default function SellScreen() {
         </View>
       </View>
       
-      <View style={styles.addressCard}>
+      <View style={[styles.addressCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View style={styles.addressHeader}>
-          <MapPin size={20} color="#111827" />
-          <Text style={styles.addressHeaderTitle}>Select or Add Address</Text>
+          <MapPin size={20} color={colors.text} />
+          <Text style={[styles.addressHeaderTitle, { color: colors.text }]}>Select or Add Address</Text>
         </View>
 
-        <View style={styles.addressTabs}>
+        <View style={[styles.addressTabs, { backgroundColor: isDark ? '#1f2937' : '#f3f4f6' }]}>
           <TouchableOpacity
-            style={[styles.addressTab, useNewAddress && styles.addressTabActive]}
+            style={[
+              styles.addressTab, 
+              useNewAddress && { 
+                backgroundColor: isDark ? '#374151' : 'white',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.1,
+                shadowRadius: 2,
+                elevation: 1,
+              }
+            ]}
             onPress={() => {
               setUseNewAddress(true);
               if (errors.savedAddress) {
@@ -853,12 +880,26 @@ export default function SellScreen() {
               }
             }}
           >
-            <Text style={[styles.addressTabText, useNewAddress && styles.addressTabTextActive]}>
+            <Text style={[
+              styles.addressTabText, 
+              { color: isDark ? '#9ca3af' : '#6b7280' }, 
+              useNewAddress && { color: isDark ? '#f9fafb' : '#111827', fontWeight: '600' }
+            ]}>
               Add New Address
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.addressTab, !useNewAddress && styles.addressTabActive]}
+            style={[
+              styles.addressTab, 
+              !useNewAddress && { 
+                backgroundColor: isDark ? '#374151' : 'white',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.1,
+                shadowRadius: 2,
+                elevation: 1,
+              }
+            ]}
             onPress={() => {
               setUseNewAddress(false);
               const addressErrors = ['title', 'addressLine', 'city', 'pinCode'];
@@ -869,7 +910,11 @@ export default function SellScreen() {
               }
             }}
           >
-            <Text style={[styles.addressTabText, !useNewAddress && styles.addressTabTextActive]}>
+            <Text style={[
+              styles.addressTabText, 
+              { color: isDark ? '#9ca3af' : '#6b7280' }, 
+              !useNewAddress && { color: isDark ? '#f9fafb' : '#111827', fontWeight: '600' }
+            ]}>
               Use Saved Address
             </Text>
           </TouchableOpacity>
@@ -878,10 +923,11 @@ export default function SellScreen() {
         {useNewAddress ? (
           <View style={styles.addressForm}>
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Address Title <Text style={styles.required}>*</Text></Text>
+              <Text style={[styles.formLabel, { color: colors.text }]}>Address Title <Text style={styles.required}>*</Text></Text>
               <TextInput
-                style={[styles.formInput, errors.title && styles.formInputError]}
+                style={[styles.formInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }, errors.title && styles.formInputError]}
                 placeholder="e.g., Home, Office"
+                placeholderTextColor={colors.textSecondary}
                 value={addressForm.title}
                 onChangeText={(text) => {
                   setAddressForm(prev => ({ ...prev, title: text }));
@@ -892,10 +938,11 @@ export default function SellScreen() {
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Address Line <Text style={styles.required}>*</Text></Text>
+              <Text style={[styles.formLabel, { color: colors.text }]}>Address Line <Text style={styles.required}>*</Text></Text>
               <TextInput
-                style={[styles.formInput, errors.addressLine && styles.formInputError]}
+                style={[styles.formInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }, errors.addressLine && styles.formInputError]}
                 placeholder="House/Flat no, Street name"
+                placeholderTextColor={colors.textSecondary}
                 value={addressForm.addressLine}
                 onChangeText={(text) => {
                   setAddressForm(prev => ({ ...prev, addressLine: text }));
@@ -906,10 +953,11 @@ export default function SellScreen() {
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Area/Landmark</Text>
+              <Text style={[styles.formLabel, { color: colors.text }]}>Area/Landmark</Text>
               <TextInput
-                style={styles.formInput}
+                style={[styles.formInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
                 placeholder="Nearby landmark or area"
+                placeholderTextColor={colors.textSecondary}
                 value={addressForm.landmark}
                 onChangeText={(text) => setAddressForm(prev => ({ ...prev, landmark: text }))}
               />
@@ -917,10 +965,11 @@ export default function SellScreen() {
 
             <View style={styles.formRow}>
               <View style={[styles.formGroup, { flex: 1, marginRight: 12 }]}>
-                <Text style={styles.formLabel}>City <Text style={styles.required}>*</Text></Text>
+                <Text style={[styles.formLabel, { color: colors.text }]}>City <Text style={styles.required}>*</Text></Text>
                 <TextInput
-                  style={[styles.formInput, errors.city && styles.formInputError]}
+                  style={[styles.formInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }, errors.city && styles.formInputError]}
                   placeholder="City"
+                  placeholderTextColor={colors.textSecondary}
                   value={addressForm.city}
                   onChangeText={(text) => {
                     setAddressForm(prev => ({ ...prev, city: text }));
@@ -930,10 +979,11 @@ export default function SellScreen() {
                 {errors.city && <Text style={styles.errorText}>{errors.city}</Text>}
               </View>
               <View style={[styles.formGroup, { flex: 1, marginLeft: 12 }]}>
-                <Text style={styles.formLabel}>PIN Code <Text style={styles.required}>*</Text></Text>
+                <Text style={[styles.formLabel, { color: colors.text }]}>PIN Code <Text style={styles.required}>*</Text></Text>
                 <TextInput
-                  style={[styles.formInput, errors.pinCode && styles.formInputError]}
+                  style={[styles.formInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }, errors.pinCode && styles.formInputError]}
                   placeholder="123456"
+                  placeholderTextColor={colors.textSecondary}
                   keyboardType="numeric"
                   maxLength={6}
                   value={addressForm.pinCode}
@@ -990,16 +1040,16 @@ export default function SellScreen() {
       </View>
 
       {/* Photo Upload Section */}
-      <View style={styles.photoCard}>
+      <View style={[styles.photoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View style={styles.photoHeader}>
-          <Camera size={20} color="#111827" />
-          <Text style={styles.photoHeaderTitle}>Upload Photos (Optional)</Text>
+          <Camera size={20} color={colors.text} />
+          <Text style={[styles.photoHeaderTitle, { color: colors.text }]}>Upload Photos (Optional)</Text>
         </View>
 
-        <TouchableOpacity style={styles.photoButton} onPress={pickImage}>
-          <Camera size={24} color="#6b7280" />
-          <Text style={styles.photoButtonText}>Add Photos</Text>
-          <Text style={styles.photoButtonSubtext}>Help us identify your scrap better</Text>
+        <TouchableOpacity style={[styles.photoButton, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={pickImage}>
+          <Camera size={24} color={colors.textSecondary} />
+          <Text style={[styles.photoButtonText, { color: colors.text }]}>Add Photos</Text>
+          <Text style={[styles.photoButtonSubtext, { color: colors.textSecondary }]}>Help us identify your scrap better</Text>
         </TouchableOpacity>
 
         {selectedImages.length > 0 && (
@@ -1026,11 +1076,11 @@ export default function SellScreen() {
 
   const renderStep4 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Order Summary</Text>
-      <Text style={styles.stepSubtitle}>Review your pickup details</Text>
+      <Text style={[styles.stepTitle, { color: colors.text }]}>Order Summary</Text>
+      <Text style={[styles.stepSubtitle, { color: colors.textSecondary }]}>Review your pickup details</Text>
       
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>Items</Text>
+      <View style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.summaryTitle, { color: colors.text }]}>Items</Text>
         {selectedItems.map((item) => {
           const fallbackImage = getFallbackImageForProduct(item.name);
           return (
@@ -1044,20 +1094,20 @@ export default function SellScreen() {
                     showLoadingIndicator={false}
                   />
                 )}
-                <Text style={styles.summaryItemName} numberOfLines={2}>
+                <Text style={[styles.summaryItemName, { color: colors.text }]} numberOfLines={2}>
                   {item.name} ({item.quantity}{item.unit})
                 </Text>
               </View>
-              <Text style={styles.summaryItemAmount}>
+              <Text style={[styles.summaryItemAmount, { color: colors.primary }]}>
                 ₹{Math.round(item.rate * item.quantity)}
               </Text>
             </View>
           );
         })}
-        <View style={styles.summaryDivider} />
+        <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
         <View style={styles.summaryTotal}>
-          <Text style={styles.summaryTotalLabel}>Estimated Total</Text>
-          <Text style={styles.summaryTotalAmount}>₹{Math.round(getTotalAmount())}</Text>
+          <Text style={[styles.summaryTotalLabel, { color: colors.text }]}>Estimated Total</Text>
+          <Text style={[styles.summaryTotalAmount, { color: colors.primary }]}>₹{Math.round(getTotalAmount())}</Text>
         </View>
       </View>
       {walletBalance > 0 && (
@@ -1359,10 +1409,11 @@ export default function SellScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Sell Scrap</Text>
-        <Text style={styles.stepTitle}>{stepTitles[currentStep - 1]}</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+      <View style={[styles.header, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Sell Scrap</Text>
+        <Text style={[styles.stepTitle, { color: colors.textSecondary }]}>{stepTitles[currentStep - 1]}</Text>
         {renderStepIndicator()}
       </View>
 
@@ -1380,20 +1431,20 @@ export default function SellScreen() {
       </ScrollView>
 
       {selectedItems.length > 0 && (
-        <View style={styles.footer}>
+        <View style={[styles.footer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
           <View style={styles.navigationButtons}>
             {currentStep > 1 && (
-              <TouchableOpacity style={styles.previousButton} onPress={handlePrevious}>
-                <ArrowLeft size={20} color="#6b7280" />
-                <Text style={styles.previousButtonText}>Previous</Text>
+              <TouchableOpacity style={[styles.previousButton, { backgroundColor: colors.card }]} onPress={handlePrevious}>
+                <ArrowLeft size={20} color={colors.textSecondary} />
+                <Text style={[styles.previousButtonText, { color: colors.textSecondary }]}>Previous</Text>
               </TouchableOpacity>
             )}
             
             <View style={styles.totalSection}>
-              <Text style={styles.totalLabel}>Estimated Total</Text>
+              <Text style={[styles.totalLabel, { color: colors.textSecondary }]}>Estimated Total</Text>
               <View style={styles.totalAmount}>
-                <IndianRupee size={16} color="#16a34a" />
-                <Text style={styles.totalValue}>{Math.round(totalPayout)}</Text>
+                <IndianRupee size={16} color={colors.primary} />
+                <Text style={[styles.totalValue, { color: colors.primary }]}>{Math.round(totalPayout)}</Text>
               </View>
             </View>
             
@@ -1404,7 +1455,7 @@ export default function SellScreen() {
               disabled={submittingOrder}
             >
               <LinearGradient
-                colors={['#16a34a', '#15803d', '#166534']}
+                colors={isDark ? ['#22c55e', '#16a34a', '#15803d'] : ['#16a34a', '#15803d', '#166534']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={{ 
@@ -1501,7 +1552,7 @@ export default function SellScreen() {
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={['#16a34a', '#15803d']}
+                colors={isDark ? ['#22c55e', '#16a34a'] : ['#16a34a', '#15803d']}
                 style={styles.modalButtonGradient}
               >
                 <Text style={styles.modalButtonText}>Okay, I understand</Text>

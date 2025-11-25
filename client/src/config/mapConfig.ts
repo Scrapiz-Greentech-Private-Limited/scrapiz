@@ -11,12 +11,13 @@ export const MAP_STYLES = {
   outdoor: MapboxGL.StyleURL.Outdoors,
   light: MapboxGL.StyleURL.Light,
   dark: MapboxGL.StyleURL.Dark,
+  customURL: 'mapbox://styles/ayaanamjad/cmidipsmh002e01qx1erzb28k',
   // Custom navigation style for better map visibility
   navigation: 'mapbox://styles/mapbox/navigation-day-v1',
   navigationNight: 'mapbox://styles/mapbox/navigation-night-v1',
 };
 
-export const DEFAULT_MAP_STYLE = MAP_STYLES.dark;
+export const DEFAULT_MAP_STYLE = MAP_STYLES.hybrid;
 
 const KRUTRIM_API_URL = 'https://api.olamaps.io/places/v1';
 

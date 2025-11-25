@@ -54,7 +54,7 @@ class GoogleMeetService:
         We use a static meeting link instead.
         """
         try:
-            print(f"?? Building Google Calendar service...")
+            print(f"Building Google Calendar service...")
             service = build('calendar', 'v3', credentials=self.creds)
             
             # Parse start time
@@ -83,7 +83,7 @@ class GoogleMeetService:
                 # We removed conferenceData because it requires a Paid Workspace account
             }
             
-            print(f"?? Creating calendar event on calendar: {self.calendar_id}")
+            print(f"Creating calendar event on calendar: {self.calendar_id}")
             
             # Create the event
             event = service.events().insert(
@@ -106,7 +106,7 @@ class GoogleMeetService:
             }
             
         except Exception as e:
-            print(f"? Error creating Calendar Event: {str(e)}")
+            print(f"Error creating Calendar Event: {str(e)}")
             import traceback
             traceback.print_exc()
             raise Exception(f"Failed to create Calendar Event: {str(e)}")

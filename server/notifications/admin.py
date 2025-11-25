@@ -1,8 +1,4 @@
-"""
-Django admin configuration for notifications app
-Note: Notifications are stored in Supabase, not Django database
-This file is here for Django app structure completeness
-"""
+
 import logging
 from django.contrib import admin
 from django.shortcuts import render, redirect

@@ -154,7 +154,6 @@ def send_user_confirmation_email_task(self, order_no_id: int):
     logger.info(f"Retrying user confirmation email task (attempt {retry_count + 1}/3) in {countdown}s")
     raise self.retry(exc=e, countdown=countdown)
 
-
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def send_admin_push_notification_task(
     self,
@@ -165,20 +164,6 @@ def send_admin_push_notification_task(
     image_url: str = None,
     admin_user_id: int = None
 ):
-    """
-    Celery task to send push notification from admin
-    
-    Args:
-        title: Notification title
-        message: Notification body
-        category: Notification category (order_updates, promotions, announcements, general)
-        deep_link_data: Optional deep link data for navigation
-        image_url: Optional image URL for rich notifications
-        admin_user_id: ID of admin who triggered the notification
-    
-    Returns:
-        Dict with success status and delivery statistics
-    """
     try:
         logger.info(f"Starting admin push notification task: title='{title}', category='{category}'")
         

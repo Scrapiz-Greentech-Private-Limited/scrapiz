@@ -38,7 +38,7 @@ def send_booking_confirmation_email(booking):
         <body>
             <div class="container">
                 <div class="header">
-                    <h1>🎉 Booking Confirmed!</h1>
+                    <h1>Booking Confirmed!</h1>
                 </div>
                 <div class="content">
                     <p>Dear {booking.name},</p>
@@ -112,9 +112,9 @@ def send_booking_confirmation_email(booking):
         Thank you for choosing Scrapiz!
         """
         
-        print(f"📧 Sending email to: {booking.user.email}")
-        print(f"📧 From: {settings.EMAIL_HOST_USER}")
-        print(f"📧 Subject: {subject}")
+        print(f" Sending email to: {booking.user.email}")
+        print(f" From: {settings.EMAIL_HOST_USER}")
+        print(f"Subject: {subject}")
         
         # Send email
         result = send_mail(
@@ -126,11 +126,11 @@ def send_booking_confirmation_email(booking):
             fail_silently=False,
         )
         
-        print(f"📧 Email send result: {result}")
+        print(f"Email send result: {result}")
         return True
         
     except Exception as e:
-        print(f"❌ Failed to send booking confirmation email: {str(e)}")
+        print(f"Failed to send booking confirmation email: {str(e)}")
         import traceback
         traceback.print_exc()
         return False  

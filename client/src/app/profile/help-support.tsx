@@ -10,9 +10,11 @@ import {
 } from 'react-native';
 import { ArrowLeft,Shield, MessageCircle, Phone, Mail, CircleHelp as HelpCircle, FileText, ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function HelpSupport(){
     const router = useRouter();
+    const { colors, isDark } = useTheme();
       const handleContactSupport = async (method: string, value: string) => {
     try {
       let url = '';
@@ -109,68 +111,68 @@ export default function HelpSupport(){
   ];
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color="#111827" />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.surface }]}>
+        <TouchableOpacity style={[styles.backButton, { backgroundColor: colors.card }]} onPress={() => router.back()}>
+          <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Help & Support</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Help & Support</Text>
         <View style={styles.headerRight} />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Contact Support</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Contact Support</Text>
           {contactMethods.map((method, index) => (
-            <TouchableOpacity key={index} style={styles.contactCard} onPress={method.action}>
+            <TouchableOpacity key={index} style={[styles.contactCard, { backgroundColor: colors.surface }]} onPress={method.action}>
               <View style={styles.contactLeft}>
-                <View style={[styles.contactIcon, { backgroundColor: `${method.color}20` }]}>
+                <View style={[styles.contactIcon, { backgroundColor: isDark ? `${method.color}30` : `${method.color}20` }]}>
                   <method.icon size={24} color={method.color} />
                 </View>
                 <View style={styles.contactContent}>
-                  <Text style={styles.contactTitle}>{method.title}</Text>
-                  <Text style={styles.contactSubtitle}>{method.subtitle}</Text>
-                  <Text style={styles.contactDescription}>{method.description}</Text>
+                  <Text style={[styles.contactTitle, { color: colors.text }]}>{method.title}</Text>
+                  <Text style={[styles.contactSubtitle, { color: colors.primary }]}>{method.subtitle}</Text>
+                  <Text style={[styles.contactDescription, { color: colors.textSecondary }]}>{method.description}</Text>
                 </View>
               </View>
-              <ChevronRight size={16} color="#d1d5db" />
+              <ChevronRight size={16} color={colors.border} />
             </TouchableOpacity>
           ))}
         </View>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Privacy & Legal</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Privacy & Legal</Text>
           <TouchableOpacity 
-            style={styles.privacyCard} 
+            style={[styles.privacyCard, { backgroundColor: colors.surface }]} 
             onPress={() => handleContactSupport('url', 'https://www.scrapiz.in/privacy-policy')}
           >
             <View style={styles.privacyLeft}>
-              <View style={styles.privacyIcon}>
-                <Shield size={24} color="#16a34a" />
+              <View style={[styles.privacyIcon, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
+                <Shield size={24} color={colors.primary} />
               </View>
               <View style={styles.privacyContent}>
-                <Text style={styles.privacyTitle}>Privacy Policy</Text>
-                <Text style={styles.privacySubtitle}>Learn how we protect your data</Text>
+                <Text style={[styles.privacyTitle, { color: colors.text }]}>Privacy Policy</Text>
+                <Text style={[styles.privacySubtitle, { color: colors.textSecondary }]}>Learn how we protect your data</Text>
               </View>
             </View>
-            <ChevronRight size={16} color="#d1d5db" />
+            <ChevronRight size={16} color={colors.border} />
           </TouchableOpacity>
         </View>
 
           
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Frequently Asked Questions</Text>
           {faqItems.map((faq, index) => (
-            <View key={index} style={styles.faqCard}>
-              <Text style={styles.faqQuestion}>{faq.question}</Text>
-              <Text style={styles.faqAnswer}>{faq.answer}</Text>
+            <View key={index} style={[styles.faqCard, { backgroundColor: colors.surface }]}>
+              <Text style={[styles.faqQuestion, { color: colors.text }]}>{faq.question}</Text>
+              <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>{faq.answer}</Text>
             </View>
           ))}
         </View>
 
-        <View style={styles.emergencyCard}>
+        <View style={[styles.emergencyCard, { backgroundColor: colors.error }]}>
           <Text style={styles.emergencyTitle}>Need Immediate Help?</Text>
-          <Text style={styles.emergencyText}>
+          <Text style={[styles.emergencyText, { color: isDark ? '#fecaca' : '#fee2e2' }]}>
             For urgent issues or emergencies, please call our 24/7 helpline
           </Text>
           <TouchableOpacity 
@@ -189,10 +191,8 @@ export default function HelpSupport(){
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
   },
   header: {
-    backgroundColor: 'white',
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 20,
@@ -209,14 +209,12 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#111827',
     fontFamily: 'Inter-SemiBold',
   },
   headerRight: {
@@ -232,12 +230,10 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
     fontFamily: 'Inter-SemiBold',
     marginBottom: 16,
   },
   contactCard: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     flexDirection: 'row',
@@ -269,19 +265,16 @@ const styles = StyleSheet.create({
   contactTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
     fontFamily: 'Inter-SemiBold',
     marginBottom: 4,
   },
   contactSubtitle: {
     fontSize: 14,
-    color: '#16a34a',
     fontFamily: 'Inter-Medium',
     marginBottom: 2,
   },
   contactDescription: {
     fontSize: 12,
-    color: '#6b7280',
     fontFamily: 'Inter-Regular',
   },
   resourceCard: {
@@ -328,7 +321,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
   },
     privacyCard: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     flexDirection: 'row',
@@ -349,7 +341,6 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#dcfce7',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -360,17 +351,14 @@ const styles = StyleSheet.create({
   privacyTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
     fontFamily: 'Inter-SemiBold',
     marginBottom: 4,
   },
   privacySubtitle: {
     fontSize: 12,
-    color: '#6b7280',
     fontFamily: 'Inter-Regular',
   },
   faqCard: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -383,18 +371,15 @@ const styles = StyleSheet.create({
   faqQuestion: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#111827',
     fontFamily: 'Inter-SemiBold',
     marginBottom: 8,
   },
   faqAnswer: {
     fontSize: 14,
-    color: '#6b7280',
     fontFamily: 'Inter-Regular',
     lineHeight: 20,
   },
   emergencyCard: {
-    backgroundColor: '#dc2626',
     borderRadius: 16,
     padding: 24,
     alignItems: 'center',
@@ -410,7 +395,6 @@ const styles = StyleSheet.create({
   },
   emergencyText: {
     fontSize: 14,
-    color: '#fecaca',
     fontFamily: 'Inter-Regular',
     textAlign: 'center',
     marginBottom: 20,

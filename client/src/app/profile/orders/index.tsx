@@ -26,20 +26,23 @@ import { useRouter } from 'expo-router';
 import { useOrdersData } from '../../../hooks/useOrderData';
 import { useOrderDetails, useFilteredOrders, useOrderTabs } from '../../../hooks/userOrderDetails';
 import { OrderSummary } from '../../../api/apiService';
+import { useTheme } from '../../../context/ThemeContext';
 
 interface HeaderComponentProps {
   onBackPress: () => void;
   orderCount: number;
+  colors: any;
+  isDark: boolean;
 }
 
-const HeaderComponent: React.FC<HeaderComponentProps> = ({ onBackPress, orderCount }) => (
-  <View style={styles.header}>
-    <TouchableOpacity style={styles.backButton} onPress={onBackPress}>
-      <ArrowLeft size={24} color="#111827" />
+const HeaderComponent: React.FC<HeaderComponentProps> = ({ onBackPress, orderCount, colors, isDark }) => (
+  <View style={[styles.header, { backgroundColor: colors.surface }]}>
+    <TouchableOpacity style={[styles.backButton, { backgroundColor: colors.card }]} onPress={onBackPress}>
+      <ArrowLeft size={24} color={colors.text} />
     </TouchableOpacity>
     <View style={styles.headerContent}>
-      <Text style={styles.headerTitle}>My Orders</Text>
-      <Text style={styles.headerSubtitle}>{orderCount} orders</Text>
+      <Text style={[styles.headerTitle, { color: colors.text }]}>My Orders</Text>
+      <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>{orderCount} orders</Text>
     </View>
   </View>
 );
@@ -47,6 +50,7 @@ const HeaderComponent: React.FC<HeaderComponentProps> = ({ onBackPress, orderCou
 
 export default function OrdersScreen(){
   const router = useRouter();
+  const { colors, isDark } = useTheme();
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
   const { orders, products, loading, error, refetch } = useOrdersData();
   const ordersWithDetails = useOrderDetails(orders, products);
@@ -100,14 +104,16 @@ export default function OrdersScreen(){
   // Loading state
   if (loading && orders.length === 0) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <HeaderComponent 
           onBackPress={() => router.back()} 
           orderCount={0}
+          colors={colors}
+          isDark={isDark}
         />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#16a34a" />
-          <Text style={styles.loadingText}>Loading your orders...</Text>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading your orders...</Text>
         </View>
       </View>
     );
@@ -116,16 +122,18 @@ export default function OrdersScreen(){
   // Error state
   if (error && orders.length === 0) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <HeaderComponent 
           onBackPress={() => router.back()} 
           orderCount={0}
+          colors={colors}
+          isDark={isDark}
         />
         <View style={styles.errorContainer}>
-          <AlertCircle size={64} color="#dc2626" />
-          <Text style={styles.errorTitle}>Failed to Load Orders</Text>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={refetch}>
+          <AlertCircle size={64} color={colors.error} />
+          <Text style={[styles.errorTitle, { color: colors.text }]}>Failed to Load Orders</Text>
+          <Text style={[styles.errorText, { color: colors.textSecondary }]}>{error}</Text>
+          <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={refetch}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -133,37 +141,41 @@ export default function OrdersScreen(){
     );
   }
 return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <HeaderComponent 
         onBackPress={() => router.back()} 
         orderCount={orders.length}
+        colors={colors}
+        isDark={isDark}
       />
 
       {/* Filter Tabs */}
-      <View style={styles.filterContainer}>
+      <View style={[styles.filterContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
           {tabs.map((tab) => (
             <TouchableOpacity
               key={tab.id}
               style={[
                 styles.filterTab,
-                selectedFilter === tab.id && styles.filterTabActive
+                { backgroundColor: colors.card },
+                selectedFilter === tab.id && { backgroundColor: colors.primary }
               ]}
               onPress={() => setSelectedFilter(tab.id)}
             >
               <Text style={[
                 styles.filterTabText,
-                selectedFilter === tab.id && styles.filterTabTextActive
+                { color: colors.textSecondary },
+                selectedFilter === tab.id && { color: 'white' }
               ]}>
                 {tab.label}
               </Text>
               <View style={[
                 styles.filterCount,
-                selectedFilter === tab.id && styles.filterCountActive
+                { backgroundColor: selectedFilter === tab.id ? 'rgba(255, 255, 255, 0.2)' : colors.surface }
               ]}>
                 <Text style={[
                   styles.filterCountText,
-                  selectedFilter === tab.id && styles.filterCountTextActive
+                  { color: selectedFilter === tab.id ? 'white' : colors.primary }
                 ]}>
                   {tab.count}
                 </Text>
@@ -178,25 +190,25 @@ return (
         style={styles.content} 
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#16a34a']} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
         }
       >
         {filteredOrders.length > 0 ? (
           filteredOrders.map((order) => (
             <TouchableOpacity
               key={order.id}
-              style={styles.orderCard}
+              style={[styles.orderCard, { backgroundColor: colors.surface }]}
               onPress={() => handleOrderPress(order.id)}
               activeOpacity={0.7}
             >
               <View style={styles.orderHeader}>
                 <View style={styles.orderInfo}>
-                  <Text style={styles.orderNumber}>#{order.order_number}</Text>
-                  <Text style={styles.orderDate}>{order.formattedDate}</Text>
+                  <Text style={[styles.orderNumber, { color: colors.text }]}>#{order.order_number}</Text>
+                  <Text style={[styles.orderDate, { color: colors.textSecondary }]}>{order.formattedDate}</Text>
                 </View>
                 <View style={[
                   styles.statusBadge, 
-                  { backgroundColor: getStatusColor(order.statusName) + '20' }
+                  { backgroundColor: getStatusColor(order.statusName) + (isDark ? '40' : '20') }
                 ]}>
                   {getStatusIcon(order.statusName)}
                   <Text style={[
@@ -212,32 +224,32 @@ return (
               <View style={styles.orderItems}>
                 {order.orders.slice(0, 3).map((item, index) => (
                   <View key={item.id} style={styles.orderItem}>
-                    <Package size={20} color="#16a34a" style={styles.orderItemIcon} />
-                    <Text style={styles.orderItemName}>{item.product.name}</Text>
-                    <Text style={styles.orderItemQuantity}>
+                    <Package size={20} color={colors.primary} style={styles.orderItemIcon} />
+                    <Text style={[styles.orderItemName, { color: colors.text }]}>{item.product.name}</Text>
+                    <Text style={[styles.orderItemQuantity, { color: colors.textSecondary }]}>
                       {parseFloat(item.quantity).toFixed(2)}{item.product.unit}
                     </Text>
-                    <Text style={styles.orderItemRate}>
+                    <Text style={[styles.orderItemRate, { color: colors.primary }]}>
                       ₹{Math.round((item.product.max_rate + item.product.min_rate) / 2)}/{item.product.unit}
                     </Text>
                   </View>
                 ))}
                 {order.orders.length > 3 && (
-                  <Text style={styles.moreItemsText}>
+                  <Text style={[styles.moreItemsText, { color: colors.textSecondary }]}>
                     +{order.orders.length - 3} more items
                   </Text>
                 )}
               </View>
               
               {/* Order Footer */}
-              <View style={styles.orderFooter}>
+              <View style={[styles.orderFooter, { borderTopColor: colors.border }]}>
                 <View style={styles.orderTotal}>
-                  <IndianRupee size={16} color="#16a34a" />
-                  <Text style={styles.orderTotalAmount}>₹{Math.round(order.totalAmount)}</Text>
+                  <IndianRupee size={16} color={colors.primary} />
+                  <Text style={[styles.orderTotalAmount, { color: colors.primary }]}>₹{Math.round(order.totalAmount)}</Text>
                 </View>
                 <View style={styles.orderAddress}>
-                  <MapPin size={12} color="#6b7280" />
-                  <Text style={styles.orderAddressText}>
+                  <MapPin size={12} color={colors.textSecondary} />
+                  <Text style={[styles.orderAddressText, { color: colors.textSecondary }]}>
                     {order.address ? `Address #${order.address}` : 'No address'}
                   </Text>
                 </View>
@@ -246,9 +258,9 @@ return (
           ))
         ) : (
           <View style={styles.emptyState}>
-            <Package size={64} color="#d1d5db" />
-            <Text style={styles.emptyTitle}>No Orders Found</Text>
-            <Text style={styles.emptySubtitle}>
+            <Package size={64} color={colors.border} />
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>No Orders Found</Text>
+            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
               {selectedFilter === 'all' 
                 ? "You haven't placed any orders yet" 
                 : `No ${getStatusText(selectedFilter)} orders found`
@@ -256,7 +268,7 @@ return (
             </Text>
             {selectedFilter !== 'all' && (
               <TouchableOpacity 
-                style={styles.clearFilterButton}
+                style={[styles.clearFilterButton, { backgroundColor: colors.primary }]}
                 onPress={() => setSelectedFilter('all')}
               >
                 <Text style={styles.clearFilterText}>View All Orders</Text>
