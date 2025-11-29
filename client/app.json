@@ -2,13 +2,13 @@
   "expo": {
     "name": "Scrapiz",
     "slug": "scrapiz-client",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
-    "icon": "./assets/images/app.png",
+    "icon": "./assets/images/newapp.png",
     "scheme": "com.scrapiz.app",
     "userInterfaceStyle": "automatic",
-    "splash":{
-      "image":"./assets/images/app.png",
+    "splash": {
+      "image": "./assets/images/newapp.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -20,23 +20,20 @@
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Scrapiz needs your location to check service availability and provide accurate scrap pickup rates in your area."
       },
       "splash": {
-        "image": "./assets/images/app.png",
+        "image": "./assets/images/newapp.png",
         "resizeMode": "contain",
         "backgroundColor": "#ffffff"
       }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/app.png",
+        "foregroundImage": "./assets/images/foreground5.png",
         "backgroundColor": "#16a34a"
       },
       "splash": {
-        "image": "./assets/images/app.png",
+        "image": "./assets/images/newapp.png",
         "resizeMode": "contain",
-        "backgroundColor": "#ffffff",
-        "mdpi":"./assets/images/app.png",
-        "hdpi":"./assets/images/app.png",
-        "xhdpi":"./assets/images/app.png"
+        "backgroundColor": "#ffffff"
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -47,9 +44,8 @@
         "android.permission.RECORD_AUDIO"
       ],
       "package": "com.scrapiz.app",
-      "googleServicesFile":"./google-services.json",
-      "versionCode": 15,
-      "useNextNotificationsApi": true
+      "googleServicesFile": "./google-services.json",
+      "versionCode": 18
     },
     "notification": {
       "icon": "./assets/images/app.png",
@@ -58,7 +54,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/app.png"
+      "favicon": "./assets/images/newapp.png"
     },
     "plugins": [
       "expo-router",
@@ -72,7 +68,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/app.png",
+          "image": "./assets/images/newapp.png",
           "resizeMode": "cover",
           "backgroundColor": "#ffffff",
           "enableFullScreenImage_legacy": true
@@ -92,14 +88,6 @@
         "@rnmapbox/maps",
         {
           "MBXAccessToken": "${env.EXPO_PUBLIC_MAPBOX_TOKEN}"
-        }
-      ],
-      [
-        "@sentry/react-native/expo",
-        {
-          "url": "https://sentry.io/",
-          "project": "react-native",
-          "organization": "scrapiz-greentech-private-limi"
         }
       ]
     ],

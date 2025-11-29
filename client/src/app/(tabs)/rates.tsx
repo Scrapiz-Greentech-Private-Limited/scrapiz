@@ -243,16 +243,16 @@ if (error && categories.length === 0) {
         <View style={[styles.disclaimerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.disclaimerHeader}>
              <AlertCircle size={fs(20)} color={colors.primary} />
-            <Text style={[styles.disclaimerTitle, { color: colors.text }]}>Important Note</Text><Text style={styles.disclaimerTitle}>Important Note</Text>
+            <Text style={[styles.disclaimerTitle, { color: colors.text }]}>Important Note</Text>
           </View>
           <Text style={[styles.disclaimerText, { color: colors.textSecondary }]}>
             The prices shown are for reference only. Actual rates may vary based on:
           </Text>
           <View style={styles.disclaimerList}>
-            <Text style={[styles.disclaimerItem, { color: colors.textSecondary }]}>• Current market conditions</Text>
-            <Text style={[styles.disclaimerItem, { color: colors.textSecondary }]}>• Quality and quantity of materials</Text>
-            <Text style={[styles.disclaimerItem, { color: colors.textSecondary }]}>• Location and transportation costs</Text>
-            <Text style={[styles.disclaimerItem, { color: colors.textSecondary }]}>• Seasonal demand fluctuations</Text>
+            <Text style={[styles.disclaimerItem, { color: colors.textSecondary }]}>1. Current market conditions</Text>
+            <Text style={[styles.disclaimerItem, { color: colors.textSecondary }]}>2. Quality and quantity of materials</Text>
+            <Text style={[styles.disclaimerItem, { color: colors.textSecondary }]}>3. Location and transportation costs</Text>
+            <Text style={[styles.disclaimerItem, { color: colors.textSecondary }]}>4. Seasonal demand fluctuations</Text>
           </View>
           <Text style={[styles.disclaimerFooter, { color: colors.textSecondary }]}>
             Contact us for accurate pricing based on your specific materials.
@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
   rateItem: {
     backgroundColor: 'white',
     borderRadius: 16,
-    padding: 16,
+    padding: 8,
     width: '48%',
     alignItems: 'center',
     shadowColor: '#000',

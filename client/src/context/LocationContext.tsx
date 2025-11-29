@@ -126,7 +126,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }){
         await AsyncStorage.setItem(STORAGE_KEYS.LOCATION_SET, 'true');
 
         const position = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
+            accuracy: Location.Accuracy.Highest,
         })
         const [geocode]  = await Location.reverseGeocodeAsync({
         latitude: position.coords.latitude,

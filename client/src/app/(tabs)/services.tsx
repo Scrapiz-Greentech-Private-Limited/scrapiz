@@ -5,18 +5,20 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { wp, hp, fs, spacing, responsiveValue } from '../../utils/responsive';
 import { useTheme } from '../../context/ThemeContext';
+import { useLocalization } from '../../context/LocalizationContext';
 
 export const services = [
-  { id: 'demolition', title: 'Demolition Service', description: 'Building and structure demolition', icon: Hammer, color: '#16a34a', bgColor: '#f0fdf4' },
-  { id: 'dismantling', title: 'Dismantling', description: 'Equipment and machinery dismantling', icon: Wrench, color: '#16a34a', bgColor: '#f0fdf4' },
-  { id: 'paper-shredding', title: 'Paper Shredding', description: 'Secure document shredding', icon: FileText, color: '#16a34a', bgColor: '#f0fdf4' },
-  { id: 'society-tieup', title: 'Society Tie-up', description: 'Scrap collection for societies', icon: Building, color: '#16a34a', bgColor: '#f0fdf4' },
-  { id: 'junk-removal', title: 'Junk Removal', description: 'Household and office junk removal', icon: Trash2, color: '#16a34a', bgColor: '#f0fdf4' },
+  { id: 'demolition', titleKey: 'services.demolitionTitle', descKey: 'services.demolitionDesc', icon: Hammer, color: '#16a34a', bgColor: '#f0fdf4' },
+  { id: 'dismantling', titleKey: 'services.dismantlingTitle', descKey: 'services.dismantlingDesc', icon: Wrench, color: '#16a34a', bgColor: '#f0fdf4' },
+  { id: 'paper-shredding', titleKey: 'services.paperShreddingTitle', descKey: 'services.paperShreddingDesc', icon: FileText, color: '#16a34a', bgColor: '#f0fdf4' },
+  { id: 'society-tieup', titleKey: 'services.societyTieupTitle', descKey: 'services.societyTieupDesc', icon: Building, color: '#16a34a', bgColor: '#f0fdf4' },
+  { id: 'junk-removal', titleKey: 'services.junkRemovalTitle', descKey: 'services.junkRemovalDesc', icon: Trash2, color: '#16a34a', bgColor: '#f0fdf4' },
 ];
 
 export default function ServicesScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
+  const { t } = useLocalization();
 
   const handleServiceSelect = (service: typeof services[0]) => {
     router.push(`/services/${service.id}`);
@@ -29,8 +31,8 @@ export default function ServicesScreen() {
         colors={isDark ? ['#22c55e', '#16a34a'] : ['#16a34a', '#15803d']}
         style={styles.header}
       >
-        <Text style={styles.headerTitle}>Our Services</Text>
-        <Text style={styles.headerSubtitle}>Professional services for all your needs</Text>
+        <Text style={styles.headerTitle}>{t('services.title')}</Text>
+        <Text style={styles.headerSubtitle}>{t('services.subtitle')}</Text>
       </LinearGradient>
 
       <ScrollView 
@@ -56,8 +58,8 @@ export default function ServicesScreen() {
                   <service.icon size={fs(24)} color={service.color} strokeWidth={2.5} />
                 </View>
                 <View style={styles.serviceTextContainer}>
-                  <Text style={styles.serviceTitle}>{service.title}</Text>
-                  <Text style={styles.serviceDescription}>{service.description}</Text>
+                  <Text style={styles.serviceTitle}>{t(service.titleKey)}</Text>
+                  <Text style={styles.serviceDescription}>{t(service.descKey)}</Text>
                 </View>
                 <ChevronRight size={fs(22)} color="rgba(255, 255, 255, 0.9)" strokeWidth={2.5} />
               </TouchableOpacity>
@@ -66,13 +68,13 @@ export default function ServicesScreen() {
         </View>
 
         <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.infoTitle, { color: colors.text }]}>Why Choose Us?</Text>
+          <Text style={[styles.infoTitle, { color: colors.text }]}>{t('services.whyChooseUs')}</Text>
           <View style={styles.infoList}>
-            <Text style={[styles.infoItem, { color: colors.textSecondary }]}>✓ Professional & Experienced Team</Text>
-            <Text style={[styles.infoItem, { color: colors.textSecondary }]}>✓ Competitive & Transparent Pricing</Text>
-            <Text style={[styles.infoItem, { color: colors.textSecondary }]}>✓ Eco-Friendly Disposal Methods</Text>
-            <Text style={[styles.infoItem, { color: colors.textSecondary }]}>✓ Fully Insured & Licensed</Text>
-            <Text style={[styles.infoItem, { color: colors.textSecondary }]}>✓ Quick Response & Flexible Scheduling</Text>
+            <Text style={[styles.infoItem, { color: colors.textSecondary }]}>{t('services.benefit1')}</Text>
+            <Text style={[styles.infoItem, { color: colors.textSecondary }]}>{t('services.benefit2')}</Text>
+            <Text style={[styles.infoItem, { color: colors.textSecondary }]}>{t('services.benefit3')}</Text>
+            <Text style={[styles.infoItem, { color: colors.textSecondary }]}>{t('services.benefit4')}</Text>
+            <Text style={[styles.infoItem, { color: colors.textSecondary }]}>{t('services.benefit5')}</Text>
           </View>
         </View>
       </ScrollView>

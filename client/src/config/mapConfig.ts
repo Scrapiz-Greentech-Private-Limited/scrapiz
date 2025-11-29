@@ -17,16 +17,16 @@ export const MAP_STYLES = {
   navigationNight: 'mapbox://styles/mapbox/navigation-night-v1',
 };
 
-export const DEFAULT_MAP_STYLE = MAP_STYLES.hybrid;
+export const DEFAULT_MAP_STYLE = MAP_STYLES.streets;
 
 const KRUTRIM_API_URL = 'https://api.olamaps.io/places/v1';
 
 // Mumbai/Bhayandar area bounds
 export function getLocalBounds(center?: [number, number]): [number, number, number, number] {
   if (center) {
-    // Create a 20km box around the center point
-    const latOffset = 0.18; // ~20km
-    const lonOffset = 0.18; // ~20km
+    // Create a 200m box around the center point (reduced from 20km)
+    const latOffset = 0.0018; // ~200m
+    const lonOffset = 0.0018; // ~200m
     return [
       center[0] - lonOffset, // min longitude
       center[1] - latOffset, // min latitude
@@ -86,14 +86,14 @@ export function buildReverseGeocodingUrl(longitude: number, latitude: number) {
 export const DEFAULT_CENTER: [number, number] = [72.8537, 19.2952];
 
 export const MAP_SETTINGS = {
-  defaultZoom: 14,
+  defaultZoom: 16,
   minZoom: 5,
-  maxZoom: 18,
+  maxZoom: 20,
   searchMinCharacters: 3,
   searchDebounceMs: 500,
   animationDuration: 1000,
-  // Search radius in km
-  searchRadius: 20,
+  // Search radius in km (reduced from 20km to 0.2km = 200m)
+  searchRadius: 0.2,
 };
 
 export function isValidCoordinate(longitude: number, latitude: number): boolean {

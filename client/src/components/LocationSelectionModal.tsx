@@ -9,6 +9,8 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
+  Alert,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import {
   MapPin,
@@ -20,6 +22,8 @@ import {
   MoreVertical,
   X,
   Plus,
+  Edit,
+  Trash2,
 } from 'lucide-react-native';
 import Toast from 'react-native-toast-message';
 import { useRouter } from 'expo-router';
@@ -53,6 +57,8 @@ export default function LocationSelectionModal({
   const [showMapPicker, setShowMapPicker] = useState(false);
   const [showMapPickerForGPS, setShowMapPickerForGPS] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showAddressMenu, setShowAddressMenu] = useState(false);
+  const [selectedAddress, setSelectedAddress] = useState<SavedLocation | null>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
 
   // Reload addresses when modal becomes visible and cleanup when it closes
@@ -218,6 +224,78 @@ export default function LocationSelectionModal({
     router.push('/profile/addresses');
   };
 
+  const handleAddressMenu = (location: SavedLocation) => {
+    setSelectedAddress(location);
+    setShowAddressMenu(true);
+  };
+
+  const handleEditAddress = () => {
+    setShowAddressMenu(false);
+    onClose();
+    
+    // Navigate to addresses screen - the screen will handle opening the edit modal
+    router.push('/profile/addresses');
+    
+    // Note: You'll need to pass the address ID to the addresses screen
+    // This can be done via query params or a global state management solution
+  };
+
+  const handleDeleteAddress = async () => {
+    if (!selectedAddress) return;
+    
+    Alert.alert(
+      'Delete Address',
+      'Are you sure you want to delete this address?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          onPress: () => setShowAddressMenu(false),
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setShowAddressMenu(false);
+              
+              // Delete from backend
+              await AuthService.deleteAddress(selectedAddress.id);
+              
+              // Remove from LocationContext
+              removeLocation(selectedAddress.id);
+              
+              // Reload addresses to ensure synchronization
+              await reloadAddresses();
+              
+              Toast.show({
+                type: 'success',
+                text1: 'Success',
+                text2: 'Address deleted successfully',
+              });
+            } catch (error: any) {
+              console.error('Error deleting address:', error);
+              
+              let errorMessage = 'Failed to delete address. Please try again.';
+              
+              if (error.response?.data?.message) {
+                errorMessage = error.response.data.message;
+              } else if (error.message) {
+                errorMessage = error.message;
+              }
+              
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: errorMessage,
+              });
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const getLocationIcon = (type: string) => {
     switch (type) {
       case 'home':
@@ -242,7 +320,7 @@ export default function LocationSelectionModal({
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <X size={24} color="#111827" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Enter your area or apartment name</Text>
+            <Text style={styles.headerTitle}>Enter your location</Text>
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
@@ -313,9 +391,7 @@ export default function LocationSelectionModal({
                 <Text style={styles.sectionTitle}>SAVED ADDRESSES</Text>
                 <View style={styles.savedAddressesList}>
                   {savedLocations.map((location) => {
-                    const isSelected =
-                      currentLocation?.latitude === location.latitude &&
-                      currentLocation?.longitude === location.longitude;
+                    const isSelected = currentLocation?.id === location.id;
 
                     return (
                       <TouchableOpacity
@@ -351,8 +427,9 @@ export default function LocationSelectionModal({
                         </View>
                         <TouchableOpacity
                           style={styles.menuButton}
-                          onPress={() => {
-                            // Handle menu options (edit, delete)
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            handleAddressMenu(location);
                           }}
                         >
                           <MoreVertical size={18} color="#6b7280" />
@@ -437,6 +514,49 @@ export default function LocationSelectionModal({
             : undefined
         }
       />
+
+      {/* Address Menu Modal */}
+      {showAddressMenu && selectedAddress && (
+        <Modal
+          visible={showAddressMenu}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowAddressMenu(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setShowAddressMenu(false)}>
+            <View style={styles.menuOverlay}>
+              <TouchableWithoutFeedback>
+                <View style={styles.menuContainer}>
+                  <View style={styles.menuHeader}>
+                    <Text style={styles.menuTitle}>{selectedAddress.label}</Text>
+                    <TouchableOpacity onPress={() => setShowAddressMenu(false)}>
+                      <X size={20} color="#6b7280" />
+                    </TouchableOpacity>
+                  </View>
+                  
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={handleEditAddress}
+                  >
+                    <Edit size={20} color="#3b82f6" />
+                    <Text style={styles.menuItemText}>Edit Address</Text>
+                  </TouchableOpacity>
+                  
+                  <View style={styles.menuDivider} />
+                  
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={handleDeleteAddress}
+                  >
+                    <Trash2 size={20} color="#ef4444" />
+                    <Text style={[styles.menuItemText, { color: '#ef4444' }]}>Delete Address</Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      )}
     </>
   );
 }
@@ -460,6 +580,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 20,
+    textAlign:"center",
     fontWeight: '700',
     color: '#111827',
     letterSpacing: -0.3,
@@ -687,5 +808,51 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#166534',
     lineHeight: 18,
+  },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  menuContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    width: '100%',
+    maxWidth: 400,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  menuHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  menuTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    gap: 12,
+  },
+  menuItemText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#111827',
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: '#e5e7eb',
+    marginVertical: 4,
   },
 });

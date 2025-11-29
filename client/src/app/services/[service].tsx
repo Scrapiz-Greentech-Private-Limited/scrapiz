@@ -13,97 +13,46 @@ import { ArrowLeft, Calendar, Clock, Shield, CheckCircle, Star } from 'lucide-re
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { services } from '../(tabs)/services';
 import { useTheme } from '../../context/ThemeContext';
+import { useLocalization } from '../../context/LocalizationContext';
 import { wp, hp, fs, spacing } from '../../utils/responsive';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const serviceDetails: { [key: string]: { included: string[]; howItWorks: string[] } } = {
-  demolition: {
-    included: [
-      'On-site assessment and quote',
-      'Professional team and equipment',
-      'Eco-friendly disposal',
-      'Insurance coverage for all work',
-      'Clean-up after completion',
-    ],
-    howItWorks: [
-      'Book your service and we\'ll contact you for details.',
-      'Our team visits for a final assessment and quote.',
-      'We complete the service professionally and safely.',
-      'The site is cleaned and waste is disposed of responsibly.',
-    ],
-  },
-  dismantling: {
-    included: [
-        'Pre-dismantling safety inspection.',
-        'Systematic dismantling of machinery.',
-        'Segregation of materials for recycling.',
-        'Transportation of dismantled parts.',
-        'Site clearance and certification.',
-    ],
-    howItWorks: [
-        'Schedule a consultation to discuss your project.',
-        'Receive a detailed dismantling plan and quote.',
-        'Our certified engineers perform the dismantling.',
-        'Materials are processed for scrap or resale.',
-    ],
-  },
-  'paper-shredding': {
-    included: [
-        'Secure collection of documents in locked bins.',
-        'On-site or off-site shredding options available.',
-        'A Certificate of Destruction is provided for compliance.',
-        'All shredded paper is 100% recycled.',
-        'Service compliant with privacy laws.',
-    ],
-    howItWorks: [
-        'Choose a one-time purge or a regular schedule.',
-        'We deliver secure bins to your location.',
-        'Our trained staff collect and shred your documents.',
-        'You receive a certificate confirming destruction.',
-    ],
-  },
-  'society-tieup': {
-    included: [
-        'Dedicated bins for paper, plastic, and metal.',
-        'Regular collection drives (weekly/bi-weekly).',
-        'Transparent, on-the-spot digital weighing.',
-        'Monthly reports on environmental impact.',
-        'Awareness programs for residents on segregation.',
-    ],
-    howItWorks: [
-        'The society committee contacts us to partner up.',
-        'We set up a dedicated scrap collection corner.',
-        'Residents drop their segregated scrap anytime.',
-        'We collect, weigh, and pay the society monthly.',
-    ],
-  },
-  'junk-removal': {
-    included: [
-        'Removal of furniture, appliances, and electronics.',
-        'Household, office, and construction debris clearance.',
-        'Responsible disposal, donation, or recycling.',
-        'Includes all labor for lifting and loading.',
-        'Same-day or next-day service available.',
-    ],
-    howItWorks: [
-        'Send a photo or list of items for a quick quote.',
-        'Schedule a convenient pickup time.',
-        'Our team arrives and quickly removes your junk.',
-        'We sweep the area clean before leaving.',
-    ],
-  },
-};
-
 
 export default function ServiceDetailsScreen() {
   const { service: serviceId } = useLocalSearchParams<{ service?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
+  const { t } = useLocalization();
 
   const service = services.find(s => s.id === serviceId);
   
-  const details = serviceDetails[service?.id || ''] || { included: [], howItWorks: [] };
+  // Get localized service details
+  const getServiceDetails = (serviceId: string) => {
+    const serviceKey = serviceId
+    .split('-')
+    .map((word, index) => 
+      index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1)
+    )
+    .join('');
+  
+  return {
+    included: [
+      t(`services.${serviceKey}.included1`),
+      t(`services.${serviceKey}.included2`),
+      t(`services.${serviceKey}.included3`),
+      t(`services.${serviceKey}.included4`),
+      t(`services.${serviceKey}.included5`),
+    ],
+    howItWorks: [
+      t(`services.${serviceKey}.step1`),
+      t(`services.${serviceKey}.step2`),
+      t(`services.${serviceKey}.step3`),
+      t(`services.${serviceKey}.step4`),
+    ],
+  };
+  };
+  
+  const details = service ? getServiceDetails(service.id) : { included: [], howItWorks: [] };
 
 
   const handleBookNow = () => {
@@ -128,7 +77,7 @@ export default function ServiceDetailsScreen() {
         </View>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing(20) }}>
           <Text style={{ fontSize: fs(18), color: colors.textSecondary, textAlign: 'center' }}>
-            Service not found
+            {t('services.serviceNotFound')}
           </Text>
         </View>
       </View>
@@ -158,17 +107,17 @@ export default function ServiceDetailsScreen() {
                 <View style={[styles.heroIcon, { backgroundColor: service.color }]}>
                     <service.icon size={fs(34)} color="white" />
                 </View>
-                <Text style={[styles.heroTitle, { color: service.color }]}>{service.title}</Text>
-                <Text style={styles.heroDescription}>{service.description}</Text>
+                <Text style={[styles.heroTitle, { color: service.color }]}>{t(service.titleKey)}</Text>
+                <Text style={styles.heroDescription}>{t(service.descKey)}</Text>
                 <View style={styles.tagsContainer}>
-                    <View style={[styles.tag, { backgroundColor: colors.surface, borderColor: colors.border }]}><Shield size={fs(14)} color={colors.textSecondary} /><Text style={[styles.tagText, { color: colors.textSecondary }]}>Insured</Text></View>
-                    <View style={[styles.tag, { backgroundColor: colors.surface, borderColor: colors.border }]}><Clock size={fs(14)} color={colors.textSecondary} /><Text style={[styles.tagText, { color: colors.textSecondary }]}>Fast</Text></View>
+                    <View style={[styles.tag, { backgroundColor: colors.surface, borderColor: colors.border }]}><Shield size={fs(14)} color={colors.textSecondary} /><Text style={[styles.tagText, { color: colors.textSecondary }]}>{t('services.insured')}</Text></View>
+                    <View style={[styles.tag, { backgroundColor: colors.surface, borderColor: colors.border }]}><Clock size={fs(14)} color={colors.textSecondary} /><Text style={[styles.tagText, { color: colors.textSecondary }]}>{t('services.fast')}</Text></View>
                     <View style={[styles.tag, { backgroundColor: colors.surface, borderColor: colors.border }]}><Star size={fs(14)} color={colors.textSecondary} /><Text style={[styles.tagText, { color: colors.textSecondary }]}>4.8 ★</Text></View>
                 </View>
             </View>
 
             <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>What's Included</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('services.whatsIncluded')}</Text>
                 <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
                     {details.included.map((item: string, index: number) => (
                     <View key={index} style={styles.listItem}>
@@ -180,7 +129,7 @@ export default function ServiceDetailsScreen() {
             </View>
 
             <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>How It Works</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('services.howItWorks')}</Text>
                 <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
                     {details.howItWorks.map((item: string, index: number) => (
                     <View key={index} className='flex-row items-start gap-4 py-2.5'>
@@ -206,7 +155,7 @@ export default function ServiceDetailsScreen() {
           onPress={handleBookNow}
         >
           <Calendar size={fs(22)} color="white" />
-          <Text style={styles.bookButtonText}>Book This Service</Text>
+          <Text style={styles.bookButtonText}>{t('services.bookThisService')}</Text>
         </TouchableOpacity>
       </View>
     </View>

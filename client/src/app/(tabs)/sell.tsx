@@ -1630,8 +1630,8 @@ const styles = StyleSheet.create({
   },
   stepNumber: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#6b7280',
+    fontWeight: '800',
+    color: '#000',
   },
   stepNumberActive: {
     color: 'white',

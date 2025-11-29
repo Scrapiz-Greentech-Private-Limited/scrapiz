@@ -252,9 +252,7 @@ export default function LoginScreen() {
             </View>
             
             <Text style={styles.welcomeText}>{t('auth.welcomeBack')}</Text>
-            <Text style={styles.subtitleText}>
-            Sell scrap, get cash — sign in!
-            </Text>
+            
           </Animated.View>
         </LinearGradient>
 
@@ -274,14 +272,14 @@ export default function LoginScreen() {
               ]}
             >
               <View style={styles.inputContainer}>
-                 <View style={[styles.inputWrapper, { backgroundColor: colors.card, borderColor: colors.border }, errors.email && styles.inputError]}>
-                  <View style={styles.iconCircle}>
+                 <View style={[styles.inputWrapper, { backgroundColor: colors.inputBackground, borderColor: errors.email ? colors.error : colors.inputBorder }]}>
+                  <View style={[styles.iconCircle, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
                     <Mail size={20} color={colors.primary} />
                   </View>
                   <TextInput
-                    style={[styles.input, errors.email && styles.inputError]}
+                    style={[styles.input, { color: colors.text }]}
                     placeholder={t('auth.enterEmail')}
-                    placeholderTextColor="#9ca3af"
+                    placeholderTextColor={colors.inputPlaceholder}
                     value={email}
                     onChangeText={(text) => {
                       setEmail(text.toLowerCase());
@@ -306,15 +304,15 @@ export default function LoginScreen() {
               </View>
 
                <View style={styles.inputContainer}>
-                 <View style={[styles.inputWrapper, { backgroundColor: colors.card, borderColor: colors.border }, errors.password && styles.inputError]}>
-                  <View style={styles.iconCircle}>
+                 <View style={[styles.inputWrapper, { backgroundColor: colors.inputBackground, borderColor: errors.password ? colors.error : colors.inputBorder }]}>
+                  <View style={[styles.iconCircle, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
                     <Lock size={20} color={colors.primary} />
                   </View>
                   <TextInput
                     ref={passwordInputRef}
-                    style={[styles.input, errors.password && styles.inputError]}
+                    style={[styles.input, { color: colors.text }]}
                     placeholder={t('auth.enterPassword')}
-                    placeholderTextColor="#9ca3af"
+                    placeholderTextColor={colors.inputPlaceholder}
                     value={password}
                     onChangeText={(text) => {
                       setPassword(text);
@@ -334,9 +332,9 @@ export default function LoginScreen() {
                     disabled={isAnyLoading}
                   >
                     {showPassword ? (
-                      <EyeOff size={22} color="#9ca3af" />
+                      <EyeOff size={22} color={colors.textSecondary} />
                     ) : (
-                      <Eye size={22} color="#9ca3af" />
+                      <Eye size={22} color={colors.textSecondary} />
                     )}
                   </TouchableOpacity>
                 </View>
@@ -349,7 +347,7 @@ export default function LoginScreen() {
 
               <Link href="/(auth)/forgot-password" asChild>
                 <TouchableOpacity style={styles.forgotPassword} activeOpacity={0.7} disabled={isAnyLoading}>
-                  <Text style={styles.forgotPasswordText}>{t('auth.forgotPasswordLink')}</Text>
+                  <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>{t('auth.forgotPasswordLink')}</Text>
                 </TouchableOpacity>
               </Link>
 
@@ -377,23 +375,27 @@ export default function LoginScreen() {
               </TouchableOpacity>
 
               <View style={styles.divider}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>{t('auth.orContinueWith')}</Text>
-                <View style={styles.dividerLine} />
+                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+                <Text style={[styles.dividerText, { color: colors.textSecondary }]}>{t('auth.orContinueWith')}</Text>
+                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
               </View>
 
               <TouchableOpacity
-                style={[styles.googleButton, isAnyLoading && styles.googleButtonDisabled]}
+                style={[
+                  styles.googleButton,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                  isAnyLoading && styles.googleButtonDisabled
+                ]}
                 onPress={handleGoogleLogin}
                 disabled={isAnyLoading}
               >
                 {isGoogleLoading ? (
-                  <ActivityIndicator color="#6b7280" size="small" />
+                  <ActivityIndicator color={colors.textSecondary} size="small" />
                 ) : (
                   <>
                     <Image source={require('../../../assets/images/Gooogle Favicon.png')}
                     className='w-6 h-6 object-contain'/>
-                    <Text className='text-[15px] font-bold text-gray-800'>{t('auth.continueWithGoogle')}</Text>
+                    <Text style={[styles.googleButtonText, { color: colors.text }]}>{t('auth.continueWithGoogle')}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -406,10 +408,10 @@ export default function LoginScreen() {
                 { opacity: fadeAnim }
               ]}
             >
-              <Text style={styles.footerText}>{t('auth.dontHaveAccount')}</Text>
+              <Text style={[styles.footerText, { color: colors.textSecondary }]}>{t('auth.dontHaveAccount')}</Text>
               <Link href="/(auth)/register" asChild>
                 <TouchableOpacity disabled={isAnyLoading}>
-                  <Text style={styles.footerLink}>{t('auth.signUpLink')}</Text>
+                  <Text style={[styles.footerLink, { color: colors.primary }]}>{t('auth.signUpLink')}</Text>
                 </TouchableOpacity>
               </Link>
             </Animated.View>
@@ -418,22 +420,26 @@ export default function LoginScreen() {
             <Animated.View 
               style={[
                 styles.trustIndicators,
-                { opacity: fadeAnim }
+                { 
+                  backgroundColor: isDark ? '#064e3b' : '#f0fdf4',
+                  borderColor: isDark ? '#16a34a' : '#bbf7d0',
+                  opacity: fadeAnim 
+                }
               ]}
             >
               <View style={styles.trustItem}>
                 <Shield size={18} color="#10b981" />
-                <Text style={styles.trustText}>{t('auth.secure')}</Text>
+                <Text style={[styles.trustText, { color: isDark ? '#86efac' : '#166534' }]}>{t('auth.secure')}</Text>
               </View>
-              <View style={styles.trustDivider} />
+              <View style={[styles.trustDivider, { backgroundColor: isDark ? '#16a34a' : '#bbf7d0' }]} />
               <View style={styles.trustItem}>
                 <Zap size={18} color="#f59e0b" />
-                <Text style={styles.trustText}>{t('auth.fastPayout')}</Text>
+                <Text style={[styles.trustText, { color: isDark ? '#86efac' : '#166534' }]}>{t('auth.fastPayout')}</Text>
               </View>
-              <View style={styles.trustDivider} />
+              <View style={[styles.trustDivider, { backgroundColor: isDark ? '#16a34a' : '#bbf7d0' }]} />
               <View style={styles.trustItem}>
                 <Sparkles size={18} color="#8b5cf6" />
-                <Text style={styles.trustText}>{t('auth.bestRates')}</Text>
+                <Text style={[styles.trustText, { color: isDark ? '#86efac' : '#166534' }]}>{t('auth.bestRates')}</Text>
               </View>
             </Animated.View>
           </View>
@@ -579,10 +585,8 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f9fafb',
     borderRadius: spacing(16),
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
     paddingHorizontal: spacing(16),
     paddingVertical: spacing(4),
     height: hp(7.1),
@@ -602,7 +606,6 @@ const styles = StyleSheet.create({
     width: wp(10.1),
     height: wp(10.1),
     borderRadius: wp(5.05),
-    backgroundColor: '#dcfce7',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing(12),
@@ -610,12 +613,8 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: fs(15),
-    color: '#1f2937',
     fontWeight: '500',
-  },
-  inputError: {
-    borderColor: '#ef4444',
-    borderWidth: 2,
+    fontFamily: 'Inter-Medium',
   },
   eyeIcon: {
     padding: spacing(8),
@@ -635,8 +634,8 @@ const styles = StyleSheet.create({
   },
   forgotPasswordText: {
     fontSize: fs(14),
-    color: '#16a34a',
     fontWeight: '700',
+    fontFamily: 'Inter-Bold',
   },
   loginButton: {
     borderRadius: spacing(16),
@@ -679,16 +678,14 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#e5e7eb',
   },
   dividerText: {
     fontSize: fs(13),
-    color: '#9ca3af',
     fontWeight: '600',
     paddingHorizontal: spacing(14),
+    fontFamily: 'Inter-SemiBold',
   },
   googleButton: {
-    backgroundColor: '#ffffff',
     borderRadius: spacing(16),
     height: hp(6.9),
     flexDirection: 'row',
@@ -696,7 +693,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing(12),
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
     marginBottom: spacing(16),
     ...Platform.select({
       ios: {
@@ -721,7 +717,7 @@ const styles = StyleSheet.create({
   googleButtonText: {
     fontSize: fs(15),
     fontWeight: '700',
-    color: '#1f2937',
+    fontFamily: 'Inter-Bold',
   },
   footer: {
     flexDirection: 'row',
@@ -731,13 +727,13 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: fs(15),
-    color: '#6b7280',
     fontWeight: '500',
+    fontFamily: 'Inter-Medium',
   },
   footerLink: {
     fontSize: fs(15),
-    color: '#16a34a',
     fontWeight: '800',
+    fontFamily: 'Inter-Bold',
   },
   trustIndicators: {
     flexDirection: 'row',
@@ -745,11 +741,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing(12),
     paddingHorizontal: spacing(10),
-    backgroundColor: '#f0fdf4',
     borderRadius: spacing(14),
     gap: spacing(8),
     borderWidth: 1,
-    borderColor: '#bbf7d0',
   },
   trustItem: {
     flexDirection: 'row',
@@ -760,13 +754,12 @@ const styles = StyleSheet.create({
   },
   trustText: {
     fontSize: fs(11),
-    color: '#166534',
     fontWeight: '700',
     flexShrink: 1,
+    fontFamily: 'Inter-Bold',
   },
   trustDivider: {
     width: 1,
     height: spacing(16),
-    backgroundColor: '#bbf7d0',
   },
 });

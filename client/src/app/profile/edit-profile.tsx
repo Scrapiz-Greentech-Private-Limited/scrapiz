@@ -9,23 +9,29 @@ import {
   Alert,
   ActivityIndicator,
   Image,
+  StatusBar,
 } from 'react-native';
-import { ArrowLeft, User, Mail, Phone, MapPin, Save, Camera, X } from 'lucide-react-native';
+import { ArrowLeft, User, Mail, Phone as PhoneIcon, MapPin, Save, Camera, X, ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthService, UserProfile } from '../../api/apiService';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalization } from '../../context/LocalizationContext';
+import { useTheme } from '../../context/ThemeContext';
+import GenderSelectionModal from '../../components/GenderSelectionModal';
 
 
 export default function EditProfileScreen(){
     const router = useRouter();
     const { t } = useLocalization();
+    const { colors, isDark } = useTheme();
     const [user , setUser] = useState<UserProfile | null>(null);
     const [formData, setFormData] = useState({
     fullName: '',
     email: '',
     phone: '',
+    gender: '' as 'male' | 'female' | 'prefer_not_to_say' | '',
     address: '',
     profileImage: '',
     })
@@ -33,12 +39,14 @@ export default function EditProfileScreen(){
     fullName: '',
     email: '',
     phone: '',
+    gender: '' as 'male' | 'female' | 'prefer_not_to_say' | '',
     address: '',
     profileImage: '',
     })
     const [isLoading, setIsLoading] = useState(false);
     const [isFetching , setIsFetching] = useState(true);
     const [imageError, setImageError] = useState(false);
+    const [showGenderModal, setShowGenderModal] = useState(false);
 
     useEffect(()=>{
         loadUserData();
@@ -52,10 +60,16 @@ export default function EditProfileScreen(){
             const addressString = primaryAddress
         ? `${primaryAddress.room_number}, ${primaryAddress.street}, ${primaryAddress.area}, ${primaryAddress.city} - ${primaryAddress.pincode}`
         : '';
+        
+        // Load from AsyncStorage if not in database
+        const storedPhone = await AsyncStorage.getItem('@user_phone');
+        const storedGender = await AsyncStorage.getItem('@user_gender');
+        
         const data = {
             fullName:userData.name || '',
             email:userData.email || '',
-            phone:primaryAddress?.phone_number || '',
+            phone: userData.phone_number || storedPhone || '',
+            gender: (userData.gender || storedGender || '') as 'male' | 'female' | 'prefer_not_to_say' | '',
             address:addressString || '',
             profileImage: userData.profile_image || '',
         };
@@ -136,6 +150,16 @@ export default function EditProfileScreen(){
             updateData.name = formData.fullName.trim();
         }
         
+        // Check if phone changed
+        if (formData.phone.trim() !== originalData.phone) {
+            updateData.phone_number = formData.phone.trim();
+        }
+        
+        // Check if gender changed
+        if (formData.gender !== originalData.gender) {
+            updateData.gender = formData.gender || null;
+        }
+        
         // Check if profile image changed
         if (formData.profileImage !== originalData.profileImage) {
             if (formData.profileImage === '') {
@@ -149,26 +173,58 @@ export default function EditProfileScreen(){
         
         // Only call API if there are changes
         if (Object.keys(updateData).length > 0) {
-            const updatedUser = await AuthService.updateUserProfile(updateData);
-            
-            // Update local state with response
-            const updatedFormData = {
-                ...formData,
-                fullName: updatedUser.name || formData.fullName,
-                profileImage: updatedUser.profile_image || '',
-            };
-            setFormData(updatedFormData);
-            setOriginalData(updatedFormData);
-            
-            Toast.show({
-                type: 'success',
-                text1: t('toasts.success.profileUpdated'),
-                text2: '',
-            });
-            
-            setTimeout(() => {
-                router.back();
-            }, 1000);
+            try {
+                const updatedUser = await AuthService.updateUserProfile(updateData);
+                
+                // Update local state with response
+                const updatedFormData = {
+                    ...formData,
+                    fullName: updatedUser.name || formData.fullName,
+                    phone: updatedUser.phone_number || formData.phone,
+                    gender: (updatedUser.gender || formData.gender) as 'male' | 'female' | 'prefer_not_to_say' | '',
+                    profileImage: updatedUser.profile_image || '',
+                };
+                setFormData(updatedFormData);
+                setOriginalData(updatedFormData);
+                
+                // Save to AsyncStorage as backup
+                if (formData.phone) {
+                    await AsyncStorage.setItem('@user_phone', formData.phone);
+                }
+                if (formData.gender) {
+                    await AsyncStorage.setItem('@user_gender', formData.gender);
+                }
+                
+                Toast.show({
+                    type: 'success',
+                    text1: t('toasts.success.profileUpdated'),
+                    text2: '',
+                });
+                
+                setTimeout(() => {
+                    router.back();
+                }, 1000);
+            } catch (apiError: any) {
+                // If API fails, save to AsyncStorage
+                console.error('API update failed, saving to AsyncStorage:', apiError);
+                
+                if (formData.phone) {
+                    await AsyncStorage.setItem('@user_phone', formData.phone);
+                }
+                if (formData.gender) {
+                    await AsyncStorage.setItem('@user_gender', formData.gender);
+                }
+                
+                Toast.show({
+                    type: 'info',
+                    text1: 'Saved Locally',
+                    text2: 'Changes saved on device. Will sync when online.',
+                });
+                
+                setTimeout(() => {
+                    router.back();
+                }, 1000);
+            }
         } else {
             Toast.show({
                 type: 'info',
@@ -189,36 +245,45 @@ export default function EditProfileScreen(){
     
     const hasChanges = () => {
         return formData.fullName !== originalData.fullName || 
+               formData.phone !== originalData.phone ||
+               formData.gender !== originalData.gender ||
                formData.profileImage !== originalData.profileImage;
+    };
+    
+    const getGenderLabel = () => {
+        if (!formData.gender) return t('profile.selectGender');
+        return t(`profile.gender${formData.gender.charAt(0).toUpperCase() + formData.gender.slice(1).replace(/_/g, '')}`);
     };
 
     if(isFetching){
         return (
-      <View style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color="#16a34a" />
-        <Text style={styles.loadingText}>Loading profile...</Text>
+      <View style={[styles.container, styles.centerContent, { backgroundColor: colors.background }]}>
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading profile...</Text>
       </View>
     );
     }
     return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color="#111827" />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+      <View style={[styles.header, { backgroundColor: colors.surface, shadowColor: colors.shadow }]}>
+        <TouchableOpacity style={[styles.backButton, { backgroundColor: colors.card }]} onPress={() => router.back()}>
+          <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Profile</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Edit Profile</Text>
         <TouchableOpacity
-          style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
+          style={[styles.saveButton, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.1)' : '#f0fdf4' }, isLoading && styles.saveButtonDisabled]}
           onPress={handleSave}
           disabled={isLoading}
         >
-          <Save size={20} color="#16a34a" />
+          <Save size={20} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.avatarSection}>
-          <View style={styles.avatarContainer}>
+          <View style={[styles.avatarContainer, { backgroundColor: colors.primary }]}>
             {formData.profileImage && !imageError ? (
               <>
                 <Image
@@ -249,8 +314,8 @@ export default function EditProfileScreen(){
             onPress={handlePickImage}
             disabled={isLoading}
           >
-            <Camera size={16} color="#16a34a" style={{ marginRight: 6 }} />
-            <Text style={styles.changePhotoText}>
+            <Camera size={16} color={colors.primary} style={{ marginRight: 6 }} />
+            <Text style={[styles.changePhotoText, { color: colors.primary }]}>
               {formData.profileImage ? 'Change Photo' : 'Add Photo'}
             </Text>
           </TouchableOpacity>
@@ -258,45 +323,86 @@ export default function EditProfileScreen(){
 
         <View style={styles.formSection}>
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Full Name</Text>
-            <View style={styles.inputWrapper}>
-              <User size={20} color="#6b7280" style={styles.inputIcon} />
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Full Name</Text>
+            <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <User size={20} color={colors.textSecondary} style={styles.inputIcon} />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: colors.text }]}
                 value={formData.fullName}
                 onChangeText={(text) => setFormData((prev) => ({ ...prev, fullName: text }))}
                 placeholder="Enter your full name"
+                placeholderTextColor={colors.inputPlaceholder}
                 editable={!isLoading}
               />
             </View>
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Email Address</Text>
-            <View style={[styles.inputWrapper, styles.inputWrapperDisabled]}>
-              <Mail size={20} color="#9ca3af" style={styles.inputIcon} />
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Email Address</Text>
+            <View style={[styles.inputWrapper, styles.inputWrapperDisabled, { backgroundColor: isDark ? colors.card : '#f9fafb', borderColor: colors.border }]}>
+              <Mail size={20} color={colors.textTertiary} style={styles.inputIcon} />
               <TextInput
-                style={[styles.input, styles.inputDisabled]}
+                style={[styles.input, styles.inputDisabled, { color: colors.textTertiary }]}
                 value={formData.email}
                 placeholder="Enter your email"
+                placeholderTextColor={colors.inputPlaceholder}
                 keyboardType="email-address"
                 editable={false}
               />
             </View>
-            <Text style={styles.inputHint}>Email cannot be changed</Text>
+            <Text style={[styles.inputHint, { color: colors.textSecondary }]}>Email cannot be changed</Text>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>{t('profile.phoneNumber')} <Text style={[styles.optionalText, { color: colors.textTertiary }]}>{t('profile.optional')}</Text></Text>
+            <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <PhoneIcon size={20} color={colors.textSecondary} style={styles.inputIcon} />
+              <TextInput
+                style={[styles.input, { color: colors.text }]}
+                value={formData.phone}
+                onChangeText={(text) => setFormData((prev) => ({ ...prev, phone: text }))}
+                placeholder="Enter your phone number"
+                placeholderTextColor={colors.inputPlaceholder}
+                keyboardType="phone-pad"
+                editable={!isLoading}
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>{t('profile.gender')} <Text style={[styles.optionalText, { color: colors.textTertiary }]}>{t('profile.optional')}</Text></Text>
+            <TouchableOpacity
+              style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              onPress={() => setShowGenderModal(true)}
+              disabled={isLoading}
+            >
+              <User size={20} color={colors.textSecondary} style={styles.inputIcon} />
+              <Text style={[styles.input, { color: formData.gender ? colors.text : colors.inputPlaceholder }]}>
+                {getGenderLabel()}
+              </Text>
+              <ChevronRight size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
           </View>
         </View>
 
         <TouchableOpacity
-          style={[styles.updateButton, isLoading && styles.updateButtonDisabled]}
+          style={[styles.updateButton, { backgroundColor: colors.primary }, isLoading && styles.updateButtonDisabled]}
           onPress={handleSave}
           disabled={isLoading}
         >
-          <Text style={styles.updateButtonText}>
+          <Text style={[styles.updateButtonText, { color: isDark ? colors.buttonText : '#ffffff' }]}>
             {isLoading ? 'Updating...' : 'Update Profile'}
           </Text>
         </TouchableOpacity>
       </ScrollView>
+      
+      <GenderSelectionModal
+        visible={showGenderModal}
+        selectedGender={formData.gender || null}
+        onClose={() => setShowGenderModal(false)}
+        onSelect={(gender) => setFormData((prev) => ({ ...prev, gender }))}
+      />
+      
       <Toast />
     </View>
   );
@@ -305,7 +411,6 @@ export default function EditProfileScreen(){
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
   },
   centerContent: {
     justifyContent: 'center',
@@ -314,18 +419,15 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#6b7280',
     fontFamily: 'Inter-Regular',
   },
   header: {
-    backgroundColor: 'white',
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -335,21 +437,18 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#111827',
     fontFamily: 'Inter-SemiBold',
   },
   saveButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f0fdf4',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -368,7 +467,6 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#16a34a',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -406,7 +504,6 @@ const styles = StyleSheet.create({
   },
   changePhotoText: {
     fontSize: 14,
-    color: '#16a34a',
     fontFamily: 'Inter-SemiBold',
   },
   formSection: {
@@ -418,23 +515,19 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#111827',
     fontFamily: 'Inter-SemiBold',
     marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: 'white',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   inputWrapperDisabled: {
-    backgroundColor: '#f9fafb',
-    borderColor: '#e5e7eb',
+    opacity: 0.7,
   },
   inputIcon: {
     marginRight: 12,
@@ -443,11 +536,10 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    color: '#111827',
     fontFamily: 'Inter-Regular',
   },
   inputDisabled: {
-    color: '#9ca3af',
+    opacity: 0.8,
   },
   textArea: {
     minHeight: 80,
@@ -455,13 +547,11 @@ const styles = StyleSheet.create({
   },
   inputHint: {
     fontSize: 12,
-    color: '#6b7280',
     fontFamily: 'Inter-Regular',
     marginTop: 4,
     marginLeft: 4,
   },
   updateButton: {
-    backgroundColor: '#16a34a',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
@@ -473,7 +563,11 @@ const styles = StyleSheet.create({
   updateButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: 'white',
     fontFamily: 'Inter-SemiBold',
+  },
+  optionalText: {
+    fontSize: 12,
+    fontWeight: '400',
+    fontFamily: 'Inter-Regular',
   },
 });

@@ -465,24 +465,24 @@ export default function Profile() {
               {updatingImage ? (
                 <ActivityIndicator size="large" color="#ffffff" />
               ) : user.profile_image && !imageError ? (
-                <>
-                  <Image
-                    source={{ uri: user.profile_image }}
-                    style={styles.avatarImage}
-                    onError={() => setImageError(true)}
-                  />
-                  <TouchableOpacity
-                    style={styles.removeImageButton}
-                    onPress={handleRemoveImage}
-                    disabled={updatingImage}
-                  >
-                    <X size={16} color="white" />
-                  </TouchableOpacity>
-                </>
+                <Image
+                  source={{ uri: user.profile_image }}
+                  style={styles.avatarImage}
+                  onError={() => setImageError(true)}
+                />
               ) : (
                 <Text style={styles.avatarText}>{getInitials(user.name)}</Text>
               )}
             </View>
+            {user.profile_image && !imageError && !updatingImage && (
+              <TouchableOpacity
+                style={styles.removeImageButton}
+                onPress={handleRemoveImage}
+                disabled={updatingImage}
+              >
+                <X size={16} color="white" />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={styles.cameraButton}
               onPress={handlePickImage}
@@ -708,8 +708,8 @@ const styles = StyleSheet.create({
   // Remove Image Button (Top Right of Avatar)
   removeImageButton: {
     position: 'absolute',
-    top: -8,
-    right: -8,
+    top: 0,
+    right: 0,
     backgroundColor: '#dc2626',
     borderRadius: 14,
     width: 28,

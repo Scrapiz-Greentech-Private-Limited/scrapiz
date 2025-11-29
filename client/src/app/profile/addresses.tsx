@@ -25,6 +25,7 @@ import {
   X,
   Navigation,
 } from 'lucide-react-native';
+import clsx from 'clsx';
 
 // --- Contexts and Services ---
 import { useLocation, SavedLocation } from '../../context/LocationContext';
@@ -610,7 +611,7 @@ export default function AddressesScreen() {
           >
             {/* Address Type Selection */}
             <View className='mb-5'>
-              <Text className='text-sm font-semibold text-gray-700 mb-2.5'>Address Type</Text>
+              <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>Address Type</Text>
               <View className='flex-row gap-3'>
                 <TouchableOpacity
                   className={clsx(
@@ -684,7 +685,7 @@ export default function AddressesScreen() {
 
             {/* Form Fields */}
             <View className='mb-4'>
-              <Text className='text-sm font-semibold text-gray-700 mb-2.5'>Address Name *</Text>
+              <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>Address Name *</Text>
               <TextInput
                 className={clsx(
                   'bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900',
@@ -706,7 +707,7 @@ export default function AddressesScreen() {
             </View>
 
             <View className='mb-4'>
-              <Text className='text-sm font-semibold text-gray-700 mb-2.5'>Phone Number *</Text>
+              <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>Phone Number *</Text>
               <TextInput
                 ref={phoneInputRef}
                 className={clsx(
@@ -732,7 +733,7 @@ export default function AddressesScreen() {
             </View>
 
             <View className='mb-4'>
-              <Text className='text-sm font-semibold text-gray-700 mb-2.5'>House/Flat Number *</Text>
+              <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>House/Flat Number *</Text>
               <TextInput
                 ref={roomInputRef}
                 className={clsx(
@@ -757,7 +758,7 @@ export default function AddressesScreen() {
             </View>
 
             <View className='mb-4'>
-              <Text className='text-sm font-semibold text-gray-700 mb-2.5'>Street *</Text>
+              <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>Street *</Text>
               <TextInput
                 ref={streetInputRef}
                 className={clsx(
@@ -780,7 +781,7 @@ export default function AddressesScreen() {
             </View>
 
             <View className='mb-4'>
-              <Text className='text-sm font-semibold text-gray-700 mb-2.5'>Area/Locality *</Text>
+              <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>Area/Locality *</Text>
               <TextInput
                 ref={areaInputRef}
                 className={clsx(
@@ -804,7 +805,7 @@ export default function AddressesScreen() {
 
             <View className='flex-row gap-4 mb-4'>
               <View className='flex-1'>
-                <Text className='text-sm font-semibold text-gray-700 mb-2.5'>City *</Text>
+                <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>City *</Text>
                 <TextInput
                   ref={cityInputRef}
                   className={clsx(
@@ -827,7 +828,7 @@ export default function AddressesScreen() {
               </View>
 
               <View className='flex-1'>
-                <Text className='text-sm font-semibold text-gray-700 mb-2.5'>State *</Text>
+                <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>State *</Text>
                 <TextInput
                   ref={stateInputRef}
                   className={clsx(
@@ -852,7 +853,7 @@ export default function AddressesScreen() {
 
             <View className='flex-row gap-4 mb-4'>
               <View className='flex-1'>
-                <Text className='text-sm font-semibold text-gray-700 mb-2.5'>Pincode *</Text>
+                <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>Pincode *</Text>
                 <TextInput
                   ref={pincodeInputRef}
                   className={clsx(
@@ -878,7 +879,7 @@ export default function AddressesScreen() {
               </View>
 
               <View className='flex-1'>
-                <Text className='text-sm font-semibold text-gray-700 mb-2.5'>Country *</Text>
+                <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>Country *</Text>
                 <TextInput
                   className='bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900'
                   placeholder="Enter country"
@@ -890,7 +891,7 @@ export default function AddressesScreen() {
             </View>
 
             <View className='mb-5'>
-              <Text className='text-sm font-semibold text-gray-700 mb-2.5'>Delivery Instructions (Optional)</Text>
+              <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>Delivery Instructions (Optional)</Text>
               <TextInput
                 ref={deliveryInputRef}
                 className='bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900 h-24 pt-4'

@@ -256,7 +256,7 @@ export default function SearchBar() {
               </View>
 
               {/* Services Section - Always functional during errors */}
-              <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginTop: 24 }]}>
+              <Text style={[styles.sectionTitle, { color: isDark ? '#cbd5e1' : colors.textSecondary, marginTop: 24 }]}>
                 Our Services
               </Text>
               {services.map((service) => (
@@ -272,14 +272,14 @@ export default function SearchBar() {
                     setTimeout(() => setIsNavigating(false), 1000);
                   }}
                 >
-                  <View style={[styles.serviceIconContainer, { backgroundColor: colors.primaryLight + '30' }]}>
-                    <service.icon size={22} color={service.color} strokeWidth={2.5} />
+                  <View style={[styles.serviceIconContainer, { backgroundColor: isDark ? colors.primary + '20' : colors.primaryLight + '30' }]}>
+                    <service.icon size={22} color={isDark ? colors.primary : service.color} strokeWidth={2.5} />
                   </View>
                   <View style={styles.serviceInfo}>
-                    <Text style={[styles.serviceTitle, { color: colors.text }]}>{service.title}</Text>
-                    <Text style={[styles.serviceDescription, { color: colors.textSecondary }]}>{service.description}</Text>
+                    <Text style={[styles.serviceTitle, { color: isDark ? '#f1f5f9' : colors.text }]}>{service.title}</Text>
+                    <Text style={[styles.serviceDescription, { color: isDark ? '#cbd5e1' : colors.textSecondary }]}>{service.description}</Text>
                   </View>
-                  <ChevronRight size={18} color={colors.textTertiary} strokeWidth={2} />
+                  <ChevronRight size={18} color={isDark ? colors.textSecondary : colors.textTertiary} strokeWidth={2} />
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -354,7 +354,7 @@ export default function SearchBar() {
                   )}
 
                   {/* Services Section - Always visible */}
-                  <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginTop: 24 }]}>
+                  <Text style={[styles.sectionTitle, { color: isDark ? '#cbd5e1' : colors.textSecondary, marginTop: 24 }]}>
                     Our Services
                   </Text>
                   {services.map((service) => (
@@ -370,14 +370,14 @@ export default function SearchBar() {
                         setTimeout(() => setIsNavigating(false), 1000);
                       }}
                     >
-                      <View style={[styles.serviceIconContainer, { backgroundColor: colors.primaryLight + '30' }]}>
-                        <service.icon size={22} color={service.color} strokeWidth={2.5} />
+                      <View style={[styles.serviceIconContainer, { backgroundColor: isDark ? colors.primary + '20' : colors.primaryLight + '30' }]}>
+                        <service.icon size={22} color={isDark ? colors.primary : service.color} strokeWidth={2.5} />
                       </View>
                       <View style={styles.serviceInfo}>
-                        <Text style={[styles.serviceTitle, { color: colors.text }]}>{service.title}</Text>
-                        <Text style={[styles.serviceDescription, { color: colors.textSecondary }]}>{service.description}</Text>
+                        <Text style={[styles.serviceTitle, { color: isDark ? '#f1f5f9' : colors.text }]}>{service.title}</Text>
+                        <Text style={[styles.serviceDescription, { color: isDark ? '#cbd5e1' : colors.textSecondary }]}>{service.description}</Text>
                       </View>
-                      <ChevronRight size={18} color={colors.textTertiary} strokeWidth={2} />
+                      <ChevronRight size={18} color={isDark ? colors.textSecondary : colors.textTertiary} strokeWidth={2} />
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -502,9 +502,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing(16),
-    paddingTop: Platform.OS === 'ios' ? spacing(50) : spacing(16),
+    paddingTop: Platform.OS === 'ios' ? spacing(60) : spacing(24),
     paddingBottom: spacing(12),
-    marginTop:spacing(15),
     borderBottomWidth: 1,
     gap: spacing(12),
   },
@@ -541,10 +540,11 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: fs(14),
-    fontWeight: '600',
+    fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: spacing(16),
+    opacity: 0.9,
   },
   popularGrid: {
     flexDirection: 'row',
@@ -702,12 +702,13 @@ const styles = StyleSheet.create({
   },
   serviceTitle: {
     fontSize: fs(15),
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: spacing(3),
   },
   serviceDescription: {
     fontSize: fs(13),
     lineHeight: fs(18),
+    opacity: 0.85,
   },
   resultImage: {
     width: wp(15),

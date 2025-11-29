@@ -939,7 +939,7 @@ const styles = StyleSheet.create({
   footerNote: {
     backgroundColor: 'white',
     borderRadius: 16,
-    padding: 16,
+    padding: 25,
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },

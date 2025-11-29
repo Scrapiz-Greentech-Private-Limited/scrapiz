@@ -381,9 +381,9 @@ const styles = StyleSheet.create({
   },
   emergencyCard: {
     borderRadius: 16,
-    padding: 24,
+    padding: 20,
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 60,
   },
   emergencyTitle: {
     fontSize: 18,

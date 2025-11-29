@@ -80,6 +80,8 @@ export interface UserProfile {
   name: string;
   email: string;
   is_staff: boolean;
+  phone_number?: string; // User's phone number
+  gender?: 'male' | 'female' | 'prefer_not_to_say'; // User's gender
   orders: OrderSummary[];
   addresses: AddressSummary[];
   referral_code?: string; // User's unique referral code to share

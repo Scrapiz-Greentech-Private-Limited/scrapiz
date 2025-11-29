@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import * as Location from 'expo-location';
-import { X, MapPin, Navigation, Search, Plus, Crosshair } from 'lucide-react-native';
+import { X, MapPin, Navigation, Search, Plus } from 'lucide-react-native';
 import Toast from 'react-native-toast-message';
 import {
   DEFAULT_MAP_STYLE,
@@ -25,7 +25,6 @@ import {
   MAP_SETTINGS,
   DEFAULT_CENTER,
   KRUTRIM_API_KEY,
-  MAP_STYLES,
 } from '../config/mapConfig';
 
 MapboxGL.setAccessToken(MAPBOX_API_KEY);
@@ -98,16 +97,23 @@ export default function MapLocationPicker({
   const [markerCoords, setMarkerCoords] = useState<[number, number]>(selectedCoords);
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [currentUserLocation, setCurrentUserLocation] = useState<[number, number] | null>(null);
+  const [isUserTyping, setIsUserTyping] = useState(false);
 
   const cameraRef = useRef<MapboxGL.Camera>(null);
   const mapRef = useRef<MapboxGL.MapView>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const hasTriggeredGPS = useRef(false);
+  const isSelectingFromSearch = useRef(false);
+  const regionChangeTimeoutRef = useRef<NodeJS.Timeout>();
+  const typingTimeoutRef = useRef<NodeJS.Timeout>();
+  
+  // NEW: Track previous center to detect zoom-only operations
+  const previousCenterRef = useRef<[number, number] | null>(null);
+  const zoomOnlyTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
     if (visible) {
       const timer = setTimeout(() => setIsMapReady(true), 300);
-      // Get user's current location for search bias
       getCurrentUserLocation();
       return () => clearTimeout(timer);
     } else {
@@ -120,25 +126,41 @@ export default function MapLocationPicker({
       setIsSearching(false);
       setIsLoadingLocation(false);
       
-      // Reset marker coordinates to initial position
       const initialCoords: [number, number] = initialLocation 
         ? [initialLocation.longitude, initialLocation.latitude] 
         : DEFAULT_CENTER;
       setMarkerCoords(initialCoords);
       setSelectedCoords(initialCoords);
       
-      // Reset GPS trigger flag when modal closes
       hasTriggeredGPS.current = false;
       
-      // Clear any pending search timeouts
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
         searchTimeoutRef.current = undefined;
       }
+      
+      if (regionChangeTimeoutRef.current) {
+        clearTimeout(regionChangeTimeoutRef.current);
+        regionChangeTimeoutRef.current = undefined;
+      }
+      
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = undefined;
+      }
+      
+      // NEW: Clear zoom-only timeout
+      if (zoomOnlyTimeoutRef.current) {
+        clearTimeout(zoomOnlyTimeoutRef.current);
+        zoomOnlyTimeoutRef.current = undefined;
+      }
+      
+      isSelectingFromSearch.current = false;
+      setIsUserTyping(false);
+      previousCenterRef.current = null;
     }
   }, [visible, initialLocation]);
 
-  // Auto-trigger GPS when autoOpenGPS is true
   useEffect(() => {
     if (visible && autoOpenGPS && isMapReady && !hasTriggeredGPS.current) {
       hasTriggeredGPS.current = true;
@@ -148,12 +170,10 @@ export default function MapLocationPicker({
 
   const getCurrentUserLocation = async () => {
     try {
-      // Check permission status first
       const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
       
       let finalStatus = existingStatus;
       
-      // Only request if not already granted
       if (existingStatus !== 'granted') {
         const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
         finalStatus = newStatus;
@@ -161,39 +181,46 @@ export default function MapLocationPicker({
       
       if (finalStatus === 'granted') {
         const position = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
+          accuracy: Location.Accuracy.Highest,
         });
         setCurrentUserLocation([position.coords.longitude, position.coords.latitude]);
-      } else {
-        console.error('Location permission not granted for search bias');
       }
     } catch (error) {
       console.error('Could not get user location for search bias:', error);
     }
   };
 
+  // IMPROVED: Debounced search with proper cleanup
   useEffect(() => {
     if (searchQuery.trim().length < MAP_SETTINGS.searchMinCharacters) {
       setSearchResults([]);
       setShowResults(false);
       return;
     }
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
 
+    // Debounce: 500ms after user stops typing
     searchTimeoutRef.current = setTimeout(() => {
       searchLocation(searchQuery);
     }, MAP_SETTINGS.searchDebounceMs);
 
     return () => {
-      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
     };
   }, [searchQuery]);
 
+  // IMPROVED: Throttled search function (prevents rapid successive calls)
   const searchLocation = async (query: string) => {
     if (!query.trim()) return;
+    
     setIsSearching(true);
+    
     try {
-      // Use current user location or marker location for proximity bias
       const proximityCoords = currentUserLocation || markerCoords;
       
       const url = buildGeocodingUrl(query, {
@@ -221,51 +248,54 @@ export default function MapLocationPicker({
 
   const reverseGeocode = async (
     latitude: number,
-    longitude: number
+    longitude: number,
+    updateSearchBox: boolean = true
   ): Promise<KrutrimReverseGeocodeResult | null> => {
-    // Set loading state to true before async operation starts
     setIsSearching(true);
     
     try {
       const url = buildReverseGeocodingUrl(longitude, latitude);
       const response = await fetch(url);
       
-      // Check if response is ok
       if (!response.ok) {
         console.error('Reverse geocoding API error:', response.status, response.statusText);
-        setSearchQuery('Location selected - please add details manually');
+        if (updateSearchBox) {
+          setSearchQuery('Location selected - please add details manually');
+        }
         return null;
       }
       
       const data = await response.json();
 
-      // Handle null or undefined data
       if (!data || data === null || data === undefined) {
         console.error('Reverse geocoding returned null/undefined response');
-        setSearchQuery('Location selected - please add details manually');
+        if (updateSearchBox) {
+          setSearchQuery('Location selected - please add details manually');
+        }
         return null;
       }
 
-      // Handle case where results array exists and has data
       if (data.results && data.results.length > 0) {
         const result = data.results[0] as KrutrimReverseGeocodeResult;
-        setSearchQuery(result.formatted_address);
+        if (updateSearchBox) {
+          setSearchQuery(result.formatted_address);
+        }
         return result;
       }
       
-      // Handle case where no results are returned - allow user to proceed with manual entry
       console.error('Reverse geocoding returned no results for coordinates:', latitude, longitude);
-      setSearchQuery('Location selected - please add details manually');
+      if (updateSearchBox) {
+        setSearchQuery('Location selected - please add details manually');
+      }
       return null;
     } catch (error) {
-      // Log geocoding errors to console for debugging
       console.error('Reverse geocoding error:', error);
       
-      // Display placeholder text when geocoding fails - allows user to proceed with manual address entry
-      setSearchQuery('Location selected - address unavailable');
+      if (updateSearchBox) {
+        setSearchQuery('Location selected - address unavailable');
+      }
       return null;
     } finally {
-      // Set loading state to false after operation completes (success or error)
       setIsSearching(false);
     }
   };
@@ -294,27 +324,33 @@ export default function MapLocationPicker({
     setShowResults(false);
     Keyboard.dismiss();
 
-    // Set loading state to true before async operation starts
+    isSelectingFromSearch.current = true;
     setIsSearching(true);
     
     try {
-      // Get place details to get coordinates
       const placeDetails = await getPlaceDetails(result.place_id);
       
       if (placeDetails) {
         const coords: [number, number] = [placeDetails.lng, placeDetails.lat];
         setSelectedCoords(coords);
         setMarkerCoords(coords);
+        previousCenterRef.current = coords; // Track this position
+        
         cameraRef.current?.flyTo(coords, MAP_SETTINGS.animationDuration);
+        
         await reverseGeocode(placeDetails.lat, placeDetails.lng);
+        
+        setTimeout(() => {
+          isSelectingFromSearch.current = false;
+        }, MAP_SETTINGS.animationDuration + 500);
       } else {
         console.warn('Could not get coordinates for selected place');
-        // Set loading state to false on error
+        isSelectingFromSearch.current = false;
         setIsSearching(false);
       }
     } catch (error) {
       console.error('Error selecting result:', error);
-      // Set loading state to false on error
+      isSelectingFromSearch.current = false;
       setIsSearching(false);
     }
   };
@@ -322,37 +358,37 @@ export default function MapLocationPicker({
   const handleUseCurrentLocation = async () => {
     setIsLoadingLocation(true);
     setShowActionMenu(false);
+    
+    isSelectingFromSearch.current = true;
+    
     try {
-      // Check current permission status before requesting
       const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
       
       let finalStatus = existingStatus;
       
-      // Only request permission if not already granted
       if (existingStatus !== 'granted') {
         const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
         finalStatus = newStatus;
       }
       
-      // Handle permission denial
       if (finalStatus !== 'granted') {
         console.error('GPS permission denied by user');
         
         Toast.show({
           type: 'error',
           text1: 'Permission Required',
-          text2: 'Location permission is needed to use this feature. Please enable location access in your device settings.',
+          text2: 'Location permission is needed to use this feature.',
           visibilityTime: 5000,
         });
         
+        isSelectingFromSearch.current = false;
         setIsLoadingLocation(false);
         return;
       }
 
-      // Acquire GPS location - wrapped in try-catch for error handling
       try {
         const position = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
+          accuracy: Location.Accuracy.Highest,
         });
 
         const coords: [number, number] = [
@@ -363,57 +399,40 @@ export default function MapLocationPicker({
         setSelectedCoords(coords);
         setMarkerCoords(coords);
         setCurrentUserLocation(coords);
+        previousCenterRef.current = coords; // Track this position
 
         cameraRef.current?.flyTo(coords, MAP_SETTINGS.animationDuration);
         await reverseGeocode(coords[1], coords[0]);
+        
+        setTimeout(() => {
+          isSelectingFromSearch.current = false;
+        }, MAP_SETTINGS.animationDuration + 500);
       } catch (gpsError: any) {
-        // GPS acquisition failed - provide detailed error handling
         console.error('GPS location acquisition error:', gpsError);
         
-        // Provide user-friendly error message based on error type
-        let errorTitle = 'Location Error';
-        let errorMessage = 'Failed to get your current location. Tap to retry or select location manually on the map.';
-        
-        if (gpsError.message?.includes('Location request failed') || gpsError.message?.includes('Location services')) {
-          errorTitle = 'GPS Unavailable';
-          errorMessage = 'Could not obtain your location. Please ensure GPS is enabled in your device settings. Tap to retry.';
-        } else if (gpsError.message?.includes('timeout') || gpsError.message?.includes('timed out')) {
-          errorTitle = 'Location Timeout';
-          errorMessage = 'Location request timed out. Please ensure you have a clear view of the sky. Tap to retry.';
-        } else if (gpsError.message?.includes('permission')) {
-          errorTitle = 'Permission Error';
-          errorMessage = 'Location permission error occurred. Please check your device settings. Tap to retry.';
-        }
-        
-        // Display error with retry option
         Toast.show({
           type: 'error',
-          text1: errorTitle,
-          text2: errorMessage,
+          text1: 'Location Error',
+          text2: 'Failed to get your current location.',
           visibilityTime: 6000,
-          onPress: () => {
-            // Retry GPS acquisition when user taps the toast
-            Toast.hide();
-            handleUseCurrentLocation();
-          },
         });
         
-        // Set loading state to false on error
+        isSelectingFromSearch.current = false;
         setIsLoadingLocation(false);
         return;
       }
     } catch (error: any) {
-      // Permission-related errors
       console.error('GPS permission error:', error);
       
       Toast.show({
         type: 'error',
         text1: 'Permission Error',
-        text2: 'Failed to request location permission. Please check your device settings.',
+        text2: 'Failed to request location permission.',
         visibilityTime: 5000,
       });
+      
+      isSelectingFromSearch.current = false;
     } finally {
-      // Always set loading state to false
       setIsLoadingLocation(false);
     }
   };
@@ -422,18 +441,31 @@ export default function MapLocationPicker({
     const { geometry } = feature;
     if (geometry && geometry.coordinates) {
       const coords = geometry.coordinates as [number, number];
+      
+      isSelectingFromSearch.current = true;
+      
       setSelectedCoords(coords);
       setMarkerCoords(coords);
+      previousCenterRef.current = coords; // Track this position
+      
       cameraRef.current?.setCamera({
         centerCoordinate: coords,
         animationDuration: 300,
       });
       await reverseGeocode(coords[1], coords[0]);
+      
+      setTimeout(() => {
+        isSelectingFromSearch.current = false;
+      }, 800);
     }
   };
 
-  // Handle map region change to update center pin location
-  const handleRegionDidChange = async () => {
+  // IMPROVED: Only update marker position, don't reverse geocode yet
+  const handleCameraChanged = async () => {
+    if (isSelectingFromSearch.current) {
+      return;
+    }
+    
     if (!mapRef.current) return;
     
     try {
@@ -442,11 +474,49 @@ export default function MapLocationPicker({
         const coords: [number, number] = [center[0], center[1]];
         setMarkerCoords(coords);
         setSelectedCoords(coords);
-        // Debounce reverse geocoding
-        if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-        searchTimeoutRef.current = setTimeout(() => {
-          reverseGeocode(coords[1], coords[0]);
-        }, 500);
+      }
+    } catch (error) {
+      console.error('Error getting map center:', error);
+    }
+  };
+
+  // FIX: Detect if this is a zoom-only operation
+  const handleMapIdle = async () => {
+    if (isSelectingFromSearch.current) {
+      return;
+    }
+    
+    if (isUserTyping) {
+      return;
+    }
+    
+    if (!mapRef.current) return;
+    
+    try {
+      const center = await mapRef.current.getCenter();
+      if (center && center.length === 2) {
+        const coords: [number, number] = [center[0], center[1]];
+        
+        // NEW: Check if center has significantly changed (not just zoom)
+        // Reduced threshold from ~11m to ~2m for more precise location
+        const hasSignificantMove = !previousCenterRef.current || 
+          Math.abs(coords[0] - previousCenterRef.current[0]) > 0.00002 || // ~2 meters
+          Math.abs(coords[1] - previousCenterRef.current[1]) > 0.00002;
+        
+        // Only reverse geocode if the map actually moved (pan), not just zoomed
+        if (hasSignificantMove) {
+          // Clear existing timeout
+          if (regionChangeTimeoutRef.current) {
+            clearTimeout(regionChangeTimeoutRef.current);
+          }
+          
+          // Debounce: Wait 600ms after user stops moving map (reduced from 800ms)
+          regionChangeTimeoutRef.current = setTimeout(() => {
+            // DON'T update search box when manually dragging - only update internal location
+            reverseGeocode(coords[1], coords[0], false);
+            previousCenterRef.current = coords; // Update tracked position
+          }, 600);
+        }
       }
     } catch (error) {
       console.error('Error getting map center:', error);
@@ -460,7 +530,8 @@ export default function MapLocationPicker({
   const handleConfirmLocation = async () => {
     const [longitude, latitude] = markerCoords;
 
-    const result = await reverseGeocode(latitude, longitude);
+    // Always fetch fresh location data on confirm
+    const result = await reverseGeocode(latitude, longitude, false);
 
     let locationResult: LocationResult = {
       latitude,
@@ -487,8 +558,6 @@ export default function MapLocationPicker({
         find('sublocality_level_1') || find('neighborhood') || 'Unknown';
     }
 
-    // In form-populate mode, just return the location data without saving to backend
-    // In standalone mode, the parent component handles the backend save
     onLocationSelect(locationResult);
     onClose();
   };
@@ -510,107 +579,117 @@ export default function MapLocationPicker({
           <View style={{ width: 40 }} />
         </View>
 
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBar}>
-            <Search size={20} color="#9ca3af" />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Try Powai, Borivali West etc..."
-              placeholderTextColor="#9ca3af"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              autoCorrect={false}
-            />
-            {isSearching && <ActivityIndicator size="small" color="#d946ef" />}
-          </View>
-        </View>
-
-        {/* Map Wrapper */}
-        <TouchableWithoutFeedback onPress={dismissResults}>
-          <View style={styles.mapWrapper}>
-            {/* Search Results */}
-            {showResults && searchResults.length > 0 && (
-              <View style={styles.resultsContainer}>
-                <FlatList
-                  data={searchResults}
-                  keyExtractor={(item) => item.place_id}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={styles.resultItem}
-                      onPress={() => handleResultSelect(item)}
-                    >
-                      <MapPin size={18} color="#6b7280" />
-                      <Text style={styles.resultText} numberOfLines={2}>
-                        {item.description}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                  style={styles.resultsList}
-                  keyboardShouldPersistTaps="handled"
+        {/* Map Container - Full Screen */}
+        <View style={styles.mapContainer}>
+          {isMapReady ? (
+            <>
+              <MapboxGL.MapView
+                ref={mapRef}
+                style={styles.map}
+                styleURL={DEFAULT_MAP_STYLE}
+                onPress={handleMapPress}
+                onCameraChanged={handleCameraChanged}
+                onMapIdle={handleMapIdle}
+                logoEnabled={false}
+                attributionEnabled={true}
+                attributionPosition={{ bottom: 8, left: 8 }}
+              >
+                <MapboxGL.Camera
+                  ref={cameraRef}
+                  centerCoordinate={selectedCoords}
+                  zoomLevel={MAP_SETTINGS.defaultZoom}
+                  animationMode="flyTo"
+                  animationDuration={MAP_SETTINGS.animationDuration}
                 />
-              </View>
-            )}
+              </MapboxGL.MapView>
 
-            {/* Map */}
-            <View style={styles.mapContainer}>
-              {isMapReady ? (
-                <>
-                  <MapboxGL.MapView
-                    ref={mapRef}
-                    style={styles.map}
-                    styleURL={DEFAULT_MAP_STYLE}
-                    onPress={handleMapPress}
-                    onRegionDidChange={handleRegionDidChange}
-                    logoEnabled={false}
-                    attributionEnabled={true}
-                    attributionPosition={{ bottom: 8, left: 8 }}
-                  >
-                    <MapboxGL.Camera
-                      ref={cameraRef}
-                      centerCoordinate={selectedCoords}
-                      zoomLevel={MAP_SETTINGS.defaultZoom}
-                      animationMode="flyTo"
-                      animationDuration={MAP_SETTINGS.animationDuration}
-                    />
-                  </MapboxGL.MapView>
-
-                  {/* Center Pin Marker - Fixed in center */}
-                  <View style={styles.centerMarkerContainer} pointerEvents="none">
-                    <View style={styles.pinTooltip}>
-                      <Text style={styles.tooltipText}>Order will be delivered here</Text>
-                      <Text style={styles.tooltipSubtext}>Move the pin to change location</Text>
-                      <View style={styles.tooltipArrow} />
-                    </View>
-                    <View style={styles.pinMarker}>
-                      <MapPin size={36} color="#ef4444" fill="#ef4444" strokeWidth={2} />
-                    </View>
-                    <View style={styles.pinShadow} />
-                  </View>
-
-                  {/* Use Current Location Button */}
-                  <TouchableOpacity
-                    style={styles.currentLocationButton}
-                    onPress={handleUseCurrentLocation}
-                    disabled={isLoadingLocation}
-                  >
-                    {isLoadingLocation ? (
-                      <ActivityIndicator size="small" color="#d946ef" />
-                    ) : (
-                      <Navigation size={18} color="#d946ef" />
-                    )}
-                    <Text style={styles.currentLocationText}>Use Current Location</Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <View style={styles.mapLoadingContainer}>
-                  <ActivityIndicator size="large" color="#d946ef" />
-                  <Text style={styles.loadingText}>Loading map...</Text>
+              {/* Search Bar Overlay */}
+              <View style={styles.searchOverlay}>
+                <View style={styles.searchBar}>
+                  <Search size={20} color="#9ca3af" />
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Try Powai, Borivali West etc..."
+                    placeholderTextColor="#9ca3af"
+                    value={searchQuery}
+                    onChangeText={(text) => {
+                      setSearchQuery(text);
+                      setIsUserTyping(true);
+                      
+                      if (typingTimeoutRef.current) {
+                        clearTimeout(typingTimeoutRef.current);
+                      }
+                      
+                      // Mark as "not typing" after 2 seconds of inactivity
+                      typingTimeoutRef.current = setTimeout(() => {
+                        setIsUserTyping(false);
+                      }, 2000);
+                    }}
+                    onFocus={() => setIsUserTyping(true)}
+                    onBlur={() => {
+                      setTimeout(() => {
+                        setIsUserTyping(false);
+                      }, 300);
+                    }}
+                    autoCorrect={false}
+                  />
+                  {isSearching && <ActivityIndicator size="small" color="#16a34a" />}
                 </View>
-              )}
+
+                {/* Search Results */}
+                {showResults && searchResults.length > 0 && (
+                  <View style={styles.resultsContainer}>
+                    <FlatList
+                      data={searchResults}
+                      keyExtractor={(item) => item.place_id}
+                      renderItem={({ item }) => (
+                        <TouchableOpacity
+                          style={styles.resultItem}
+                          onPress={() => handleResultSelect(item)}
+                        >
+                          <MapPin size={18} color="#6b7280" />
+                          <Text style={styles.resultText} numberOfLines={2}>
+                            {item.description}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                      style={styles.resultsList}
+                      keyboardShouldPersistTaps="handled"
+                    />
+                  </View>
+                )}
+              </View>
+
+              {/* Center Tooltip Only (no pin marker) */}
+              <View style={styles.centerTooltipContainer} pointerEvents="none">
+                <View style={styles.pinTooltip}>
+                  <Text style={styles.tooltipText}>Order will be delivered here</Text>
+                  <Text style={styles.tooltipSubtext}>Move the pin to change location</Text>
+                  <View style={styles.tooltipArrow} />
+                </View>
+              </View>
+
+              {/* Use Current Location Button */}
+              <TouchableOpacity
+                style={styles.currentLocationButton}
+                onPress={handleUseCurrentLocation}
+                disabled={isLoadingLocation}
+              >
+                {isLoadingLocation ? (
+                  <ActivityIndicator size="small" color="#16a34a" />
+                ) : (
+                  <Navigation size={18} color="#16a34a" />
+                )}
+                <Text style={styles.currentLocationText}>Use Current Location</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <View style={styles.mapLoadingContainer}>
+              <ActivityIndicator size="large" color="#16a34a" />
+              <Text style={styles.loadingText}>Loading map...</Text>
             </View>
-          </View>
-        </TouchableWithoutFeedback>
+          )}
+        </View>
 
         {/* Footer */}
         <View style={styles.footer}>
@@ -618,10 +697,10 @@ export default function MapLocationPicker({
             <MapPin size={20} color="#111827" />
             <View style={styles.addressTextContainer}>
               <Text style={styles.addressTitle} numberOfLines={1}>
-                {searchQuery ? searchQuery.split(',')[0] : 'Select Location'}
+                Select Location
               </Text>
               <Text style={styles.addressSubtitle} numberOfLines={2}>
-                {searchQuery || 'Move the pin to select your delivery location'}
+                Move the pin to select your delivery location
               </Text>
             </View>
             {searchQuery && (
@@ -634,18 +713,15 @@ export default function MapLocationPicker({
           <TouchableOpacity
             style={[
               styles.confirmButton,
-              (!searchQuery || saving) && styles.confirmButtonDisabled,
+              saving && styles.confirmButtonDisabled,
             ]}
             onPress={handleConfirmLocation}
-            disabled={!searchQuery || saving}
+            disabled={saving}
           >
             {saving ? (
               <ActivityIndicator size="small" color="#ffffff" />
             ) : (
-              <Text style={[
-                styles.confirmButtonText,
-                !searchQuery && styles.confirmButtonTextDisabled,
-              ]}>
+              <Text style={styles.confirmButtonText}>
                 Confirm location
               </Text>
             )}
@@ -669,7 +745,7 @@ export default function MapLocationPicker({
                       onPress={handleUseCurrentLocation}
                       disabled={isLoadingLocation}
                     >
-                      <Navigation size={20} color="#d946ef" />
+                      <Navigation size={20} color="#16a34a" />
                       <Text style={styles.actionMenuText}>Use Current Location</Text>
                     </TouchableOpacity>
 
@@ -708,7 +784,7 @@ export default function MapLocationPicker({
                             onAddManualAddress();
                           }}
                         >
-                          <Plus size={20} color="#d946ef" />
+                          <Plus size={20} color="#16a34a" />
                           <Text style={styles.actionMenuText}>Add Manual Address</Text>
                         </TouchableOpacity>
                       </>
@@ -734,8 +810,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 50 : 16,
-    paddingBottom: 12,
+    paddingTop: Platform.OS === 'ios' ? 60 : 24,
+    paddingBottom: 16,
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
@@ -750,60 +826,6 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     marginRight: -40,
-  },
-  searchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#ffffff',
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: '#111827',
-  },
-  mapWrapper: {
-    flex: 1,
-  },
-  resultsContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#ffffff',
-    maxHeight: 300,
-    zIndex: 10,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
-  resultsList: {
-    flexGrow: 0,
-  },
-  resultItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    gap: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  resultText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#111827',
-    lineHeight: 20,
   },
   mapContainer: {
     flex: 1,
@@ -823,22 +845,77 @@ const styles = StyleSheet.create({
   map: {
     flex: 1,
   },
-  // Center Pin Marker (Fixed in center of screen)
-  centerMarkerContainer: {
+  // Search Bar Overlay on Map
+  searchOverlay: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    right: 16,
+    zIndex: 10,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#111827',
+  },
+  resultsContainer: {
+    backgroundColor: '#ffffff',
+    maxHeight: 300,
+    marginTop: 8,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  resultsList: {
+    flexGrow: 0,
+  },
+  resultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  resultText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#111827',
+    lineHeight: 20,
+  },
+  // Center Tooltip Only (no pin marker)
+  centerTooltipContainer: {
     position: 'absolute',
     top: '50%',
     left: '50%',
-    marginLeft: -18,
-    marginTop: -80,
+    marginLeft: -110,
+    marginTop: -100,
     alignItems: 'center',
-    zIndex: 10,
+    zIndex: 5,
   },
   pinTooltip: {
     backgroundColor: '#111827',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    marginBottom: 8,
     maxWidth: 220,
     alignItems: 'center',
   },
@@ -866,18 +943,6 @@ const styles = StyleSheet.create({
     borderRightColor: 'transparent',
     borderTopColor: '#111827',
   },
-  pinMarker: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pinShadow: {
-    width: 16,
-    height: 6,
-    borderRadius: 8,
-    backgroundColor: '#000000',
-    opacity: 0.2,
-    marginTop: 2,
-  },
   currentLocationButton: {
     position: 'absolute',
     bottom: 20,
@@ -898,15 +963,15 @@ const styles = StyleSheet.create({
   currentLocationText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#d946ef',
+    color: '#16a34a',
   },
   footer: {
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+    paddingTop: 16,
+    paddingBottom: Platform.OS === 'ios' ? 32 : 20,
   },
   addressContainer: {
     flexDirection: 'row',
@@ -931,15 +996,15 @@ const styles = StyleSheet.create({
   changeButton: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#d946ef',
+    color: '#16a34a',
     paddingTop: 2,
   },
   confirmButton: {
-    backgroundColor: '#d946ef',
+    backgroundColor: '#16a34a',
     borderRadius: 8,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 12,
   },
   confirmButtonDisabled: {
     backgroundColor: '#e5e7eb',
