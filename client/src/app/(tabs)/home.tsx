@@ -331,7 +331,7 @@ v          <View style={styles.decorativeCircle1} />
                 >
                   <Image source={category.icon} style={styles.itemImage} />
                   <Text style={[styles.categoryName, { color: colors.text }]}>{category.name}</Text>
-                  <Text style={[styles.categoryRate, { color: category.color }]}>
+                  <Text style={[styles.categoryRate, { color: '#16a34a' }]}>
                     {category.rate}
                   </Text>
                 </TouchableOpacity>
@@ -415,7 +415,7 @@ v          <View style={styles.decorativeCircle1} />
               </View>
               <View style={styles.referTextContainer}>
                 <Text style={[styles.referTitle, { color: isDark ? '#fef3c7' : '#78350f' }]}>{t('home.referAndEarn')}</Text>
-                <Text style={[styles.referSubtitle, { color: isDark ? '#fde68a' : '#92400e' }]}>
+                <Text style={[styles.referSubtitle, { color: isDark ? '#FCD34D' : '#D97706' }]}>
                   {t('home.referSubtitle')}
                 </Text>
               </View>
@@ -926,6 +926,17 @@ const styles = StyleSheet.create({
   referCard: {
     borderRadius: 20,
     overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#f59e0b',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.4, 
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 10, // Increased Android elevation
+      }
+    }),
     shadowColor: '#f59e0b',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,

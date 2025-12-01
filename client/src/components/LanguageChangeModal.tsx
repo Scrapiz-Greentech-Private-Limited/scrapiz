@@ -31,8 +31,8 @@ interface LanguageChangeModalProps {
 export default function LanguageChangeModal({
   visible,
   currentLanguage,
-  onClose,
-  onLanguageChange,
+  onClose,languageInfo,
+  onLanguageChange
 }: LanguageChangeModalProps) {
   const { t } = useLocalization();
   const { colors, isDark } = useTheme();
@@ -147,7 +147,9 @@ export default function LanguageChangeModal({
                       accessibilityState={{ checked: isSelected }}
                     >
                       <View style={styles.languageInfo}>
-                        <Text style={styles.languageIcon}>{language.icon}</Text>
+                        <View style={[styles.languageIconContainer]}>
+                          <Text style={styles.languageIcon ,{ color: isSelected ? colors.primary : colors.text }}>{language.icon}</Text>
+                        </View>
                         <Text
                           style={[
                             styles.languageNativeName,
@@ -265,11 +267,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
+  languageIconContainer: {
+    width: 48,
+    height: 48,
+    //borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 4,
+  },
   languageIcon: {
     fontSize: 28,
-    marginRight: 16,
-    width: 40,
     textAlign: 'center',
+    fontWeight: '500'
   },
   languageNativeName: {
     fontSize: 18,

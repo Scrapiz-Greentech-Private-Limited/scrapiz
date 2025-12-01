@@ -48,7 +48,7 @@
       "versionCode": 18
     },
     "notification": {
-      "icon": "./assets/images/app.png",
+      "icon": "./assets/images/foreground5.png",
       "color": "#16a34a"
     },
     "web": {
@@ -68,10 +68,14 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/newapp.png",
-          "resizeMode": "cover",
+          "image": "./assets/images/splashScreen.png",
+          "resizeMode": "contain",
           "backgroundColor": "#ffffff",
-          "enableFullScreenImage_legacy": true
+          "dark":{
+            "image":"./assets/images/splashScreen.png",
+            "backgroundColor": "#121212"
+          }
+
         }
       ],
       [
@@ -98,9 +102,10 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.scrapiz.in/api",
         "EXPO_PUBLIC_FRONTEND_SECRET": "Scrapiz#0nn$(tab!z",
-        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "765250017313-94tside5h04tidg35gahkevddopjr74l.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "765250017313-m05cng47dvaisjc3gnoo2fkvifsv5q30.apps.googleusercontent.com",
-        "EXPO_PUBLIC_MAP_TILER_API_KEY": "oEldgWNaTPZsPFgr6fab"
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "515246444918-9i1en7elr36ogmjimmsu0durj7cr0aai.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "515246444918-vcupmtbkchia1qrqtp4sr6ge1qkkvlur.apps.googleusercontent.com",
+        "EXPO_PUBLIC_MAP_TILER_API_KEY": "oEldgWNaTPZsPFgr6fab",
+        "EXPO_PUBLIC_GOOGLE_MAPS_KEY":"AIzaSyCXv6HR4agCc7eHo02CjVgN4yMVxbvQRqg"
       },
       "router": {},
       "eas": {

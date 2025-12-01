@@ -3,6 +3,7 @@ import { Stack, Tabs } from "expo-router";
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '@expo-google-fonts/inter';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
+
 import { useEffect, useRef } from "react";
 import { ActivityIndicator, StyleSheet, View, Platform } from 'react-native';
 import '@/global.css';

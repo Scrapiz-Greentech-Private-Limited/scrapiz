@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User
+from .models import User, AuditLog
 from django.utils import timezone
 from inventory.serializers import OrderNoSerializer
 from user.serializers import AddressSerializer
@@ -22,6 +22,8 @@ class UserSerializer(serializers.ModelSerializer):
             'confirm_password',
             'promo_code',
             'otp',
+            'phone_number',
+            'gender',
             'referral_code',
             'referred_balance',
             'has_completed_first_order',
@@ -66,3 +68,22 @@ class ReferredUserSerializer(serializers.ModelSerializer):
   def get_earned_amount(self, obj):
     """Calculate the amount earned from this referral"""
     return 20.00 if obj.has_completed_first_order else 0.00
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+  user = serializers.SerializerMethodField()
+  
+  class Meta:
+    model = AuditLog
+    fields = ['id', 'user', 'action', 'ip_address', 'timestamp']
+    read_only_fields = fields
+  
+  def get_user(self, obj):
+    """Return user information if user exists"""
+    if obj.user:
+      return {
+        'id': obj.user.id,
+        'email': obj.user.email,
+        'name': obj.user.name,
+      }
+    return None

@@ -587,3 +587,72 @@ class RedeemReferralBalanceView(APIView):
       )
   
   
+
+#
+ ------------------ Audit Log Views ------------------
+class AuditLogView(APIView):
+    """
+    View for retrieving audit logs with optional filtering
+    Admin only endpoint
+    """
+    def get(self, request):
+        # Authenticate and check if user is staff
+        user = authenticate_request(request)
+        if not user or not (user.is_staff or user.is_superuser):
+            return Response(
+                {"error": "Unauthorized. Admin access required."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get filter parameters
+        action = request.GET.get('action', None)
+        user_id = request.GET.get('user_id', None)
+        start_date = request.GET.get('start_date', None)
+        end_date = request.GET.get('end_date', None)
+        
+        # Start with all audit logs
+        queryset = AuditLog.objects.all().select_related('user')
+        
+        # Apply filters
+        if action:
+            queryset = queryset.filter(action=action)
+        
+        if user_id:
+            try:
+                queryset = queryset.filter(user_id=int(user_id))
+            except (ValueError, TypeError):
+                return Response(
+                    {"error": "Invalid user_id parameter"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        if start_date:
+            try:
+                start_datetime = timezone.datetime.fromisoformat(start_date)
+                queryset = queryset.filter(timestamp__gte=start_datetime)
+            except (ValueError, TypeError):
+                return Response(
+                    {"error": "Invalid start_date format. Use ISO format (YYYY-MM-DD)"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        if end_date:
+            try:
+                end_datetime = timezone.datetime.fromisoformat(end_date)
+                # Add one day to include the entire end date
+                end_datetime = end_datetime + timezone.timedelta(days=1)
+                queryset = queryset.filter(timestamp__lt=end_datetime)
+            except (ValueError, TypeError):
+                return Response(
+                    {"error": "Invalid end_date format. Use ISO format (YYYY-MM-DD)"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Order by most recent first
+        queryset = queryset.order_by('-timestamp')
+        
+        # Serialize and return
+        from ..serializers import AuditLogSerializer
+        serializer = AuditLogSerializer(queryset, many=True)
+        
+        return Response(serializer.data, status=status.HTTP_200_OK)

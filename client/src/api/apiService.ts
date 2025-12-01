@@ -528,6 +528,16 @@ export class AuthService {
     }
   }
 
+  // Content APIs
+  static async getCarouselImages(): Promise<any[]> {
+    try {
+      const response = await apiClient.get('/content/carousel/');
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch carousel images');
+    }
+  }
+
   static async getOrderNos(): Promise<OrderSummary[]> {
     try {
       const response = await apiClient.get(API_CONFIG.ENDPOINTS.INVENTORY_ORDERNOS);

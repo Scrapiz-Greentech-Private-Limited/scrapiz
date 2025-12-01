@@ -169,10 +169,16 @@ export default function LoginScreen() {
 
   const handleGoogleLogin = async () => {
     try {
-      await signInWithGoogle();
+      const success = await signInWithGoogle();
       // Navigation will be handled by useEffect when authSuccess changes
-    } catch (error) {
+      // Error toast will be shown by the error useEffect below
+    } catch (error: any) {
       console.error('Google login error:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Sign In Failed',
+        text2: error.message || 'Unable to sign in. Please try again',
+      });
     }
   };
 
@@ -181,11 +187,11 @@ export default function LoginScreen() {
     if (googleError) {
       Toast.show({
         type: 'error',
-        text1: t('common.error'),
+        text1: 'Sign In Failed',
         text2: googleError,
       });
     }
-  }, [googleError, t]);
+  }, [googleError]);
 
   const isAnyLoading = isLoading || isGoogleLoading;
 

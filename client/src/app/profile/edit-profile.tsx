@@ -422,9 +422,9 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
   },
   header: {
-    paddingTop: 60,
+    paddingTop: 50,
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -520,7 +520,7 @@ const styles = StyleSheet.create({
   },
   inputWrapper: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 16,
@@ -531,7 +531,6 @@ const styles = StyleSheet.create({
   },
   inputIcon: {
     marginRight: 12,
-    marginTop: 2,
   },
   input: {
     flex: 1,
@@ -555,7 +554,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 40,
   },
   updateButtonDisabled: {
     opacity: 0.7,

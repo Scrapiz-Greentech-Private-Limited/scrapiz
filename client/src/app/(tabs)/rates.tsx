@@ -22,9 +22,40 @@ import { wp, hp, fs } from '../../utils/responsive';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { AuthService, CategorySummary, ProductSummary } from '../../api/apiService';
+import { RemoteImage } from '../../components/RemoteImage';
 
+// Helper to get product image - checks S3 URL first, then falls back to local assets
+const getImageForProduct = (product: ProductSummary) => {
+  // Priority 1: Use S3 image if available
+  if (product.image_url) {
+    return { uri: product.image_url };
+  }
+  
+  // Priority 2: Fallback to local assets based on product name
+  const name = product.name.toLowerCase();
+  if (name.includes('newspaper')) return require('../../../assets/images/Scrap_Rates_Photos/Newspaper.jpg');
+  if (name.includes('cardboard') || name.includes('corrugated')) return require('../../../assets/images/Scrap_Rates_Photos/Cardboard.jpg');
+  if (name.includes('book') || name.includes('paper')) return require('../../../assets/images/Scrap_Rates_Photos/Book.jpg');
+  if (name.includes('plastic')) return require('../../../assets/images/Scrap_Rates_Photos/Plastics.jpg');
+  if (name.includes('iron') || name.includes('steel')) return require('../../../assets/images/Scrap_Rates_Photos/Iron.jpg');
+  if (name.includes('aluminum') || name.includes('aluminium')) return require('../../../assets/images/Scrap_Rates_Photos/Aluminium.jpg');
+  if (name.includes('copper')) return require('../../../assets/images/Scrap_Rates_Photos/Copper.jpg');
+  if (name.includes('brass')) return require('../../../assets/images/Scrap_Rates_Photos/Brass.jpg');
+  if (name.includes('tin')) return require('../../../assets/images/Scrap_Rates_Photos/Tin.jpg');
+  if (name.includes('refrigerator')) return require('../../../assets/images/Scrap_Rates_Photos/fridge.jpg');
+  if (name.includes('battery')) return require('../../../assets/images/Scrap_Rates_Photos/Battery.jpg');
+  if (name.includes('front load machine')) return require('../../../assets/images/Scrap_Rates_Photos/FrontLoadMachine.jpg');
+  if (name.includes('tv') || name.includes('television')) return require('../../../assets/images/Scrap_Rates_Photos/TV.jpg');
+  if (name.includes('laptops')) return require('../../../assets/images/Scrap_Rates_Photos/Laptops.jpg');
+  if (name.includes('windowac')) return require('../../../assets/images/Scrap_Rates_Photos/WindowAC.jpg');
+  if (name.includes('printer')) return require('../../../assets/images/Scrap_Rates_Photos/Printer.jpg');
+  if (name.includes('microwave')) return require('../../../assets/images/Scrap_Rates_Photos/Microwave.jpg');
+  if (name.includes('glass')) return require('../../../assets/images/Scrap_Rates_Photos/glass.jpg');
+  return null;
+};
 
-const getImageForProduct = (productName: string) => {
+// Helper to get fallback image for a product (used by RemoteImage component)
+const getFallbackImageForProduct = (productName: string) => {
   const name = productName.toLowerCase();
   if (name.includes('newspaper')) return require('../../../assets/images/Scrap_Rates_Photos/Newspaper.jpg');
   if (name.includes('cardboard') || name.includes('corrugated')) return require('../../../assets/images/Scrap_Rates_Photos/Cardboard.jpg');
@@ -44,8 +75,8 @@ const getImageForProduct = (productName: string) => {
   if (name.includes('printer')) return require('../../../assets/images/Scrap_Rates_Photos/Printer.jpg');
   if (name.includes('microwave')) return require('../../../assets/images/Scrap_Rates_Photos/Microwave.jpg');
   if (name.includes('glass')) return require('../../../assets/images/Scrap_Rates_Photos/glass.jpg');
-
-  return null;
+  // Default fallback
+  return require('../../../assets/images/Scrap_Rates_Photos/TV.jpg');
 };
 
 const getCategoryIcon = (categoryName: string) => {
@@ -129,20 +160,26 @@ export default function RatesScreen(){
 
         <View style={styles.itemsGrid}>
           {categoryProducts.map((item, index) => {
-            const productImage = getImageForProduct(item.name);
+            const productImage = getImageForProduct(item);
+            const fallbackImage = getFallbackImageForProduct(item.name);
             return (
               <View key={index} style={[styles.rateItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <View style={[
-                styles.itemIcon, 
-                item.image ? { 
-                  backgroundColor: isDark ? colors.surface : '#ffffff',
-                  borderWidth: 2,
-                  borderColor: colors.border,
-                  overflow: 'hidden'
-                } : { backgroundColor: category.color }
-              ]}>
+                  styles.itemIcon, 
+                  productImage ? { 
+                    backgroundColor: isDark ? colors.surface : '#ffffff',
+                    borderWidth: 2,
+                    borderColor: colors.border,
+                    overflow: 'hidden'
+                  } : { backgroundColor: getCategoryColor(category.name) }
+                ]}>
                   {productImage ? (
-                    <Image source={productImage} style={styles.itemImage} />
+                    <RemoteImage 
+                      source={productImage} 
+                      fallback={fallbackImage}
+                      style={styles.itemImage}
+                      showLoadingIndicator={false}
+                    />
                   ) : (
                     <Text style={styles.itemEmoji}>{categoryIcon}</Text>
                   )}
@@ -276,28 +313,6 @@ if (error && categories.length === 0) {
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>No rates available</Text>
-          </View>
-        )}
-
-        {/* Market Trends */}
-        {products.length > 0 && (
-          <View style={styles.trendsSection}>
-            <Text style={[styles.trendsTitle, { color: colors.text }]}>Market Trends</Text>
-            <View style={[styles.trendsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <View style={styles.trendItem}>
-                <View style={[styles.trendIndicator, { backgroundColor: '#16a34a' }]} />
-                <Text style={[styles.trendText, { color: colors.textSecondary }]}>
-                  {products.length} products available
-                </Text>
-              </View>
-              
-              <View style={styles.trendItem}>
-                <View style={[styles.trendIndicator, { backgroundColor: '#3b82f6' }]} />
-                <Text style={styles.trendText}>
-                  {categories.length} categories available
-                </Text>
-              </View>
-            </View>
           </View>
         )}
 
@@ -525,53 +540,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 14,
   },
-  trendsSection: {
-    marginBottom: 24,
-  },
-  trendsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    fontFamily: 'Inter-SemiBold',
-    marginBottom: 16,
-  },
-  trendsCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  trendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  trendIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 12,
-  },
-  trendText: {
-    fontSize: 14,
-    color: '#374151',
-    fontFamily: 'Inter-Regular',
-  },
   contactSection: {
     backgroundColor: 'white',
     borderRadius: 16,
     padding: 24,
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 40,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
+    borderWidth: 1,
   },
   contactTitle: {
     fontSize: 18,

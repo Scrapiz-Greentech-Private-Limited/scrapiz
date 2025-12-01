@@ -15,6 +15,16 @@ class User(AbstractBaseUser, PermissionsMixin):
     date_joined = models.DateTimeField(default=timezone.now)  # Add this line
     is_superuser = models.BooleanField(default=False)
     phone_number = models.CharField(max_length=14, default= False, null=True)
+    gender = models.CharField(
+        max_length=20,
+        choices=[
+            ('male', 'Male'),
+            ('female', 'Female'),
+            ('prefer_not_to_say', 'Prefer not to say'),
+        ],
+        null=True,
+        blank=True
+    )
     session_id = models.CharField(max_length=255, null=True, blank=True)
     referral_code = models.CharField(max_length = 255, unique=True , null = True , blank = True , db_index = True)
     referred_by = models.ForeignKey('self',on_delete=models.SET_NULL,null=True,blank=True,related_name='referrals')

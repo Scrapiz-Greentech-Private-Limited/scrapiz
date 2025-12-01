@@ -8,6 +8,7 @@
       "developmentClient": true,
       "credentialsSource":"local",
       "distribution": "internal"
+
     },
     "preview": {
       "distribution": "internal"

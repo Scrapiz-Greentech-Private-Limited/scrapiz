@@ -25,6 +25,10 @@ import {
   MAP_SETTINGS,
   DEFAULT_CENTER,
   KRUTRIM_API_KEY,
+  buildGoogleAutocompletePayload,
+  buildGooglePlaceDetailsPayload,
+  GOOGLE_API_KEY,
+  getSessionToken,
 } from '../config/mapConfig';
 
 MapboxGL.setAccessToken(MAPBOX_API_KEY);
@@ -71,6 +75,14 @@ interface MapLocationPickerProps {
   autoOpenGPS?: boolean;
   saving?: boolean;
 }
+interface GoogleAutocompleteResult {
+  place_id: string;
+  description: string;
+  structured_formatting?: {
+    main_text: string;
+    secondary_text: string;
+  };
+}
 
 export default function MapLocationPicker({
   visible,
@@ -88,8 +100,11 @@ export default function MapLocationPicker({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<KrutrimAutocompleteResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [selectedAddress, setSelectedAddress] = useState<string>('');
+  const [selectedAddressDetails, setSelectedAddressDetails] = useState<any>(null);
   const [showResults, setShowResults] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
+  const sessionTokenRef = useRef<string>(getSessionToken());
   const [selectedCoords, setSelectedCoords] = useState<[number, number]>(
     initialLocation ? [initialLocation.longitude, initialLocation.latitude] : DEFAULT_CENTER
   );
@@ -106,8 +121,7 @@ export default function MapLocationPicker({
   const isSelectingFromSearch = useRef(false);
   const regionChangeTimeoutRef = useRef<NodeJS.Timeout>();
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
-  
-  // NEW: Track previous center to detect zoom-only operations
+
   const previousCenterRef = useRef<[number, number] | null>(null);
   const zoomOnlyTimeoutRef = useRef<NodeJS.Timeout>();
 
@@ -221,19 +235,36 @@ export default function MapLocationPicker({
     setIsSearching(true);
     
     try {
-      const proximityCoords = currentUserLocation || markerCoords;
-      
-      const url = buildGeocodingUrl(query, {
-        proximity: proximityCoords,
-        limit: 5,
-        bbox: getIndiaBounds(),
-      });
-      
-      const response = await fetch(url);
+      const payload = buildGoogleAutocompletePayload(
+        query,
+        sessionTokenRef.current,
+        currentUserLocation
+      );
+
+      const response = await fetch(
+        'https://places.googleapis.com/v1/places:autocomplete',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': GOOGLE_API_KEY,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
       const data = await response.json();
 
-      if (data.predictions) {
-        setSearchResults(data.predictions);
+      if (data.suggestions) {
+        const formattedResults: GoogleAutocompleteResult[] = data.suggestions.map((item: any) => ({
+          place_id: item.placePrediction.placeId,
+          description: item.placePrediction.text.text,
+          structured_formatting: {
+            main_text: item.placePrediction.structuredFormat?.mainText?.text || '',
+            secondary_text: item.placePrediction.structuredFormat?.secondaryText?.text || '',
+          },
+        }));
+        setSearchResults(formattedResults);
         setShowResults(true);
       } else {
         setSearchResults([]);
@@ -258,8 +289,9 @@ export default function MapLocationPicker({
       const response = await fetch(url);
       
       if (!response.ok) {
-        console.error('Reverse geocoding API error:', response.status, response.statusText);
+        console.error('Reverse geocoding API error:', response.status);
         if (updateSearchBox) {
+          setSelectedAddress('Location selected - please add details manually');
           setSearchQuery('Location selected - please add details manually');
         }
         return null;
@@ -267,31 +299,28 @@ export default function MapLocationPicker({
       
       const data = await response.json();
 
-      if (!data || data === null || data === undefined) {
-        console.error('Reverse geocoding returned null/undefined response');
-        if (updateSearchBox) {
-          setSearchQuery('Location selected - please add details manually');
-        }
-        return null;
-      }
-
       if (data.results && data.results.length > 0) {
         const result = data.results[0] as KrutrimReverseGeocodeResult;
+        setSelectedAddress(result.formatted_address);
+        setSelectedAddressDetails(result);
+        
         if (updateSearchBox) {
           setSearchQuery(result.formatted_address);
         }
+        
         return result;
       }
       
-      console.error('Reverse geocoding returned no results for coordinates:', latitude, longitude);
+      console.error('Reverse geocoding returned no results');
       if (updateSearchBox) {
-        setSearchQuery('Location selected - please add details manually');
+        setSelectedAddress('Location selected - address unavailable');
+        setSearchQuery('Location selected - address unavailable');
       }
       return null;
     } catch (error) {
-      console.error('Reverse geocoding error:', error);
-      
+      console.error('Reverse geocoding error:', error); 
       if (updateSearchBox) {
+        setSelectedAddress('Location selected - address unavailable');
         setSearchQuery('Location selected - address unavailable');
       }
       return null;
@@ -328,23 +357,57 @@ export default function MapLocationPicker({
     setIsSearching(true);
     
     try {
-      const placeDetails = await getPlaceDetails(result.place_id);
+      const response = await fetch(
+        `https://places.googleapis.com/v1/places/${result.place_id}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': GOOGLE_API_KEY,
+            'X-Goog-FieldMask': 'location,formattedAddress,addressComponents',
+          },
+        }
+      );
+
+      const data = await response.json();
       
-      if (placeDetails) {
-        const coords: [number, number] = [placeDetails.lng, placeDetails.lat];
+      // Reset session token after getting place details
+      sessionTokenRef.current = getSessionToken();
+
+      const locationData = data.location;
+      const formattedAddress = data.formattedAddress;
+      
+      if (locationData && formattedAddress) {
+        const coords: [number, number] = [locationData.longitude, locationData.latitude];
         setSelectedCoords(coords);
         setMarkerCoords(coords);
-        previousCenterRef.current = coords; // Track this position
+        previousCenterRef.current = coords;
+        
+        // Set the address from Google Places API directly
+        setSelectedAddress(formattedAddress);
+        setSearchQuery(formattedAddress);
+        
+        // Convert Google address components to Krutrim format for compatibility
+        const addressComponents = data.addressComponents || [];
+        const mockKrutrimResult: KrutrimReverseGeocodeResult = {
+          formatted_address: formattedAddress,
+          address_components: addressComponents.map((comp: any) => ({
+            long_name: comp.longText || comp.shortText || '',
+            short_name: comp.shortText || '',
+            types: comp.types || [],
+          })),
+          place_id: result.place_id,
+        };
+        setSelectedAddressDetails(mockKrutrimResult);
         
         cameraRef.current?.flyTo(coords, MAP_SETTINGS.animationDuration);
         
-        await reverseGeocode(placeDetails.lat, placeDetails.lng);
-        
         setTimeout(() => {
           isSelectingFromSearch.current = false;
+          setIsSearching(false);
         }, MAP_SETTINGS.animationDuration + 500);
       } else {
-        console.warn('Could not get coordinates for selected place');
+        console.warn('Could not get coordinates or address from Google Place Details');
         isSelectingFromSearch.current = false;
         setIsSearching(false);
       }
@@ -482,13 +545,7 @@ export default function MapLocationPicker({
 
   // FIX: Detect if this is a zoom-only operation
   const handleMapIdle = async () => {
-    if (isSelectingFromSearch.current) {
-      return;
-    }
-    
-    if (isUserTyping) {
-      return;
-    }
+    if (isSelectingFromSearch.current || isUserTyping) return;
     
     if (!mapRef.current) return;
     
@@ -512,8 +569,8 @@ export default function MapLocationPicker({
           
           // Debounce: Wait 600ms after user stops moving map (reduced from 800ms)
           regionChangeTimeoutRef.current = setTimeout(() => {
-            // DON'T update search box when manually dragging - only update internal location
-            reverseGeocode(coords[1], coords[0], false);
+            // Update both selectedAddress and searchQuery when manually dragging
+            reverseGeocode(coords[1], coords[0], true);
             previousCenterRef.current = coords; // Update tracked position
           }, 600);
         }
@@ -531,7 +588,8 @@ export default function MapLocationPicker({
     const [longitude, latitude] = markerCoords;
 
     // Always fetch fresh location data on confirm
-    const result = await reverseGeocode(latitude, longitude, false);
+    let result = selectedAddressDetails
+    if(!result) result = await reverseGeocode(latitude, longitude, false);
 
     let locationResult: LocationResult = {
       latitude,
@@ -663,7 +721,7 @@ export default function MapLocationPicker({
               {/* Center Tooltip Only (no pin marker) */}
               <View style={styles.centerTooltipContainer} pointerEvents="none">
                 <View style={styles.pinTooltip}>
-                  <Text style={styles.tooltipText}>Order will be delivered here</Text>
+                  <Text style={styles.tooltipText}>Pickup point for agent</Text>
                   <Text style={styles.tooltipSubtext}>Move the pin to change location</Text>
                   <View style={styles.tooltipArrow} />
                 </View>
@@ -697,10 +755,10 @@ export default function MapLocationPicker({
             <MapPin size={20} color="#111827" />
             <View style={styles.addressTextContainer}>
               <Text style={styles.addressTitle} numberOfLines={1}>
-                Select Location
+                {selectedAddress ? "Delievery Location" : "Select Location"}
               </Text>
               <Text style={styles.addressSubtitle} numberOfLines={2}>
-                Move the pin to select your delivery location
+                {selectedAddress || "Move the pin to select your delivery location"}
               </Text>
             </View>
             {searchQuery && (

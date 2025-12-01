@@ -11,6 +11,7 @@ import {
 import { ArrowLeft,Shield, MessageCircle, Phone, Mail, CircleHelp as HelpCircle, FileText, ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function HelpSupport(){
     const router = useRouter();
@@ -65,7 +66,7 @@ export default function HelpSupport(){
          {
       icon: Phone,
       title: 'Call Us',
-      subtitle: '+91 87654 32100',
+      subtitle: '+918828700630',
       description: 'Available 9 AM - 6 PM, Mon-Sat',
       action: () => handleContactSupport('phone'),
       color: '#16a34a',
@@ -73,7 +74,7 @@ export default function HelpSupport(){
      {
       icon: Mail,
       title: 'Email Support',
-      subtitle: 'support@scrapiz.com',
+      subtitle: 'support@scrapiz.in',
       description: 'We respond within 24 hours',
       action: () => handleContactSupport('email'),
       color: '#f59e0b',
@@ -170,7 +171,17 @@ export default function HelpSupport(){
           ))}
         </View>
 
-        <View style={[styles.emergencyCard, { backgroundColor: colors.error }]}>
+        <LinearGradient 
+        colors={isDark ? ['#7f1d1d', '#b91c1c'] : ['#ef4444', '#f87171']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.emergencyCard, {
+          shadowColor: colors.error,
+          shadowOffset: {width:0 , height: 0},
+          shadowOpacity: 0.3,
+          shadowRadius: 12,
+          elevation: 8
+        }]}>
           <Text style={styles.emergencyTitle}>Need Immediate Help?</Text>
           <Text style={[styles.emergencyText, { color: isDark ? '#fecaca' : '#fee2e2' }]}>
             For urgent issues or emergencies, please call our 24/7 helpline
@@ -182,7 +193,7 @@ export default function HelpSupport(){
             <Phone size={20} color="white" />
             <Text style={styles.emergencyButtonText}>Call Emergency Support</Text>
           </TouchableOpacity>
-        </View>
+        </LinearGradient>
       </ScrollView>
     </View>
   );

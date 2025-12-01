@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'inventory',
     'user',
     'services',
+    'content',
     'rest_framework',
     'notifications',
     'waitlist',

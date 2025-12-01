@@ -305,7 +305,7 @@ export default function AddressesScreen() {
 
     // Delivery suggestion validation (max 500 chars, optional)
     if (formData.delivery_suggestion && formData.delivery_suggestion.length > 500) {
-      errors.delivery_suggestion = 'Delivery instructions must be 500 characters or less';
+      errors.delivery_suggestion = 'Pickup Instructions must be 500 characters or less';
     }
 
     // If there are errors, show toast with first error
@@ -610,58 +610,64 @@ export default function AddressesScreen() {
             showsVerticalScrollIndicator={false}
           >
             {/* Address Type Selection */}
-            <View className='mb-5'>
+            <View style={{ marginBottom: 20 }}>
               <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>Address Type</Text>
-              <View className='flex-row gap-3'>
+              <View style={{ flexDirection: 'row', gap: 12 }}>
                 <TouchableOpacity
-                  className={clsx(
-                    'flex-1 flex-row items-center justify-center p-3 bg-gray-50 rounded-xl border border-gray-200 gap-1.5',
-                    addressType === 'home' && 'bg-green-50 border-green-600'
-                  )}
+                  style={[
+                    styles.addressTypeButton,
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                    addressType === 'home' && { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#f0fdf4', borderColor: colors.primary }
+                  ]}
                   onPress={() => setAddressType('home')}
                 >
-                  <Home size={18} color={addressType === 'home' ? '#16a34a' : '#6b7280'} />
+                  <Home size={18} color={addressType === 'home' ? colors.primary : colors.textSecondary} />
                   <Text
-                    className={clsx(
-                      'text-sm text-gray-500 font-medium',
-                      addressType === 'home' && 'text-green-600 font-semibold'
-                    )}
+                    style={[
+                      styles.addressTypeText,
+                      { color: colors.textSecondary },
+                      addressType === 'home' && { color: colors.primary, fontWeight: '600' }
+                    ]}
                   >
                     Home
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  className={clsx(
-                    'flex-1 flex-row items-center justify-center p-3 bg-gray-50 rounded-xl border border-gray-200 gap-1.5',
-                    addressType === 'office' && 'bg-green-50 border-green-600'
-                  )}
+                  style={[
+                    styles.addressTypeButton,
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                    addressType === 'office' && { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#f0fdf4', borderColor: colors.primary }
+                  ]}
                   onPress={() => setAddressType('office')}
                 >
-                  <Building size={18} color={addressType === 'office' ? '#16a34a' : '#6b7280'} />
+                  <Building size={18} color={addressType === 'office' ? colors.primary : colors.textSecondary} />
                   <Text
-                    className={clsx(
-                      'text-sm text-gray-500 font-medium',
-                      addressType === 'office' && 'text-green-600 font-semibold'
-                    )}
+                    style={[
+                      styles.addressTypeText,
+                      { color: colors.textSecondary },
+                      addressType === 'office' && { color: colors.primary, fontWeight: '600' }
+                    ]}
                   >
                     Office
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  className={clsx(
-                    'flex-1 flex-row items-center justify-center p-3 bg-gray-50 rounded-xl border border-gray-200 gap-1.5',
-                    addressType === 'other' && 'bg-green-50 border-green-600'
-                  )}
+                  style={[
+                    styles.addressTypeButton,
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                    addressType === 'other' && { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#f0fdf4', borderColor: colors.primary }
+                  ]}
                   onPress={() => setAddressType('other')}
                 >
-                  <MapPin size={18} color={addressType === 'other' ? '#16a34a' : '#6b7280'} />
+                  <MapPin size={18} color={addressType === 'other' ? colors.primary : colors.textSecondary} />
                   <Text
-                    className={clsx(
-                      'text-sm text-gray-500 font-medium',
-                      addressType === 'other' && 'text-green-600 font-semibold'
-                    )}
+                    style={[
+                      styles.addressTypeText,
+                      { color: colors.textSecondary },
+                      addressType === 'other' && { color: colors.primary, fontWeight: '600' }
+                    ]}
                   >
                     Other
                   </Text>
@@ -671,27 +677,32 @@ export default function AddressesScreen() {
 
             {/* Use Current Location Button */}
             <TouchableOpacity
-              className='flex-row items-center justify-center gap-2 p-4 bg-blue-50 border border-blue-200 rounded-xl mb-5'
+              style={[
+                styles.locationButton,
+                { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#f0fdf4', borderColor: isDark ? colors.primary : '#bbf7d0' }
+              ]}
               onPress={handleUseCurrentLocation}
               disabled={locationLoading}
             >
               {locationLoading ? (
-                <ActivityIndicator size="small" color="#16a34a" />
+                <ActivityIndicator size="small" color={colors.primary} />
               ) : (
-                <Navigation size={18} color="#16a34a" />
+                <Navigation size={18} color={colors.primary} />
               )}
-              <Text className='text-green-600 font-semibold'>Use Current Location</Text>
+              <Text style={[styles.locationButtonText, { color: colors.primary }]}>Use Current Location</Text>
             </TouchableOpacity>
 
             {/* Form Fields */}
-            <View className='mb-4'>
+            <View style={{ marginBottom: 16 }}>
               <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>Address Name *</Text>
               <TextInput
-                className={clsx(
-                  'bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900',
-                  formErrors.name && 'border-red-500 bg-red-50'
-                )}
+                style={[
+                  styles.formInput,
+                  { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.inputText },
+                  formErrors.name && { borderColor: colors.error, backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2' }
+                ]}
                 placeholder="e.g., Home, Office"
+                placeholderTextColor={colors.inputPlaceholder}
                 value={formData.name}
                 onChangeText={(text) => {
                   setFormData({ ...formData, name: text });
@@ -703,18 +714,20 @@ export default function AddressesScreen() {
                 onSubmitEditing={() => phoneInputRef.current?.focus()}
                 blurOnSubmit={false}
               />
-              {formErrors.name && <Text className='text-xs text-red-500 mt-1 ml-1'>{formErrors.name}</Text>}
+              {formErrors.name && <Text style={[styles.errorText, { color: colors.error }]}>{formErrors.name}</Text>}
             </View>
 
-            <View className='mb-4'>
+            <View style={{ marginBottom: 16 }}>
               <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>Phone Number *</Text>
               <TextInput
                 ref={phoneInputRef}
-                className={clsx(
-                  'bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900',
-                  formErrors.phone_number && 'border-red-500 bg-red-50'
-                )}
+                style={[
+                  styles.formInput,
+                  { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.inputText },
+                  formErrors.phone_number && { borderColor: colors.error, backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2' }
+                ]}
                 placeholder="Enter phone number"
+                placeholderTextColor={colors.inputPlaceholder}
                 keyboardType="phone-pad"
                 value={formData.phone_number}
                 onChangeText={(text) => {
@@ -728,19 +741,21 @@ export default function AddressesScreen() {
                 blurOnSubmit={false}
               />
               {formErrors.phone_number && (
-                <Text className='text-xs text-red-500 mt-1 ml-1'>{formErrors.phone_number}</Text>
+                <Text style={[styles.errorText, { color: colors.error }]}>{formErrors.phone_number}</Text>
               )}
             </View>
 
-            <View className='mb-4'>
+            <View style={{ marginBottom: 16 }}>
               <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>House/Flat Number *</Text>
               <TextInput
                 ref={roomInputRef}
-                className={clsx(
-                  'bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900',
-                  formErrors.room_number && 'border-red-500 bg-red-50'
-                )}
+                style={[
+                  styles.formInput,
+                  { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.inputText },
+                  formErrors.room_number && { borderColor: colors.error, backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2' }
+                ]}
                 placeholder="e.g., Flat 101"
+                placeholderTextColor={colors.inputPlaceholder}
                 value={formData.room_number}
                 onChangeText={(text) => {
                   setFormData({ ...formData, room_number: text });
@@ -753,19 +768,21 @@ export default function AddressesScreen() {
                 blurOnSubmit={false}
               />
               {formErrors.room_number && (
-                <Text className='text-xs text-red-500 mt-1 ml-1'>{formErrors.room_number}</Text>
+                <Text style={[styles.errorText, { color: colors.error }]}>{formErrors.room_number}</Text>
               )}
             </View>
 
-            <View className='mb-4'>
+            <View style={{ marginBottom: 16 }}>
               <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>Street *</Text>
               <TextInput
                 ref={streetInputRef}
-                className={clsx(
-                  'bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900',
-                  formErrors.street && 'border-red-500 bg-red-50'
-                )}
+                style={[
+                  styles.formInput,
+                  { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.inputText },
+                  formErrors.street && { borderColor: colors.error, backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2' }
+                ]}
                 placeholder="Enter street name"
+                placeholderTextColor={colors.inputPlaceholder}
                 value={formData.street}
                 onChangeText={(text) => {
                   setFormData({ ...formData, street: text });
@@ -777,18 +794,20 @@ export default function AddressesScreen() {
                 onSubmitEditing={() => areaInputRef.current?.focus()}
                 blurOnSubmit={false}
               />
-              {formErrors.street && <Text className='text-xs text-red-500 mt-1 ml-1'>{formErrors.street}</Text>}
+              {formErrors.street && <Text style={[styles.errorText, { color: colors.error }]}>{formErrors.street}</Text>}
             </View>
 
-            <View className='mb-4'>
+            <View style={{ marginBottom: 16 }}>
               <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>Area/Locality *</Text>
               <TextInput
                 ref={areaInputRef}
-                className={clsx(
-                  'bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900',
-                  formErrors.area && 'border-red-500 bg-red-50'
-                )}
+                style={[
+                  styles.formInput,
+                  { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.inputText },
+                  formErrors.area && { borderColor: colors.error, backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2' }
+                ]}
                 placeholder="Enter area"
+                placeholderTextColor={colors.inputPlaceholder}
                 value={formData.area}
                 onChangeText={(text) => {
                   setFormData({ ...formData, area: text });
@@ -800,19 +819,21 @@ export default function AddressesScreen() {
                 onSubmitEditing={() => cityInputRef.current?.focus()}
                 blurOnSubmit={false}
               />
-              {formErrors.area && <Text className='text-xs text-red-500 mt-1 ml-1'>{formErrors.area}</Text>}
+              {formErrors.area && <Text style={[styles.errorText, { color: colors.error }]}>{formErrors.area}</Text>}
             </View>
 
-            <View className='flex-row gap-4 mb-4'>
-              <View className='flex-1'>
+            <View style={{ flexDirection: 'row', gap: 16, marginBottom: 16 }}>
+              <View style={{ flex: 1 }}>
                 <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>City *</Text>
                 <TextInput
                   ref={cityInputRef}
-                  className={clsx(
-                    'bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900',
-                    formErrors.city && 'border-red-500 bg-red-50'
-                  )}
+                  style={[
+                    styles.formInput,
+                    { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.inputText },
+                    formErrors.city && { borderColor: colors.error, backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2' }
+                  ]}
                   placeholder="Enter city"
+                  placeholderTextColor={colors.inputPlaceholder}
                   value={formData.city}
                   onChangeText={(text) => {
                     setFormData({ ...formData, city: text });
@@ -824,18 +845,20 @@ export default function AddressesScreen() {
                   onSubmitEditing={() => stateInputRef.current?.focus()}
                   blurOnSubmit={false}
                 />
-                {formErrors.city && <Text className='text-xs text-red-500 mt-1 ml-1'>{formErrors.city}</Text>}
+                {formErrors.city && <Text style={[styles.errorText, { color: colors.error }]}>{formErrors.city}</Text>}
               </View>
 
-              <View className='flex-1'>
+              <View style={{ flex: 1 }}>
                 <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>State *</Text>
                 <TextInput
                   ref={stateInputRef}
-                  className={clsx(
-                    'bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900',
-                    formErrors.state && 'border-red-500 bg-red-50'
-                  )}
+                  style={[
+                    styles.formInput,
+                    { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.inputText },
+                    formErrors.state && { borderColor: colors.error, backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2' }
+                  ]}
                   placeholder="Enter state"
+                  placeholderTextColor={colors.inputPlaceholder}
                   value={formData.state}
                   onChangeText={(text) => {
                     setFormData({ ...formData, state: text });
@@ -847,20 +870,22 @@ export default function AddressesScreen() {
                   onSubmitEditing={() => pincodeInputRef.current?.focus()}
                   blurOnSubmit={false}
                 />
-                {formErrors.state && <Text className='text-xs text-red-500 mt-1 ml-1'>{formErrors.state}</Text>}
+                {formErrors.state && <Text style={[styles.errorText, { color: colors.error }]}>{formErrors.state}</Text>}
               </View>
             </View>
 
-            <View className='flex-row gap-4 mb-4'>
-              <View className='flex-1'>
+            <View style={{ flexDirection: 'row', gap: 16, marginBottom: 16 }}>
+              <View style={{ flex: 1 }}>
                 <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>Pincode *</Text>
                 <TextInput
                   ref={pincodeInputRef}
-                  className={clsx(
-                    'bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900',
-                    formErrors.pincode && 'border-red-500 bg-red-50'
-                  )}
+                  style={[
+                    styles.formInput,
+                    { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.inputText },
+                    formErrors.pincode && { borderColor: colors.error, backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2' }
+                  ]}
                   placeholder="Enter pincode"
+                  placeholderTextColor={colors.inputPlaceholder}
                   keyboardType="number-pad"
                   value={formData.pincode}
                   onChangeText={(text) => {
@@ -875,14 +900,18 @@ export default function AddressesScreen() {
                   onSubmitEditing={() => deliveryInputRef.current?.focus()}
                   blurOnSubmit={false}
                 />
-                {formErrors.pincode && <Text className='text-xs text-red-500 mt-1 ml-1'>{formErrors.pincode}</Text>}
+                {formErrors.pincode && <Text style={[styles.errorText, { color: colors.error }]}>{formErrors.pincode}</Text>}
               </View>
 
-              <View className='flex-1'>
+              <View style={{ flex: 1 }}>
                 <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>Country *</Text>
                 <TextInput
-                  className='bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900'
+                  style={[
+                    styles.formInput,
+                    { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.inputText }
+                  ]}
                   placeholder="Enter country"
+                  placeholderTextColor={colors.inputPlaceholder}
                   value={formData.country}
                   onChangeText={(text) => setFormData({ ...formData, country: text })}
                   returnKeyType="done"
@@ -890,12 +919,17 @@ export default function AddressesScreen() {
               </View>
             </View>
 
-            <View className='mb-5'>
-              <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>Delivery Instructions (Optional)</Text>
+            <View style={{ marginBottom: 20 }}>
+              <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>Pickup Instructions (Optional)</Text>
               <TextInput
                 ref={deliveryInputRef}
-                className='bg-gray-50 rounded-xl border border-gray-200 p-4 text-[15px] text-gray-900 h-24 pt-4'
+                style={[
+                  styles.formInput,
+                  styles.textArea,
+                  { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.inputText }
+                ]}
                 placeholder="e.g., Ring bell twice, near gate"
+                placeholderTextColor={colors.inputPlaceholder}
                 multiline
                 numberOfLines={3}
                 value={formData.delivery_suggestion}
@@ -906,17 +940,18 @@ export default function AddressesScreen() {
             </View>
 
             <TouchableOpacity
-              className={clsx(
-                'bg-green-600 rounded-xl p-4 items-center mt-6 shadow-lg shadow-green-600/30',
-                saving && 'opacity-50'
-              )}
+              style={[
+                styles.saveAddressButton,
+                { backgroundColor: colors.primary },
+                saving && { opacity: 0.5 }
+              ]}
               onPress={handleSave}
               disabled={saving}
             >
               {saving ? (
-                <ActivityIndicator size="small" color="white" />
+                <ActivityIndicator size="small" color={isDark ? colors.buttonText : '#ffffff'} />
               ) : (
-                <Text className='text-base font-semibold text-white'>
+                <Text style={[styles.saveAddressButtonText, { color: isDark ? colors.buttonText : '#ffffff' }]}>
                   {editingId ? 'Update Address' : 'Save Address'}
                 </Text>
               )}
@@ -948,9 +983,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingTop: 60,
+    paddingTop: 50,
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1153,6 +1188,64 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
+  },
+  addressTypeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 6,
+  },
+  addressTypeText: {
+    fontSize: 14,
+    fontWeight: '500',
+    fontFamily: 'Inter-Medium',
+  },
+  locationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  locationButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+  },
+  formInput: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 16,
+    fontSize: 15,
+    fontFamily: 'Inter-Regular',
+  },
+  textArea: {
+    height: 96,
+    paddingTop: 16,
+    textAlignVertical: 'top',
+  },
+  saveAddressButton: {
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 24,
+    shadowColor: '#16a34a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  saveAddressButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
   },
 });
 

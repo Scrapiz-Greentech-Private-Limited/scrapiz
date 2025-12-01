@@ -698,7 +698,7 @@ export default function SellScreen() {
                   )}
                   <View>
                     <Text style={[styles.selectedItemName, { color: colors.text }]}>{item.name}</Text>
-                    <Text style={[styles.selectedItemRate, { color: colors.primary }]}>
+                    <Text style={styles.selectedItemRate}>
                       ₹{Math.round(item.rate)}/{item.unit}
                     </Text>
                   </View>
@@ -708,20 +708,20 @@ export default function SellScreen() {
                     style={styles.quantityButton}
                     onPress={() => updateQuantity(item.id, -1)}
                   >
-                    <Minus size={16} color="#6b7280" />
+                    <Minus size={14} color="#6b7280" />
                   </TouchableOpacity>
-                  <Text style={styles.quantityText}>{item.quantity}{item.unit}</Text>
+                  <Text style={{ color: colors.primary }}>{item.quantity}{item.unit}</Text>
                   <TouchableOpacity
                     style={styles.quantityButton}
                     onPress={() => updateQuantity(item.id, 1)}
                   >
-                    <Plus size={16} color="#6b7280" />
+                    <Plus size={14} color="#6b7280" />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.removeButton}
                     onPress={() => removeItem(item.id)}
                   >
-                    <Trash2 size={16} color="#dc2626" />
+                    <Trash2 size={14} color="#dc2626" />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1004,30 +1004,31 @@ export default function SellScreen() {
                   key={address.id}
                   style={[
                     styles.savedAddressCard,
-                    selectedAddressId === address.id && styles.savedAddressCardActive
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                    selectedAddressId === address.id && { backgroundColor: isDark ? '#064e3b' : '#f0fdf4', borderColor: colors.primary }
                   ]}
                   onPress={() => setSelectedAddressId(address.id)}
                 >
                   <View style={styles.savedAddressInfo}>
-                    <Text style={styles.savedAddressTitle}>
+                    <Text style={[styles.savedAddressTitle, { color: colors.text }]}>
                       {address.name}
                     </Text>
-                    <Text style={styles.savedAddressText}>
+                    <Text style={[styles.savedAddressText, { color: colors.textSecondary }]}>
                       {address.street}, {address.city} - {address.pincode}
                     </Text>
                   </View>
-                  <View style={styles.savedAddressRadio}>
+                  <View style={[styles.savedAddressRadio, { borderColor: colors.primary }]}>
                     {selectedAddressId === address.id && (
-                      <View style={styles.radioSelected} />
+                      <View style={[styles.radioSelected, { backgroundColor: colors.primary }]} />
                     )}
                   </View>
                 </TouchableOpacity>
               ))
             ) : (
-              <View style={styles.noSavedAddress}>
-                <MapPin size={48} color="#9ca3af" />
-                <Text style={styles.noSavedAddressText}>No saved addresses yet</Text>
-                <Text style={styles.noSavedAddressSubtext}>
+              <View style={[styles.noSavedAddress, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <MapPin size={48} color={colors.border} />
+                <Text style={[styles.noSavedAddressText, { color: colors.textSecondary }]}>No saved addresses yet</Text>
+                <Text style={[styles.noSavedAddressSubtext, { color: colors.textTertiary }]}>
                   Please add a new address to continue
                 </Text>
               </View>
@@ -1054,7 +1055,7 @@ export default function SellScreen() {
 
         {selectedImages.length > 0 && (
           <View style={styles.selectedImagesContainer}>
-            <Text style={styles.selectedImagesTitle}>Selected Photos ({selectedImages.length})</Text>
+            <Text style={[styles.selectedImagesTitle, { color: colors.text }]}>Selected Photos ({selectedImages.length})</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imagesScroll}>
               {selectedImages.map((uri, index) => (
                 <View key={index} style={styles.imageContainer}>
@@ -1111,16 +1112,17 @@ export default function SellScreen() {
         </View>
       </View>
       {walletBalance > 0 && (
-        <View style={styles.referralCard}>
+        <View style={[styles.referralCard, { backgroundColor: colors.surface, borderColor: isDark ? colors.primary : '#dcfce7' }]}>
           <View style={styles.referralHeader}>
             <View style={styles.referralHeaderLeft}>
-              <View style={styles.referralIconContainer}>
-                <Wallet size={20} color={walletBalance >= 120 ? "#16a34a" : "#f59e0b"} />
+              <View style={[styles.referralIconContainer, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#dcfce7' }]}>
+                <Wallet size={20} color={walletBalance >= 120 ? colors.primary : "#f59e0b"} />
               </View>
               <View>
-                <Text style={styles.referralTitle}>Referral Wallet</Text>
+                <Text style={[styles.referralTitle, { color: colors.text }]}>Referral Wallet</Text>
                 <Text style={[
                   styles.referralBalance,
+                  { color: colors.primary },
                   walletBalance < 120 && { color: '#f59e0b' }
                 ]}>
                   ₹{walletBalance.toFixed(2)} available
@@ -1149,25 +1151,25 @@ export default function SellScreen() {
           
           {walletBalance >= 120 ? (
             useReferralBonus && (
-              <View style={styles.referralDiscountInfo}>
-                <Text style={styles.referralDiscountText}>
+              <View style={[styles.referralDiscountInfo, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#f0fdf4', borderColor: isDark ? colors.primary : '#bbf7d0' }]}>
+                <Text style={[styles.referralDiscountText, { color: colors.primary }]}>
                   💰 Referral Applied: +₹{Math.round(referralBonus)}
                 </Text>
-                <Text style={styles.referralDiscountSubtext}>
+                <Text style={[styles.referralDiscountSubtext, { color: isDark ? '#dcfce7' : '#15803d' }]}>
                   Bonus amount will be added to your total payout
                 </Text>
               </View>
             )
           ) : (
-            <View style={styles.referralLockedInfo}>
-              <View style={styles.referralLockedIconContainer}>
+            <View style={[styles.referralLockedInfo, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : '#fffbeb', borderColor: isDark ? '#f59e0b' : '#fde68a' }]}>
+              <View style={[styles.referralLockedIconContainer, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
                 <AlertCircle size={20} color="#f59e0b" />
               </View>
               <View style={styles.referralLockedTextContainer}>
-                <Text style={styles.referralLockedTitle}>
+                <Text style={[styles.referralLockedTitle, { color: isDark ? '#fbbf24' : '#92400e' }]}>
                   Minimum ₹120 Required
                 </Text>
-                <Text style={styles.referralLockedSubtext}>
+                <Text style={[styles.referralLockedSubtext, { color: isDark ? '#fcd34d' : '#b45309' }]}>
                   Earn ₹{(120 - walletBalance).toFixed(2)} more to redeem your referral balance
                 </Text>
               </View>
@@ -1178,63 +1180,63 @@ export default function SellScreen() {
 
        {/* Final Amount Summary */}
       {useReferralBonus && referralBonus > 0 && (
-        <View style={styles.finalAmountCard}>
+        <View style={[styles.finalAmountCard, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#f0fdf4', borderColor: colors.primary }]}>
           <View style={styles.finalAmountRow}>
-            <Text style={styles.finalAmountLabel}>Estimated Value</Text>
-            <Text style={styles.finalAmountValue}>₹{Math.round(estimatedValue)}</Text>
+            <Text style={[styles.finalAmountLabel, { color: colors.textSecondary }]}>Estimated Value</Text>
+            <Text style={[styles.finalAmountValue, { color: colors.textSecondary }]}>₹{Math.round(estimatedValue)}</Text>
           </View>
           <View style={styles.finalAmountRow}>
-            <Text style={styles.finalAmountLabelBonus}>Referral Bonus</Text>
-            <Text style={styles.finalAmountValueBonus}>+₹{Math.round(referralBonus)}</Text>
+            <Text style={[styles.finalAmountLabelBonus, { color: colors.primary }]}>Referral Bonus</Text>
+            <Text style={[styles.finalAmountValueBonus, { color: colors.primary }]}>+₹{Math.round(referralBonus)}</Text>
           </View>
-          <View style={styles.finalAmountDivider} />
+          <View style={[styles.finalAmountDivider, { backgroundColor: colors.primary }]} />
           <View style={styles.finalAmountRow}>
-            <Text style={styles.finalAmountLabelFinal}>Total Payout</Text>
-            <Text style={styles.finalAmountValueFinal}>₹{Math.round(totalPayout)}</Text>
+            <Text style={[styles.finalAmountLabelFinal, { color: colors.text }]}>Total Payout</Text>
+            <Text style={[styles.finalAmountValueFinal, { color: colors.primary }]}>₹{Math.round(totalPayout)}</Text>
           </View>
-          <Text style={styles.finalAmountNote}>
+          <Text style={[styles.finalAmountNote, { color: isDark ? '#dcfce7' : '#15803d', borderTopColor: isDark ? colors.primary : '#bbf7d0' }]}>
             💸 You will receive this amount from us
           </Text>
         </View>
       )}
 
       {/* Pickup Details */}
-      <View style={styles.pickupDetailsCard}>
-        <View style={styles.pickupDetailsHeader}>
-          <View style={styles.pickupDetailsIconWrapper}>
-            <Calendar size={20} color="#16a34a" />
+      <View style={[styles.pickupDetailsCard, { backgroundColor: colors.surface }]}>
+        <View style={[styles.pickupDetailsHeader, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#f0fdf4', borderBottomColor: isDark ? colors.primary : '#dcfce7' }]}>
+          <View style={[styles.pickupDetailsIconWrapper, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.2)' : '#dcfce7' }]}>
+            <Calendar size={20} color={colors.primary} />
           </View>
-          <Text style={styles.pickupDetailsTitle}>Pickup Details</Text>
+          <Text style={[styles.pickupDetailsTitle, { color: colors.text }]}>Pickup Details</Text>
         </View>
         
         <View style={styles.pickupDetailsContent}>
           <View style={styles.pickupDetailRow}>
             <View style={styles.pickupDetailLabel}>
-              <Calendar size={16} color="#6b7280" />
-              <Text style={styles.pickupDetailLabelText}>Schedule</Text>
+              <Calendar size={16} color={colors.textSecondary} />
+              <Text style={[styles.pickupDetailLabelText, { color: colors.textSecondary }]}>Schedule</Text>
             </View>
             <View style={styles.pickupDetailValue}>
-              <Text style={styles.pickupDetailValueText}>{selectedDate}</Text>
-              <View style={styles.pickupTimeBadge}>
-                <Text style={styles.pickupTimeText}>{selectedTime}</Text>
+              <Text style={[styles.pickupDetailValueText, { color: colors.text }]}>{selectedDate}</Text>
+              <View style={[styles.pickupTimeBadge, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#f0fdf4', borderColor: colors.primary }]}>
+                <Text style={[styles.pickupTimeText, { color: colors.primary }]}>{selectedTime}</Text>
               </View>
             </View>
           </View>
 
-          <View style={styles.pickupDetailDivider} />
+          <View style={[styles.pickupDetailDivider, { backgroundColor: colors.border }]} />
 
           <View style={styles.pickupDetailRow}>
             <View style={styles.pickupDetailLabel}>
-              <MapPin size={16} color="#6b7280" />
-              <Text style={styles.pickupDetailLabelText}>Location</Text>
+              <MapPin size={16} color={colors.textSecondary} />
+              <Text style={[styles.pickupDetailLabelText, { color: colors.textSecondary }]}>Location</Text>
             </View>
             <View style={styles.pickupDetailValue}>
               {getAddressTitle() && (
-                <View style={styles.addressTitleBadge}>
-                  <Text style={styles.addressTitleText}>{getAddressTitle()}</Text>
+                <View style={[styles.addressTitleBadge, { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#eff6ff' }]}>
+                  <Text style={[styles.addressTitleText, { color: isDark ? '#60a5fa' : '#2563eb' }]}>{getAddressTitle()}</Text>
                 </View>
               )}
-              <Text style={styles.pickupAddressText}>
+              <Text style={[styles.pickupAddressText, { color: colors.textSecondary }]}>
                 {getDisplayAddress()}
               </Text>
             </View>
@@ -1242,104 +1244,104 @@ export default function SellScreen() {
         </View>
       </View>
 
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>Contact Information</Text>
+      <View style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.summaryTitle, { color: colors.text }]}>Contact Information</Text>
         <View style={styles.summaryDetail}>
-          <User size={16} color="#6b7280" />
-          <Text style={styles.summaryDetailText}>{contactForm.name}</Text>
+          <User size={16} color={colors.textSecondary} />
+          <Text style={[styles.summaryDetailText, { color: colors.textSecondary }]}>{contactForm.name}</Text>
         </View>
         <View style={styles.summaryDetail}>
-          <Phone size={16} color="#6b7280" />
-          <Text style={styles.summaryDetailText}>{contactForm.mobile}</Text>
+          <Phone size={16} color={colors.textSecondary} />
+          <Text style={[styles.summaryDetailText, { color: colors.textSecondary }]}>{contactForm.mobile}</Text>
         </View>
       </View>
 
       {/* Notes Section */}
-      <View style={styles.summaryCard}>
+      <View style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View style={styles.notesTitleContainer}>
-          <FileText size={18} color="#16a34a" />
-          <Text style={styles.summaryTitle}>Notes (Optional)</Text>
+          <FileText size={18} color={colors.primary} />
+          <Text style={[styles.summaryTitle, { color: colors.text }]}>Notes (Optional)</Text>
         </View>
         <TextInput
-          style={styles.notesInput}
+          style={[styles.notesInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
           placeholder="Add any special instructions or details for pickup..."
-          placeholderTextColor="#9ca3af"
+          placeholderTextColor={colors.inputPlaceholder}
           multiline
           numberOfLines={4}
           value={notes}
           onChangeText={setNotes}
           textAlignVertical="top"
         />
-        <Text style={styles.notesHint}>
+        <Text style={[styles.notesHint, { color: colors.textSecondary }]}>
           E.g., Gate code, parking instructions, specific location details, etc.
         </Text>
       </View>
 
       {/* Pickup Charges Section */}
-      <View style={styles.pickupChargesCard}>
-        <View style={styles.pickupChargesHeader}>
+      <View style={[styles.pickupChargesCard, { backgroundColor: colors.surface }]}>
+        <View style={[styles.pickupChargesHeader, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#f0fdf4', borderBottomColor: isDark ? colors.primary : '#dcfce7' }]}>
           <View style={styles.pickupChargesTitleContainer}>
-            <View style={styles.pickupChargesIconWrapper}>
-              <Scale size={22} color="#16a34a" />
+            <View style={[styles.pickupChargesIconWrapper, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.2)' : '#dcfce7' }]}>
+              <Scale size={22} color={colors.primary} />
             </View>
-            <Text style={styles.pickupChargesTitle}>Pickup Charges</Text>
+            <Text style={[styles.pickupChargesTitle, { color: colors.text }]}>Pickup Charges</Text>
           </View>
-          <TouchableOpacity style={styles.infoIconContainer}>
-            <AlertCircle size={18} color="#6b7280" />
+          <TouchableOpacity style={[styles.infoIconContainer, { backgroundColor: colors.card }]}>
+            <AlertCircle size={18} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
 
         <View style={styles.chargeOptionsContainer}>
-          <View style={styles.freeChargeCard}>
+          <View style={[styles.freeChargeCard, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#f0fdf4', borderColor: colors.primary }]}>
             <View style={styles.chargeCardHeader}>
-              <View style={styles.freeTagLarge}>
+              <View style={[styles.freeTagLarge, { backgroundColor: colors.primary }]}>
                 <Text style={styles.freeTagLargeText}>FREE</Text>
               </View>
             </View>
             <View style={styles.chargeConditionsContainer}>
-              <View style={styles.chargeCondition}>
-                <View style={styles.conditionIconCircle}>
+              <View style={[styles.chargeCondition, { backgroundColor: colors.card }]}>
+                <View style={[styles.conditionIconCircle, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
                   <Text style={styles.conditionIcon}>⚖️</Text>
                 </View>
-                <Text style={styles.conditionText}>Weight above{'\n'}<Text style={styles.conditionBold}>20 kg</Text></Text>
+                <Text style={[styles.conditionText, { color: colors.textSecondary }]}>Weight above{'\n'}<Text style={[styles.conditionBold, { color: colors.text }]}>20 kg</Text></Text>
               </View>
               <View style={styles.orDividerContainer}>
-                <View style={styles.orDividerLine} />
-                <Text style={styles.orDividerText}>OR</Text>
-                <View style={styles.orDividerLine} />
+                <View style={[styles.orDividerLine, { backgroundColor: colors.primary }]} />
+                <Text style={[styles.orDividerText, { color: colors.primary }]}>OR</Text>
+                <View style={[styles.orDividerLine, { backgroundColor: colors.primary }]} />
               </View>
-              <View style={styles.chargeCondition}>
-                <View style={styles.conditionIconCircle}>
+              <View style={[styles.chargeCondition, { backgroundColor: colors.card }]}>
+                <View style={[styles.conditionIconCircle, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
                   <Text style={styles.conditionIcon}>💰</Text>
                 </View>
-                <Text style={styles.conditionText}>Amount above{'\n'}<Text style={styles.conditionBold}>₹200</Text></Text>
+                <Text style={[styles.conditionText, { color: colors.textSecondary }]}>Amount above{'\n'}<Text style={[styles.conditionBold, { color: colors.text }]}>₹200</Text></Text>
               </View>
             </View>
           </View>
 
-          <View style={styles.paidChargeCard}>
+          <View style={[styles.paidChargeCard, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : '#fef9f0', borderColor: '#f59e0b' }]}>
             <View style={styles.chargeCardHeader}>
               <View style={styles.paidTagLarge}>
                 <Text style={styles.paidTagLargeText}>₹30</Text>
               </View>
             </View>
             <View style={styles.chargeConditionsContainer}>
-              <View style={styles.chargeCondition}>
-                <View style={styles.conditionIconCircle}>
+              <View style={[styles.chargeCondition, { backgroundColor: colors.card }]}>
+                <View style={[styles.conditionIconCircle, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
                   <Text style={styles.conditionIcon}>⚖️</Text>
                 </View>
-                <Text style={styles.conditionText}>Weight below{'\n'}<Text style={styles.conditionBold}>20 kg</Text></Text>
+                <Text style={[styles.conditionText, { color: colors.textSecondary }]}>Weight below{'\n'}<Text style={[styles.conditionBold, { color: colors.text }]}>20 kg</Text></Text>
               </View>
               <View style={styles.andDividerContainer}>
                 <View style={styles.andDividerLine} />
                 <Text style={styles.andDividerText}>AND</Text>
                 <View style={styles.andDividerLine} />
               </View>
-              <View style={styles.chargeCondition}>
-                <View style={styles.conditionIconCircle}>
+              <View style={[styles.chargeCondition, { backgroundColor: colors.card }]}>
+                <View style={[styles.conditionIconCircle, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
                   <Text style={styles.conditionIcon}>💰</Text>
                 </View>
-                <Text style={styles.conditionText}>Amount below{'\n'}<Text style={styles.conditionBold}>₹200</Text></Text>
+                <Text style={[styles.conditionText, { color: colors.textSecondary }]}>Amount below{'\n'}<Text style={[styles.conditionBold, { color: colors.text }]}>₹200</Text></Text>
               </View>
             </View>
           </View>
@@ -1347,57 +1349,57 @@ export default function SellScreen() {
       </View>
 
       {/* Keep in Mind Section */}
-      <View style={styles.keepInMindCard}>
-        <Text style={styles.keepInMindTitle}>Please keep in mind</Text>
+      <View style={[styles.keepInMindCard, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.keepInMindTitle, { color: colors.text }]}>Please keep in mind</Text>
         
         <View style={styles.keepInMindGrid}>
           <View style={styles.keepInMindRow}>
-            <View style={styles.keepInMindItem}>
-              <View style={styles.keepInMindIconContainer}>
+            <View style={[styles.keepInMindItem, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' }]}>
+              <View style={[styles.keepInMindIconContainer, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
                 <Text style={styles.keepInMindEmoji}>🪵🍾</Text>
                 <View style={styles.keepInMindCross}>
                   <X size={28} color="#dc2626" strokeWidth={3} />
                 </View>
               </View>
-              <Text style={styles.keepInMindText}>We do not buy{'\n'}Wood & Glass</Text>
+              <Text style={[styles.keepInMindText, { color: colors.text }]}>We do not buy{'\n'}Wood & Glass</Text>
             </View>
 
-            <View style={styles.keepInMindItem}>
-              <View style={styles.keepInMindIconContainer}>
+            <View style={[styles.keepInMindItem, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' }]}>
+              <View style={[styles.keepInMindIconContainer, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
                 <Text style={styles.keepInMindEmoji}>👕👖</Text>
                 <View style={styles.keepInMindCross}>
                   <X size={28} color="#dc2626" strokeWidth={3} />
                 </View>
               </View>
-              <Text style={styles.keepInMindText}>We do not buy{'\n'}Clothes</Text>
+              <Text style={[styles.keepInMindText, { color: colors.text }]}>We do not buy{'\n'}Clothes</Text>
             </View>
           </View>
 
           <View style={styles.keepInMindRow}>
-            <View style={styles.keepInMindItem}>
-              <View style={styles.keepInMindIconContainer}>
+            <View style={[styles.keepInMindItem, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' }]}>
+              <View style={[styles.keepInMindIconContainer, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
                 <Text style={styles.keepInMindEmoji}>🪑💻</Text>
                 <View style={styles.keepInMindCross}>
                   <X size={28} color="#dc2626" strokeWidth={3} />
                 </View>
               </View>
-              <Text style={styles.keepInMindText}>We buy only in{'\n'}scrap rates</Text>
+              <Text style={[styles.keepInMindText, { color: colors.text }]}>We buy only in{'\n'}scrap rates</Text>
             </View>
 
-            <View style={styles.keepInMindItem}>
-              <View style={styles.keepInMindIconContainer}>
+            <View style={[styles.keepInMindItem, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' }]}>
+              <View style={[styles.keepInMindIconContainer, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
                 <Text style={styles.keepInMindEmoji}>⚖️📦</Text>
-                <Text style={styles.keepInMindWeight}>20 kg</Text>
+                <Text style={[styles.keepInMindWeight, { backgroundColor: colors.surface, color: colors.text }]}>20 kg</Text>
               </View>
-              <Text style={styles.keepInMindText}>Free pickup only{'\n'}above 20 kg</Text>
+              <Text style={[styles.keepInMindText, { color: colors.text }]}>Free pickup only{'\n'}above 20 kg</Text>
             </View>
           </View>
         </View>
       </View>
 
       {selectedImages.length > 0 && (
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Attached Photos</Text>
+        <View style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.summaryTitle, { color: colors.text }]}>Attached Photos</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.summaryImagesScroll}>
             {selectedImages.map((uri, index) => (
               <Image key={index} source={{ uri }} style={styles.summaryImage} />
@@ -1462,9 +1464,9 @@ export default function SellScreen() {
                   flexDirection: 'row', 
                   alignItems: 'center', 
                   gap: 6,
-                  paddingHorizontal: 16,
-                  paddingVertical: 12,
-                  borderRadius: 12,
+                  paddingHorizontal: 18,
+                  paddingVertical: 10,
+                  borderRadius: 10,
                 }}
               >
                 {submittingOrder ? (
@@ -1474,7 +1476,7 @@ export default function SellScreen() {
                     <Text style={styles.nextButtonText}>
                       {currentStep === 4 ? 'Schedule' : 'Next'}
                     </Text>
-                    <ArrowRight size={18} color="white" />
+                    <ArrowRight size={16} color="white" />
                   </>
                 )}
               </LinearGradient>
@@ -1494,9 +1496,9 @@ export default function SellScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalOverlay}
         >
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Please keep in mind</Text>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Please keep in mind</Text>
             </View>
 
             <ScrollView 
@@ -1506,42 +1508,42 @@ export default function SellScreen() {
               bounces={false}
             >
               <View style={styles.guidelinesGrid}>
-                <View style={styles.guidelineCard}>
-                  <View style={styles.guidelineImageContainer}>
+                <View style={[styles.guidelineCard, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' }]}>
+                  <View style={[styles.guidelineImageContainer, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
                     <Text style={styles.guidelineEmoji}>🪵🍾</Text>
                     <View style={styles.crossMark}>
                       <X size={40} color="#dc2626" strokeWidth={4} />
                     </View>
                   </View>
-                  <Text style={styles.guidelineText}>We do not buy Wood & Glass</Text>
+                  <Text style={[styles.guidelineText, { color: colors.text }]}>We do not buy Wood & Glass</Text>
                 </View>
 
-                <View style={styles.guidelineCard}>
-                  <View style={styles.guidelineImageContainer}>
+                <View style={[styles.guidelineCard, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' }]}>
+                  <View style={[styles.guidelineImageContainer, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
                     <Text style={styles.guidelineEmoji}>👕👖</Text>
                     <View style={styles.crossMark}>
                       <X size={40} color="#dc2626" strokeWidth={4} />
                     </View>
                   </View>
-                  <Text style={styles.guidelineText}>We do not buy Clothes</Text>
+                  <Text style={[styles.guidelineText, { color: colors.text }]}>We do not buy Clothes</Text>
                 </View>
 
-                <View style={styles.guidelineCard}>
-                  <View style={styles.guidelineImageContainer}>
+                <View style={[styles.guidelineCard, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' }]}>
+                  <View style={[styles.guidelineImageContainer, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
                     <Text style={styles.guidelineEmoji}>🪑💻</Text>
                     <View style={styles.crossMark}>
                       <X size={40} color="#dc2626" strokeWidth={4} />
                     </View>
                   </View>
-                  <Text style={styles.guidelineText}>We buy only in scrap rates</Text>
+                  <Text style={[styles.guidelineText, { color: colors.text }]}>We buy only in scrap rates</Text>
                 </View>
 
-                <View style={styles.guidelineCard}>
-                  <View style={styles.guidelineImageContainer}>
+                <View style={[styles.guidelineCard, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' }]}>
+                  <View style={[styles.guidelineImageContainer, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
                     <Text style={styles.guidelineEmoji}>⚖️📦</Text>
-                    <Text style={styles.weightBadge}>20 kg</Text>
+                    <Text style={[styles.weightBadge, { backgroundColor: colors.surface, color: colors.text }]}>20 kg</Text>
                   </View>
-                  <Text style={styles.guidelineText}>Free pickup only above 20 kg</Text>
+                  <Text style={[styles.guidelineText, { color: colors.text }]}>Free pickup only above 20 kg</Text>
                 </View>
               </View>
             </ScrollView>
@@ -1610,9 +1612,9 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   stepCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#e5e7eb',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1622,25 +1624,27 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   stepGradient: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
   stepNumber: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#000',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6b7280',
   },
   stepNumberActive: {
     color: 'white',
+    fontSize: 12,
+    fontWeight: '700',
   },
   stepLine: {
-    width: 40,
+    width: 32,
     height: 2,
     backgroundColor: '#e5e7eb',
-    marginHorizontal: 8,
+    marginHorizontal: 6,
   },
   stepLineActive: {
     backgroundColor: '#16a34a',
@@ -1776,6 +1780,7 @@ const styles = StyleSheet.create({
   selectedItemRate: {
     fontSize: 12,
     color: '#16a34a',
+    fontWeight: '500',
   },
   quantityControls: {
     flexDirection: 'row',
@@ -1783,24 +1788,24 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   quantityButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
   },
   quantityText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#111827',
-    minWidth: 40,
+    minWidth: 36,
     textAlign: 'center',
   },
   removeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#fee2e2',
     justifyContent: 'center',
     alignItems: 'center',
@@ -2110,7 +2115,9 @@ const styles = StyleSheet.create({
   },
   footer: {
     backgroundColor: 'white',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingBottom: 16,
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
   },
@@ -2124,47 +2131,46 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f3f4f6',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     gap: 6,
   },
   previousButtonText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#6b7280',
   },
   totalSection: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'center',
-    marginHorizontal: 16,
+    marginHorizontal: 12,
   },
   totalLabel: {
     fontSize: 10,
     color: '#6b7280',
-    marginBottom: 2,
-    textAlign: 'center',
+    marginBottom: 3,
   },
   totalAmount: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   totalValue: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     color: '#16a34a',
-    marginLeft: 4,
+    marginLeft: 2,
   },
   nextButton: {
-    borderRadius: 12,
+    borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
     overflow: 'hidden',
     flexShrink: 1,
   },
   nextButtonText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: 'white',
   },
@@ -2490,7 +2496,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalContent: {
-    backgroundColor: 'white',
     borderRadius: 24,
     width: '100%',
     maxWidth: 400,
@@ -2509,7 +2514,6 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#111827',
   },
   guidelinesScroll: {
     flexGrow: 0,
@@ -2527,7 +2531,6 @@ const styles = StyleSheet.create({
   },
   guidelineCard: {
     width: '48%',
-    backgroundColor: '#fef9f0',
     borderRadius: 16,
     padding: 16,
     alignItems: 'center',
@@ -2536,7 +2539,6 @@ const styles = StyleSheet.create({
   guidelineImageContainer: {
     width: '100%',
     height: 100,
-    backgroundColor: '#fef3c7',
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
@@ -2557,18 +2559,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 10,
     right: 10,
-    backgroundColor: 'white',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
     fontSize: 16,
     fontWeight: '700',
-    color: '#111827',
   },
   guidelineText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#111827',
     textAlign: 'center',
     lineHeight: 18,
   },

@@ -20,6 +20,8 @@ import { useScrapCategories } from '../hooks/useScrapCategories';
 import { services } from '../app/(tabs)/services';
 import { wp, hp, fs, spacing } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
+import { useLocalization } from '../context/LocalizationContext';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 
 interface SearchResult {
@@ -37,6 +39,7 @@ interface SearchResult {
 export default function SearchBar() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
+  const { t } = useLocalization();
   
   // Backend data hooks
   const { products, categories, loading, error, refetch } = useHomeData();
@@ -111,15 +114,18 @@ export default function SearchBar() {
 
     // Search services
     services.forEach((service) => {
+      const serviceTitle = t(service.titleKey);
+      const serviceDesc = t(service.descKey);
       const serviceId = `service-${service.id}`;
+      
       if (!addedIds.has(serviceId) &&
-          (service.title.toLowerCase().includes(lowerQuery) ||
-           service.description.toLowerCase().includes(lowerQuery))) {
+          (serviceTitle.toLowerCase().includes(lowerQuery) ||
+           serviceDesc.toLowerCase().includes(lowerQuery))) {
         addedIds.add(serviceId);
         results.push({
           id: serviceId,
-          name: service.title,
-          description: service.description,
+          name: serviceTitle,
+          description: serviceDesc,
           category: 'Services',
           categoryIcon: '🛠️',
           categoryColor: '#16a34a',
@@ -207,7 +213,7 @@ export default function SearchBar() {
         transparent={true}
         onRequestClose={handleCloseModal}
       >
-        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface }}>
           {/* Search Header */}
           <View style={[styles.searchHeader, { borderBottomColor: colors.border, backgroundColor: colors.surface }]}>
             <View style={[styles.searchInputContainer, { backgroundColor: colors.card }]}>
@@ -276,8 +282,8 @@ export default function SearchBar() {
                     <service.icon size={22} color={isDark ? colors.primary : service.color} strokeWidth={2.5} />
                   </View>
                   <View style={styles.serviceInfo}>
-                    <Text style={[styles.serviceTitle, { color: isDark ? '#f1f5f9' : colors.text }]}>{service.title}</Text>
-                    <Text style={[styles.serviceDescription, { color: isDark ? '#cbd5e1' : colors.textSecondary }]}>{service.description}</Text>
+                    <Text style={[styles.serviceTitle, { color: isDark ? '#f1f5f9' : colors.text }]}>{t(service.titleKey)}</Text>
+                    <Text style={[styles.serviceDescription, { color: isDark ? '#cbd5e1' : colors.textSecondary }]}>{t(service.descKey)}</Text>
                   </View>
                   <ChevronRight size={18} color={isDark ? colors.textSecondary : colors.textTertiary} strokeWidth={2} />
                 </TouchableOpacity>
@@ -374,8 +380,8 @@ export default function SearchBar() {
                         <service.icon size={22} color={isDark ? colors.primary : service.color} strokeWidth={2.5} />
                       </View>
                       <View style={styles.serviceInfo}>
-                        <Text style={[styles.serviceTitle, { color: isDark ? '#f1f5f9' : colors.text }]}>{service.title}</Text>
-                        <Text style={[styles.serviceDescription, { color: isDark ? '#cbd5e1' : colors.textSecondary }]}>{service.description}</Text>
+                        <Text style={[styles.serviceTitle, { color: isDark ? '#f1f5f9' : colors.text }]}>{t(service.titleKey)}</Text>
+                        <Text style={[styles.serviceDescription, { color: isDark ? '#cbd5e1' : colors.textSecondary }]}>{t(service.descKey)}</Text>
                       </View>
                       <ChevronRight size={18} color={isDark ? colors.textSecondary : colors.textTertiary} strokeWidth={2} />
                     </TouchableOpacity>
@@ -445,12 +451,11 @@ export default function SearchBar() {
               )}
             </ScrollView>
           )}
-        </View>
+        </SafeAreaView>
       </Modal>
     </>
   );
 }
-
 const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
@@ -484,25 +489,18 @@ const styles = StyleSheet.create({
     flex: 1,
     fontWeight: '600',
   },
-  searchBadge: {
-    width: wp(7.5),
-    height: wp(7.5),
-    backgroundColor: '#fef3c7',
-    borderRadius: wp(3.75),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  searchBadgeText: {
-    fontSize: fs(14),
-  },
   modalContainer: {
     flex: 1,
+    // Removed specific padding here, handled by SafeAreaView and Header padding
   },
+  
+  // FIXED HEADER: Increased Padding for Danger Zone
   searchHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing(16),
-    paddingTop: Platform.OS === 'ios' ? spacing(60) : spacing(24),
+    // Drastically increased top padding to avoid status bar overlap
+    paddingTop: Platform.OS === 'ios' ? spacing(20) : spacing(40), 
     paddingBottom: spacing(12),
     borderBottomWidth: 1,
     gap: spacing(12),
@@ -511,187 +509,112 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: 10, // Slightly sharper corners
     paddingHorizontal: spacing(12),
-    paddingVertical: Platform.OS === 'android' ? spacing(8) : spacing(10),
+    paddingVertical: Platform.OS === 'android' ? spacing(6) : spacing(10), // Reduced height
     gap: spacing(8),
+    height: spacing(40), // Fixed compact height
   },
   searchInput: {
     flex: 1,
-    fontSize: fs(15),
-    ...Platform.select({
-      android: {
-        paddingVertical: 0,
-      },
-    }),
+    fontSize: fs(14),
+    paddingVertical: 0,
   },
   cancelButton: {
-    paddingHorizontal: spacing(8),
+    paddingHorizontal: spacing(4),
   },
   cancelText: {
-    fontSize: fs(15),
+    fontSize: fs(14),
     fontWeight: '600',
   },
   resultsContainer: {
     flex: 1,
   },
   popularContainer: {
-    padding: spacing(20),
+    padding: spacing(16), // Reduced outer padding
   },
   sectionTitle: {
-    fontSize: fs(14),
+    fontSize: fs(12), // Reduced font size
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: spacing(16),
+    marginBottom: spacing(10),
     opacity: 0.9,
   },
+  
+  // COMPACTED POPULAR GRID
   popularGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: spacing(12),
+    gap: spacing(8),
+    marginBottom: spacing(4),
   },
   popularChip: {
-    width: '48%', // Ensures 2x2 grid on all devices
-    flexDirection: 'column',
+    width: '48%',
+    flexDirection: 'row', // Changed to row for compactness (optional, or keep col)
     alignItems: 'center',
-    paddingHorizontal: spacing(14),
-    paddingVertical: spacing(16),
-    borderRadius: 16,
-    borderWidth: 1.5,
-    gap: spacing(10),
-    minHeight: hp(15), // Ensures consistent height
+    paddingHorizontal: spacing(10),
+    paddingVertical: spacing(10), // Reduced padding
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: spacing(8),
+    minHeight: hp(8), // Reduced height
   },
   popularImage: {
-    width: wp(20),
-    height: wp(20),
-    borderRadius: 12,
+    width: wp(10), // Reduced size
+    height: wp(10),
+    borderRadius: 8,
     backgroundColor: '#f3f4f6',
   },
-  popularIcon: {
-    fontSize: fs(18),
-  },
   popularLabel: {
-    fontSize: fs(14),
+    fontSize: fs(12), // Reduced font
     fontWeight: '600',
-    textAlign: 'center',
+    flex: 1,
   },
+
+  // COMPACTED CATEGORIES
   categoryItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing(16),
-    borderRadius: 12,
-    marginBottom: spacing(12),
-    gap: spacing(12),
+    padding: spacing(10), // Reduced padding
+    borderRadius: 10,
+    marginBottom: spacing(8),
+    gap: spacing(10),
   },
   categoryImage: {
-    width: wp(15),
-    height: wp(15),
-    borderRadius: 12,
+    width: wp(11), // Reduced size
+    height: wp(11),
+    borderRadius: 8,
     backgroundColor: '#f3f4f6',
-  },
-  categoryIcon: {
-    width: wp(12),
-    height: wp(12),
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  categoryEmoji: {
-    fontSize: fs(24),
   },
   categoryInfo: {
     flex: 1,
   },
   categoryTitle: {
-    fontSize: fs(15),
+    fontSize: fs(14),
     fontWeight: '600',
-    marginBottom: spacing(4),
+    marginBottom: spacing(2),
   },
   categoryCount: {
-    fontSize: fs(13),
-  },
-  resultsContent: {
-    padding: spacing(20),
-  },
-  resultsCount: {
-    fontSize: fs(14),
-    fontWeight: '500',
-    marginBottom: spacing(16),
-  },
-  resultItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: spacing(16),
-    borderRadius: 12,
-    marginBottom: spacing(12),
-    gap: spacing(12),
-  },
-  resultIcon: {
-    width: wp(12),
-    height: wp(12),
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  resultEmoji: {
-    fontSize: fs(24),
-  },
-  resultInfo: {
-    flex: 1,
-  },
-  resultName: {
-    fontSize: fs(16),
-    fontWeight: '600',
-    marginBottom: spacing(4),
-  },
-  resultDescription: {
-    fontSize: fs(13),
-    marginBottom: spacing(6),
-  },
-  resultCategory: {
     fontSize: fs(12),
-    fontWeight: '600',
   },
-  noResults: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: hp(10),
-  },
-  noResultsEmoji: {
-    fontSize: fs(64),
-    marginBottom: spacing(16),
-  },
-  noResultsText: {
-    fontSize: fs(18),
-    fontWeight: '600',
-    marginBottom: spacing(8),
-  },
-  noResultsSubtext: {
-    fontSize: fs(14),
-    textAlign: 'center',
-    paddingHorizontal: spacing(40),
-  },
+
+  // COMPACTED SERVICES
   serviceItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing(16),
-    borderRadius: 12,
-    marginBottom: spacing(10),
-    gap: spacing(12),
+    padding: spacing(12), // Reduced padding
+    borderRadius: 10,
+    marginBottom: spacing(8),
+    gap: spacing(10),
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.03, // Subtler shadow
   },
   serviceIconContainer: {
-    width: wp(11),
-    height: wp(11),
-    borderRadius: 12,
+    width: wp(9), // Reduced size
+    height: wp(9),
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -701,19 +624,107 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   serviceTitle: {
-    fontSize: fs(15),
-    fontWeight: '700',
-    marginBottom: spacing(3),
+    fontSize: fs(14),
+    fontWeight: '600',
+    marginBottom: spacing(2),
   },
   serviceDescription: {
+    fontSize: fs(12),
+    opacity: 0.8,
+  },
+
+  // COMPACTED SEARCH RESULTS
+  resultsContent: {
+    padding: spacing(16),
+  },
+  resultsCount: {
     fontSize: fs(13),
-    lineHeight: fs(18),
-    opacity: 0.85,
+    fontWeight: '500',
+    marginBottom: spacing(12),
+  },
+  resultItem: {
+    flexDirection: 'row',
+    alignItems: 'center', // Align center vertically
+    padding: spacing(10), // Reduced
+    borderRadius: 10,
+    marginBottom: spacing(8),
+    gap: spacing(10),
+  },
+  resultIcon: {
+    width: wp(10),
+    height: wp(10),
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  resultEmoji: {
+    fontSize: fs(20),
+  },
+  resultInfo: {
+    flex: 1,
+  },
+  resultName: {
+    fontSize: fs(14),
+    fontWeight: '600',
+    marginBottom: spacing(2),
+  },
+  resultDescription: {
+    fontSize: fs(12),
+    marginBottom: spacing(2),
+  },
+  resultRate: {
+    fontSize: fs(12),
+    fontWeight: '600',
   },
   resultImage: {
-    width: wp(15),
-    height: wp(15),
-    borderRadius: 12,
+    width: wp(12),
+    height: wp(12),
+    borderRadius: 8,
     backgroundColor: '#f3f4f6',
+  },
+  
+  // UTILS
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: spacing(20),
+  },
+  loadingText: {
+    marginTop: spacing(8),
+    fontSize: fs(13),
+  },
+  errorContainer: {
+    alignItems: 'center',
+    padding: spacing(20),
+  },
+  errorText: {
+    fontSize: fs(14),
+    marginBottom: spacing(8),
+  },
+  retryButton: {
+    backgroundColor: '#16a34a',
+    paddingHorizontal: spacing(16),
+    paddingVertical: spacing(8),
+    borderRadius: 8,
+  },
+  retryText: {
+    color: 'white',
+    fontSize: fs(12),
+    fontWeight: '600',
+  },
+  noResults: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: hp(8),
+  },
+  noResultsEmoji: {
+    fontSize: fs(40),
+    marginBottom: spacing(12),
+  },
+  noResultsText: {
+    fontSize: fs(16),
+    fontWeight: '600',
   },
 });

@@ -1,5 +1,5 @@
 from django.urls import path
-from .views.user import  RegisterView, LoginView, LogoutView, PasswordResetView, PasswordResetRequestView, ResendotpView, UserView,ReferredUsersView , ReferralTransactionsView,RedeemReferralBalanceView
+from .views.user import  RegisterView, LoginView, LogoutView, PasswordResetView, PasswordResetRequestView, ResendotpView, UserView,ReferredUsersView , ReferralTransactionsView,RedeemReferralBalanceView, AuditLogView
 from .views.oauth import GoogleOAuthLoginView
 
 urlpatterns = [
@@ -14,4 +14,5 @@ urlpatterns = [
     path('referrals/users/', ReferredUsersView.as_view(), name='referred-users'),
     path('referrals/transactions/', ReferralTransactionsView.as_view(), name='referral-transactions'),
     path('referrals/redeem/', RedeemReferralBalanceView.as_view(), name='redeem-referral-balance'),
+    path('audit-logs/', AuditLogView.as_view(), name='audit-logs'),
 ]

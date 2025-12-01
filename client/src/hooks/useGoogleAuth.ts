@@ -13,16 +13,9 @@ export const useGoogleAuth = () => {
   const [error, setError] = useState<string | null>(null);
   const [authSuccess, setAuthSuccess] = useState(false);
   const { setAuthenticatedState, refreshAuthStatus } = useAuth();
-
-
-
-  
-
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
     iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
     androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
-    
-
   });
 
   useEffect(() => {
@@ -32,12 +25,14 @@ export const useGoogleAuth = () => {
       if (response.type === 'cancel') {
         setError('Sign in was cancelled');
         setIsLoading(false);
+        setAuthSuccess(false);
         return;
       }
 
       if (response.type === 'success') {
         setIsLoading(true);
         setError(null);
+        setAuthSuccess(false);
 
         try {
           const { params } = response;
@@ -63,19 +58,22 @@ export const useGoogleAuth = () => {
             
             setError(null);
             setAuthSuccess(true);
+            setIsLoading(false);
           } else {
             throw new Error('No JWT received from server');
           }
         } catch (err: any) {
           console.error('Auth error:', err);
-          setError(err.message || 'Authentication failed');
+          const errorMessage = err.message || 'Unable to sign in. Please try again';
+          setError(errorMessage);
           setAuthSuccess(false);
-        } finally {
           setIsLoading(false);
         }
       } else if (response.type === 'error') {
         console.error('Google auth error:', response.error);
-        setError(response.error?.message || 'Authentication failed');
+        const errorMessage = response.error?.message || 'Unable to sign in. Please try again';
+        setError(errorMessage);
+        setAuthSuccess(false);
         setIsLoading(false);
       }
     };
@@ -85,6 +83,7 @@ export const useGoogleAuth = () => {
 
   const signInWithGoogle = async () => {
     setError(null);
+    setAuthSuccess(false);
     setIsLoading(true);
 
     try {
@@ -96,11 +95,24 @@ export const useGoogleAuth = () => {
       const result = await promptAsync();
       console.log('Prompt result:', result.type);
 
+      // If user cancelled or there was an error, stop loading immediately
+      if (result.type === 'cancel' || result.type === 'error') {
+        setIsLoading(false);
+        if (result.type === 'cancel') {
+          setError('Sign in was cancelled');
+        } else {
+          setError('Unable to sign in. Please try again');
+        }
+        return false;
+      }
+
+      // Keep loading true for success case - will be handled by useEffect
       return result.type === 'success';
     } catch (err: any) {
       console.error('Google Prompt Error:', err);
-      setError(err.message || 'Failed to start sign in');
+      setError(err.message || 'Unable to sign in. Please try again');
       setIsLoading(false);
+      setAuthSuccess(false);
       return false;
     }
   };

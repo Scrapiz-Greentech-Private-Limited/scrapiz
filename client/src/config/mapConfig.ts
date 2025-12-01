@@ -1,7 +1,11 @@
 import MapboxGL from '@rnmapbox/maps';
-
+import 'react-native-get-random-values';
+import { v4 as uuidv4 } from 'uuid';
 export const MAPBOX_API_KEY = process.env.EXPO_PUBLIC_MAPBOX_TOKEN || '';
 export const KRUTRIM_API_KEY = process.env.EXPO_PUBLIC_KRUTRIM_API_KEY || '';
+export const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY || '';
+
+export const getSessionToken = () => uuidv4();
 
 // Map Styles
 export const MAP_STYLES = {
@@ -17,7 +21,7 @@ export const MAP_STYLES = {
   navigationNight: 'mapbox://styles/mapbox/navigation-night-v1',
 };
 
-export const DEFAULT_MAP_STYLE = MAP_STYLES.streets;
+export const DEFAULT_MAP_STYLE = MAP_STYLES.hybrid;
 
 const KRUTRIM_API_URL = 'https://api.olamaps.io/places/v1';
 
@@ -72,6 +76,50 @@ export function buildGeocodingUrl(
   }
 
   return `${KRUTRIM_API_URL}/autocomplete?${params.toString()}`;
+}
+export function buildGoogleAutocompletePayload(
+  query: string,
+  sessionToken: string,
+  userLocation?: { lat: number; lng: number } | number[] | null
+) {
+  let lat, lng;
+  if (Array.isArray(userLocation)) {
+    [lng, lat] = userLocation;
+  } else if (userLocation && 'lat' in userLocation) {
+    lat = userLocation.lat;
+    lng = userLocation.lng;
+  }
+
+  const payload: any = {
+    input: query,
+    sessionToken: sessionToken,
+    includedRegionCodes: ['in'], // Restrict to India
+  };
+
+  // Add location bias if available
+  if (lat && lng) {
+    payload.locationBias = {
+      circle: {
+        center: {
+          latitude: lat,
+          longitude: lng,
+        },
+        radius: 5000.0, // 5km radius
+      },
+    };
+  }
+
+  return payload;
+}
+
+export function buildGoogleGeocodeUrl(lat: number, lng: number) {
+  return `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_API_KEY}`;
+}
+
+export function buildGooglePlaceDetailsPayload(sessionToken: string) {
+  return {
+    sessionToken: sessionToken,
+  };
 }
 
 export function buildReverseGeocodingUrl(longitude: number, latitude: number) {
@@ -178,8 +226,11 @@ export default {
   KRUTRIM_API_URL,
   MAP_SETTINGS,
   KRUTRIM_API_KEY,
+  GOOGLE_API_KEY,
   buildGeocodingUrl,
   buildReverseGeocodingUrl,
+  buildGoogleAutocompletePayload,
+  buildGooglePlaceDetailsPayload,
   isValidCoordinate,
   formatCoordinates,
   calculateDistance,

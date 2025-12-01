@@ -101,24 +101,38 @@ export default function LocationSelectionModal({
   const searchLocation = async (query: string) => {
     setIsSearching(true);
     try {
-      // Integrate with your Krutrim/OLA Maps API search here
-      // Using the same logic from MapLocationPicker
-      const url = `https://api.olamaps.io/places/v1/autocomplete?input=${encodeURIComponent(
-        query
-      )}&api_key=${process.env.EXPO_PUBLIC_KRUTRIM_API_KEY}`;
+      // Use Google Places API (New) with POST request
+      const { buildGoogleAutocompletePayload, GOOGLE_API_KEY, getSessionToken } = await import('../config/mapConfig');
       
-      const response = await fetch(url);
+      const sessionToken = getSessionToken();
+      const payload = buildGoogleAutocompletePayload(query, sessionToken, null);
+
+      const response = await fetch(
+        'https://places.googleapis.com/v1/places:autocomplete',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': GOOGLE_API_KEY,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
       const data = await response.json();
 
-      if (data.predictions) {
-        setSearchResults(data.predictions);
+      if (data.suggestions) {
+        const formattedResults = data.suggestions.map((item: any) => ({
+          place_id: item.placePrediction.placeId,
+          description: item.placePrediction.text.text,
+        }));
+        setSearchResults(formattedResults);
       } else {
         setSearchResults([]);
       }
     } catch (error) {
       console.error('Location search error:', error);
       setSearchResults([]);
-      // Optionally show a toast for search errors
       Toast.show({
         type: 'error',
         text1: 'Search Error',
