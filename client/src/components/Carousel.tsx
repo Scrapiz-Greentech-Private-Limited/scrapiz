@@ -33,11 +33,25 @@ interface CarouselImage {
   is_active: boolean;
 }
 
-const renderCarouselItem = ({ item }: { item: any }) => (
-  <View style={styles.carouselItem}>
-    <Image source={item.image} style={styles.carouselImage} />
-  </View>
-);
+const renderCarouselItem = ({ item }: { item: any }) => {
+  // Handle both local images and remote URLs
+  const imageSource = item.isLocal 
+    ? item.image 
+    : { uri: item.image_url };
+
+  return (
+    <View style={styles.carouselItem}>
+      <Image 
+        source={imageSource} 
+        style={styles.carouselImage}
+        defaultSource={require('../../assets/images/Become_A_Scrap_Seller.png')}
+        onError={(error) => {
+          console.log('Image load error:', error.nativeEvent.error);
+        }}
+      />
+    </View>
+  );
+};
 
 
 export default function CustomCarousel() {
@@ -52,15 +66,30 @@ export default function CustomCarousel() {
     try {
       const images: CarouselImage[] = await AuthService.getCarouselImages();
       
+      console.log('Carousel images received from backend:', images);
+      
       if (images && images.length > 0) {
         // Transform backend data to carousel format
-        const transformedData = images.map((img) => ({
-          id: img.id,
-          image_url: img.image_url,
-          title: img.title,
-          isLocal: false,
-        }));
-        setCarouselData(transformedData);
+        const transformedData = images
+          .filter(img => img.is_active) // Only show active images
+          .map((img) => ({
+            id: img.id,
+            image_url: img.image_url,
+            title: img.title,
+            isLocal: false,
+          }));
+        
+        console.log('Transformed carousel data:', transformedData);
+        
+        if (transformedData.length > 0) {
+          setCarouselData(transformedData);
+        } else {
+          console.log('No active images, using fallback');
+          // Keep fallback data if no active images
+        }
+      } else {
+        console.log('No images received, using fallback');
+        // Keep fallback data if no images
       }
     } catch (error) {
       console.log('Failed to load carousel images, using fallback:', error);

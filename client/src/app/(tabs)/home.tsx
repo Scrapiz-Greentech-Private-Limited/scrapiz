@@ -25,6 +25,7 @@ import {
 import CustomCarousel from '../../components/Carousel';
 import LocationSelector from '@/src/components/LocationSelector';
 import SearchBar from '@/src/components/SearchBar';
+import { RemoteImage } from '../../components/RemoteImage';
 //Hooks
 import { useHomeData } from '../../hooks/useHomeData';
 import { useScrapCategories } from '../../hooks/useScrapCategories';
@@ -277,7 +278,7 @@ v          <View style={styles.decorativeCircle1} />
                 end={{ x: 1, y: 1 }}
             >
                 <View style={[styles.actionIcon, { backgroundColor: 'white' }]}>
-                  <PackagePlus size={22} color="#16a34a" strokeWidth={2.5} />
+                  <PackagePlus size={28} color="#16a34a" strokeWidth={2.5} />
                 </View>
                 <Text style={[styles.actionTitle, { color: 'white' }]}>{t('home.sellScrap')}</Text>
                 <Text style={[styles.actionSubtitle, { color: '#d1fae5' }]}>{t('home.schedulePickup')}</Text>
@@ -295,7 +296,7 @@ v          <View style={styles.decorativeCircle1} />
               end={{ x: 1, y: 1 }}
             >
                 <View style={[styles.actionIcon, { backgroundColor: 'white' }]}>
-                  <AreaChart size={22} color="#16a34a" strokeWidth={2.5} />
+                  <AreaChart size={28} color="#16a34a" strokeWidth={2.5} />
                 </View>
                 <Text style={[styles.actionTitle, { color: 'white' }]}>{t('home.viewRates')}</Text>
                 <Text style={[styles.actionSubtitle, { color: 'white' }]}>{t('home.todaysPrices')}</Text>
@@ -330,8 +331,13 @@ v          <View style={styles.decorativeCircle1} />
                   onPress={() => handleNavigate('/(tabs)/rates')}
                 >
                   <View style={styles.rateIconContainer}>
-                    <Image source={category.icon} style={styles.itemImage} resizeMode='contain' />
-                    </View>
+                    <RemoteImage 
+                      source={category.icon} 
+                      fallback={category.icon}
+                      style={styles.itemImage}
+                      showLoadingIndicator={false}
+                    />
+                  </View>
                   <Text style={[styles.categoryName, { color: colors.text }]}
                   numberOfLines={2}>{category.name}</Text>
                   <View style={styles.priceBadge}>
@@ -802,27 +808,28 @@ rateCard: {
   },
   actionCard: {
     flex: 1,
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#000',
+    shadowColor: '#16a34a',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 6,
   },
   actionCardGradient: {
-    padding: wp(4), // Reduced from 4.8
+    paddingVertical: hp(2.5), // Use vertical padding instead of just padding
+    paddingHorizontal: wp(2),
     alignItems: 'center',
-    minHeight: hp(15), // Reduced from 17.2
+    minHeight: hp(13),      // CHANGED: Reduced from 15 to 13 to remove empty space
     justifyContent: 'center',
   },
   actionIcon: {
-    width: wp(10), // Reduced from 11.7
-    height: wp(10), // Reduced from 11.7
-    borderRadius: wp(5), // Reduced from 5.9
+    width: wp(13),          // CHANGED: Increased from 10 to 13
+    height: wp(13),         // CHANGED: Increased from 10 to 13
+    borderRadius: wp(6.5),  // Adjusted to half of width
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: hp(1), // Reduced from 1.2
+    marginBottom: hp(1.2),  // Give space between icon and text
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -830,15 +837,17 @@ rateCard: {
     elevation: 3,
   },
   actionTitle: {
-    fontSize: fs(14), // Reduced from 15
-    fontWeight: '700',
-    fontFamily: 'Inter-Bold',
-    marginBottom: hp(0.3), // Reduced from 0.4
+    fontSize: fs(16),       // CHANGED: Increased from 14 to 16 for better readability
+    fontWeight: '800',      // Made bolder
+    fontFamily: 'Inter-ExtraBold',
+    marginBottom: hp(0.2), 
+    textAlign: 'center',    // Ensures text stays centered
   },
   actionSubtitle: {
-    fontSize: fs(10), // Reduced from 11
-    fontFamily: 'Inter-Regular',
+    fontSize: fs(11),       // CHANGED: Increased from 10 to 11
+    fontFamily: 'Inter-Medium',
     opacity: 0.9,
+    textAlign: 'center',
   },
   moreServicesText: {
     fontSize: fs(14), // 14
