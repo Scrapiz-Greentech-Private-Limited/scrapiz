@@ -3,9 +3,9 @@ export type DeletionReason =
   | 'better_alternative'
   | 'not_using'
   | 'privacy_concerns'
-  | 'too_many_notifications'
   | 'difficult_to_use'
   | 'other';
+
 export interface DeletionFeedback {
   reason: DeletionReason;
   comments?: string;

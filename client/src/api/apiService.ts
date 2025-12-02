@@ -363,9 +363,11 @@ export class AuthService {
     }
   }
 
-  // Update user profile (name and/or profile image)
+  // Update user profile (name, phone, gender, and/or profile image)
   static async updateUserProfile(data: { 
     name?: string; 
+    phone_number?: string;
+    gender?: 'male' | 'female' | 'prefer_not_to_say' | null;
     profile_image?: string | null; 
   }): Promise<UserProfile> {
     try {
@@ -374,6 +376,20 @@ export class AuthService {
       // Add name if provided
       if (data.name !== undefined) {
         formData.append('name', data.name);
+      }
+      
+      // Add phone_number if provided
+      if (data.phone_number !== undefined) {
+        formData.append('phone_number', data.phone_number);
+      }
+      
+      // Add gender if provided
+      if (data.gender !== undefined) {
+        if (data.gender === null || data.gender === '') {
+          formData.append('gender', '');
+        } else {
+          formData.append('gender', data.gender);
+        }
       }
       
       // Handle profile_image
@@ -432,6 +448,12 @@ export class AuthService {
     feedback: DeletionFeedback
   ): Promise<ApiResponse> {
     try {
+      console.log('🗑️ Deleting account with feedback:', {
+        reason: feedback.reason,
+        hasComments: !!feedback.comments,
+        endpoint: API_CONFIG.BASE_URL + API_CONFIG.ENDPOINTS.USER
+      });
+
       const response = await apiClient.delete(API_CONFIG.ENDPOINTS.USER, {
         data: {
           reason: feedback.reason,
@@ -439,12 +461,20 @@ export class AuthService {
         }
       });
       
+      console.log('✅ Account deletion response:', response.data);
+      
       // Clear local auth token on successful deletion
       await AsyncStorage.removeItem('authToken');
       
       return response.data as ApiResponse;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to delete account');
+      console.error('❌ Account deletion error:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message,
+        fullError: error
+      });
+      throw new Error(error.response?.data?.error || error.message || 'Failed to delete account');
     }
   }
 

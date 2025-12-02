@@ -144,17 +144,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await unregisterPushToken(expoPushToken);
         } catch (notifError) {
           console.error('Failed to unregister push token:', notifError);
+          // Non-critical, continue
         }
       }
       
       // Clear authentication token from AsyncStorage
-      await AuthService.logout();
+      try {
+        await AuthService.logout();
+      } catch (logoutError) {
+        console.error('Logout API call failed (non-critical):', logoutError);
+        // Token is already removed by logout method, so this is non-critical
+      }
       
       // Update authentication state
       setIsAuthenticated(false);
     } catch (error) {
       console.error('Error clearing auth state:', error);
-      // Even if logout fails, clear local state
+      // Even if everything fails, clear local state
       setIsAuthenticated(false);
     }
   };

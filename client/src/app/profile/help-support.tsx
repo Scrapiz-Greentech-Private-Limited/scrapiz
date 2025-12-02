@@ -24,37 +24,31 @@ export default function HelpSupport(){
       switch (method) {
         case 'phone':
           url = `tel:${value}`;
-          canOpen = await Linking.canOpenURL(url);
+          await Linking.openURL(url);
           break;
         case 'email':
           url = `mailto:${value}`;
-          canOpen = await Linking.canOpenURL(url);
+          await Linking.openURL(url);
           break;
         case 'whatsapp':
           // Remove + and spaces from phone number
           const cleanNumber = value.replace(/[\s+]/g, '');
           url = `whatsapp://send?phone=${cleanNumber}`;
           canOpen = await Linking.canOpenURL(url);
-          if (!canOpen) {
+          if (canOpen) {
             // Fallback to web WhatsApp
-            url = `https://wa.me/${cleanNumber}`;
-            canOpen = true;
+            await Linking.openURL(url);
+            
+          }else{
+            await Linking.openURL(`https://wa.me/${cleanNumber}`);
           }
           break;
         case 'url':
           url = value;
-          canOpen = await Linking.canOpenURL(url);
+          await Linking.openURL(url);
           break;
       }
 
-      if (canOpen) {
-        await Linking.openURL(url);
-      } else {
-        Alert.alert(
-          'Unable to Open',
-          `Unable to open ${method}. Please make sure you have the app installed.`
-        );
-      }
     } catch (error) {
       Alert.alert(
         'Error',
@@ -66,9 +60,9 @@ export default function HelpSupport(){
          {
       icon: Phone,
       title: 'Call Us',
-      subtitle: '+918828700630',
+      subtitle: '+91 8828700630',
       description: 'Available 9 AM - 6 PM, Mon-Sat',
-      action: () => handleContactSupport('phone'),
+      action: () => handleContactSupport('phone', '+918828700630'),
       color: '#16a34a',
     },
      {
@@ -76,7 +70,7 @@ export default function HelpSupport(){
       title: 'Email Support',
       subtitle: 'support@scrapiz.in',
       description: 'We respond within 24 hours',
-      action: () => handleContactSupport('email'),
+      action: () => handleContactSupport('email', 'support@scrapiz.in'),
       color: '#f59e0b',
     },
     ];
@@ -188,7 +182,7 @@ export default function HelpSupport(){
           </Text>
           <TouchableOpacity 
             style={styles.emergencyButton}
-            onPress={() => handleContactSupport('phone')}
+            onPress={() => handleContactSupport('phone', '+918828700630')}
           >
             <Phone size={20} color="white" />
             <Text style={styles.emergencyButtonText}>Call Emergency Support</Text>

@@ -14,6 +14,7 @@ import en from './translations/en.json';
 import hi from './translations/hi.json';
 import mr from './translations/mr.json';
 import gu from './translations/gu.json';
+import ur from './translations/ur.json';
 
 /**
  * Custom language detector plugin for i18next
@@ -81,7 +82,8 @@ i18n
       en: { translation: en },
       hi: { translation: hi },
       mr: { translation: mr },
-      gu: { translation: gu }
+      gu: { translation: gu },
+      ur: { translation: ur }
     },
 
     // Fallback language when translation is missing

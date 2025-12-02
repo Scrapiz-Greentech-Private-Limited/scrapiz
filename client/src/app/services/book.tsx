@@ -55,7 +55,7 @@ const getBookingDates = () => {
     const date = addDays(today, i);
     dates.push({
       fullDate: date,
-      dayName: i === 0 ? 'Today' : i === 1 ? 'Tom' : format(date, 'EEE'),
+      dayName: i === 0 ? 'Today'  : format(date, 'EEE'),
       dayNumber: format(date, 'd'),
       month: format(date, 'MMM')
     });

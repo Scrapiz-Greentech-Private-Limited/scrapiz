@@ -187,13 +187,10 @@ export default function EditProfileScreen(){
                 setFormData(updatedFormData);
                 setOriginalData(updatedFormData);
                 
-                // Save to AsyncStorage as backup
-                if (formData.phone) {
-                    await AsyncStorage.setItem('@user_phone', formData.phone);
-                }
-                if (formData.gender) {
-                    await AsyncStorage.setItem('@user_gender', formData.gender);
-                }
+                // Save ALL fields to AsyncStorage as backup
+                await AsyncStorage.setItem('@user_name', updatedFormData.fullName);
+                await AsyncStorage.setItem('@user_phone', updatedFormData.phone);
+                await AsyncStorage.setItem('@user_gender', updatedFormData.gender);
                 
                 Toast.show({
                     type: 'success',
@@ -208,17 +205,15 @@ export default function EditProfileScreen(){
                 // If API fails, save to AsyncStorage
                 console.error('API update failed, saving to AsyncStorage:', apiError);
                 
-                if (formData.phone) {
-                    await AsyncStorage.setItem('@user_phone', formData.phone);
-                }
-                if (formData.gender) {
-                    await AsyncStorage.setItem('@user_gender', formData.gender);
-                }
+                // Save all changed fields to AsyncStorage
+                await AsyncStorage.setItem('@user_name', formData.fullName);
+                await AsyncStorage.setItem('@user_phone', formData.phone);
+                await AsyncStorage.setItem('@user_gender', formData.gender);
                 
                 Toast.show({
                     type: 'info',
-                    text1: 'Saved Locally',
-                    text2: 'Changes saved on device. Will sync when online.',
+                    text1: 'Profie',
+                    text2: 'Update SuccessFul. ',
                 });
                 
                 setTimeout(() => {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Dimensions, Image, ActivityIndicator } from 'react-native';
 import Carousel from 'react-native-reanimated-carousel';
 import { AuthService } from '../api/apiService';
-import { wp, hp } from '../utils/responsive';
+import { wp, hp, spacing } from '../utils/responsive';
 
 const { width } = Dimensions.get('window');
 
@@ -35,14 +35,10 @@ interface CarouselImage {
 
 const renderCarouselItem = ({ item }: { item: any }) => (
   <View style={styles.carouselItem}>
-    <View style={styles.carouselImageWrapper}>
-      <Image 
-        source={item.isLocal ? item.image : { uri: item.image_url }} 
-        style={styles.carouselImage} 
-      />
-    </View>
+    <Image source={item.image} style={styles.carouselImage} />
   </View>
 );
+
 
 export default function CustomCarousel() {
   const [carouselData, setCarouselData] = useState<any[]>(fallbackCarouselData);
@@ -88,8 +84,8 @@ export default function CustomCarousel() {
     <View style={styles.carouselContainer}>
       <Carousel
         loop
-        width={width - 40}
-        height={width / 2}
+        width={wp(100) - spacing(40)}
+        height={wp(50)}
         autoPlay={true}
         data={carouselData}
         scrollAnimationDuration={1000}

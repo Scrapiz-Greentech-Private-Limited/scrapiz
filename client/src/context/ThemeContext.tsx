@@ -65,10 +65,10 @@ interface ThemeContextType {
 }
 
 const lightColors: ThemeColors = {
-  // Backgrounds - Using softer colors instead of pure white
-  background: '#f8fafc',
-  surface: '#ffffff',
-  card: '#ffffff',
+  // Backgrounds - Warm wheat/cream tones for softer appearance
+  background: '#fafff3',
+  surface: '#fefdfb',
+  card: '#fefdfb',
   
   // Text
   text: '#111827',
@@ -87,32 +87,32 @@ const lightColors: ThemeColors = {
   info: '#3b82f6',
   
   // Borders
-  border: '#e5e7eb',
-  divider: '#f3f4f6',
+  border: '#e7e5e1',
+  divider: '#f5f3f0',
   
   // Inputs
-  inputBackground: '#ffffff',
-  inputBorder: '#d1d5db',
+  inputBackground: '#fefdfb',
+  inputBorder: '#d4d2ce',
   inputText: '#111827',
   inputPlaceholder: '#9ca3af',
   
   // Buttons
   buttonBackground: '#16a34a',
   buttonText: '#ffffff',
-  buttonDisabled: '#d1d5db',
+  buttonDisabled: '#d4d2ce',
   
   // Tab Bar
-  tabBarBackground: '#ffffff',
+  tabBarBackground: '#fefdfb',
   tabBarActive: '#16a34a',
   tabBarInactive: '#9ca3af',
   
   // Modal
-  modalBackground: '#ffffff',
+  modalBackground: '#fefdfb',
   modalOverlay: 'rgba(0, 0, 0, 0.5)',
   
   // Special
-  skeleton: '#e5e7eb',
-  shimmer: '#f3f4f6',
+  skeleton: '#e7e5e1',
+  shimmer: '#f5f3f0',
   shadow: '#000000',
 };
 

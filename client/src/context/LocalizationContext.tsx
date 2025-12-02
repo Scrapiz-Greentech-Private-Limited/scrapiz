@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
+import { I18nManager, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
+import * as Updates from 'expo-updates';
 import i18n from '../localization/i18n';
 import { 
   Language, 
@@ -107,8 +109,43 @@ export const LocalizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   /**
+   * Check if a language requires RTL layout
+   */
+  const isRTLLanguage = (lang: Language): boolean => {
+    const language = SUPPORTED_LANGUAGES.find(l => l.code === lang);
+    return language?.direction === 'rtl';
+  };
+
+  /**
+   * Apply RTL layout changes based on language
+   * Requires app restart to fully apply RTL changes
+   */
+  const applyRTLLayout = async (lang: Language): Promise<boolean> => {
+    const shouldBeRTL = isRTLLanguage(lang);
+    const currentlyRTL = I18nManager.isRTL;
+
+    // If RTL state needs to change
+    if (shouldBeRTL !== currentlyRTL) {
+      try {
+        console.log(`[LocalizationContext] Switching RTL from ${currentlyRTL} to ${shouldBeRTL}`);
+        
+        I18nManager.allowRTL(shouldBeRTL);
+        I18nManager.forceRTL(shouldBeRTL);
+        
+        // Return true to indicate restart is needed
+        return true;
+      } catch (error) {
+        console.error('[LocalizationContext] Error applying RTL layout:', error);
+        return false;
+      }
+    }
+
+    return false; // No restart needed
+  };
+
+  /**
    * Change the current language
-   * Updates i18n, saves to AsyncStorage, and shows toast notification
+   * Updates i18n, saves to AsyncStorage, applies RTL if needed, and shows toast notification
    * Handles errors with rollback to previous language
    */
   const changeLanguage = async (newLanguage: Language): Promise<void> => {
@@ -137,15 +174,54 @@ export const LocalizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         setIsLanguageSet(true);
       }
       
-      // Show success toast notification
-      Toast.show({
-        type: 'success',
-        text1: t('notifications.languageChanged'),
-        position: 'bottom',
-        visibilityTime: 2000,
-      });
+      // Check if RTL layout needs to be applied
+      const needsRestart = await applyRTLLayout(newLanguage);
       
-      console.log('[LocalizationContext] Language changed successfully to:', newLanguage);
+      if (needsRestart) {
+        // Show toast with restart message
+        Toast.show({
+          type: 'success',
+          text1: t('notifications.languageChanged'),
+          text2: t('notifications.restartingApp'),
+          position: 'bottom',
+          visibilityTime: 2000,
+        });
+        
+        console.log('[LocalizationContext] RTL layout changed, restarting app...');
+        
+        // Restart app after a short delay to show the toast
+        setTimeout(async () => {
+          try {
+            // For Expo apps, use expo-updates to reload
+            if (Platform.OS !== 'web') {
+              await Updates.reloadAsync();
+            } else {
+              // For web, just reload the page
+              window.location.reload();
+            }
+          } catch (error) {
+            console.error('[LocalizationContext] Error restarting app:', error);
+            // Fallback: show message to user to manually restart
+            Toast.show({
+              type: 'info',
+              text1: t('notifications.languageChanged'),
+              text2: 'Please restart the app to apply layout changes',
+              position: 'bottom',
+              visibilityTime: 4000,
+            });
+          }
+        }, 2000);
+      } else {
+        // Show success toast notification (no restart needed)
+        Toast.show({
+          type: 'success',
+          text1: t('notifications.languageChanged'),
+          position: 'bottom',
+          visibilityTime: 2000,
+        });
+        
+        console.log('[LocalizationContext] Language changed successfully to:', newLanguage);
+      }
     } catch (error) {
       console.error('[LocalizationContext] Error changing language:', error);
       

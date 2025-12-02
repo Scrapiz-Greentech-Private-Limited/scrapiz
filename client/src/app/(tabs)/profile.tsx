@@ -339,8 +339,16 @@ export default function Profile() {
   const confirmDeletion = async (feedback: DeletionFeedback) => {
     try {
       setDeletingAccount(true);
+      
+      // Delete account
       await AuthService.deleteUserWithFeedback(feedback);
-      await clearAuthState();
+      
+      // Clear auth state (ignore any errors since account is already deleted)
+      try {
+        await clearAuthState();
+      } catch (clearError) {
+        console.log('Auth state cleared (with non-critical errors)');
+      }
 
       Alert.alert(
         t('profile.accountDeleted'),

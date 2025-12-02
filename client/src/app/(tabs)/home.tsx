@@ -325,15 +325,23 @@ v          <View style={styles.decorativeCircle1} />
                   style={[
                   styles.rateCard,
                   { backgroundColor: colors.surface, borderColor: colors.border },
-                index === 3 && { marginRight: 0 }
+                index === 3 && { marginRight:wp(5.3) }
               ]}
                   onPress={() => handleNavigate('/(tabs)/rates')}
                 >
-                  <Image source={category.icon} style={styles.itemImage} />
-                  <Text style={[styles.categoryName, { color: colors.text }]}>{category.name}</Text>
-                  <Text style={[styles.categoryRate, { color: '#16a34a' }]}>
+                  <View style={styles.rateIconContainer}>
+                    <Image source={category.icon} style={styles.itemImage} resizeMode='contain' />
+                    </View>
+                  <Text style={[styles.categoryName, { color: colors.text }]}
+                  numberOfLines={2}>{category.name}</Text>
+                  <View style={styles.priceBadge}>
+                    <Text style={[styles.categoryRate, { color: '#16a34a' }]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit={true}
+                    minimumFontScale={0.8}>
                     {category.rate}
                   </Text>
+                  </View>
                 </TouchableOpacity>
               ))
             ) : (
@@ -405,21 +413,21 @@ v          <View style={styles.decorativeCircle1} />
           activeOpacity={0.8}
         >
             <LinearGradient
-            colors={isDark ? ['#78350f', '#92400e'] : ['#fef3c7', '#fde68a']}
+            colors={isDark ? ['#065f46', '#047857', '#059669'] : ['#d1fae5', '#a7f3d0', '#6ee7b7']}
             style={styles.referCardGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
                <View style={styles.referIconContainer}>
-                <Gift size={fs(28)} color={isDark ? '#fbbf24' : '#f59e0b'} strokeWidth={2.5} />
+                <Gift size={fs(28)} color={isDark ? '#6ee7b7' : '#059669'} strokeWidth={2.5} />
               </View>
               <View style={styles.referTextContainer}>
-                <Text style={[styles.referTitle, { color: isDark ? '#fef3c7' : '#78350f' }]}>{t('home.referAndEarn')}</Text>
-                <Text style={[styles.referSubtitle, { color: isDark ? '#FCD34D' : '#D97706' }]}>
+                <Text style={[styles.referTitle, { color: isDark ? '#d1fae5' : '#064e3b' }]}>{t('home.referAndEarn')}</Text>
+                <Text style={[styles.referSubtitle, { color: isDark ? '#a7f3d0' : '#047857' }]}>
                   {t('home.referSubtitle')}
                 </Text>
               </View>
-               <ChevronRight size={fs(20)} color={isDark ? '#fbbf24' : '#f59e0b'} strokeWidth={2.5} />
+               <ChevronRight size={fs(20)} color={isDark ? '#6ee7b7' : '#059669'} strokeWidth={2.5} />
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -637,6 +645,7 @@ const styles = StyleSheet.create({
     gap: wp(2.7), // 10
     marginTop: hp(-1.2), // -10
   },
+
   statCard: {
     flex: 1,
     backgroundColor: 'white',
@@ -724,42 +733,68 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   ratesScrollView: {
-    paddingBottom: hp(1), // 8px bottom spacing - reduced
+    paddingBottom: hp(2), // 8px bottom spacing - reduced
   },
+
   ratesScrollContent: {
     paddingHorizontal: wp(5.3), // 20
   },
-  rateCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: wp(3.5), // Reduced from 4.3
-    marginRight: wp(3.2), // 12 spacing between cards
-    width: wp(28), // Reduced from 32
+rateCard: {
+    // INCREASED WIDTH: from wp(28) to wp(36) to fit text
+    width: wp(36), 
+    minHeight: hp(18), // Fixed height ensures alignment
+    borderRadius: 20,
+    padding: wp(3),
+    marginRight: wp(3.2),
     alignItems: 'center',
+    justifyContent: 'space-between', // Distributes content evenly
+    borderWidth: 1,
+    // Improved Shadow
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  rateIconContainer: {
+    width: wp(16),   // CHANGED: Increased from wp(12) to match card size
+    height: wp(16),  // CHANGED: Increased height
+    borderRadius: wp(8), // Half of width to keep it circular
+    backgroundColor: '#f1f5f9', 
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: hp(0.5), // Small gap between icon and text
   },
   itemImage: {
-    width: wp(11), // Reduced from 12.8
-    height: wp(11), // Reduced from 12.8
-    marginBottom: hp(1), // Reduced from 1.2
-    borderRadius: wp(5.5), // Reduced from 6.4
-    backgroundColor: '#f3f4f6',
+    width: wp(9),   // CHANGED: Increased from wp(7) for better visibility
+    height: wp(9),  // CHANGED: Increased height
+    resizeMode: 'contain',
   },
-  categoryName: {
-    fontSize: fs(11), // Reduced from 12
+ categoryName: {
+    fontSize: fs(12),
     color: '#6b7280',
     fontFamily: 'Inter-Medium',
     textAlign: 'center',
-    marginBottom: hp(0.4), // Reduced from 0.5
+    marginTop: hp(0.5),   // Reduced slightly since icon is bigger
+    marginBottom: hp(1.5),
+    textAlignVertical: 'center',
+  },
+  
+  priceBadge: {
+    backgroundColor: 'rgba(22, 163, 74, 0.1)', // Light green background
+    paddingVertical: hp(0.8),
+    paddingHorizontal: wp(2),
+    borderRadius: 8,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   categoryRate: {
-    fontSize: fs(15), // Reduced from 16
-    fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
+    fontSize: fs(14),
+    fontWeight: '700',
+    color: '#16a34a',
+    fontFamily: 'Inter-Bold',
+    textAlign: 'center',
   },
   actionsGrid: {
     flexDirection: 'row',
@@ -928,16 +963,16 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...Platform.select({
       ios: {
-        shadowColor: '#f59e0b',
+        shadowColor: '#10b981',
         shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.4, 
+        shadowOpacity: 0.3, 
         shadowRadius: 12,
       },
       android: {
-        elevation: 10, // Increased Android elevation
+        elevation: 8,
       }
     }),
-    shadowColor: '#f59e0b',
+    shadowColor: '#10b981',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -960,7 +995,7 @@ const styles = StyleSheet.create({
     borderRadius: wp(6.4), // 24
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#f59e0b',
+    shadowColor: '#10b981',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
@@ -973,13 +1008,11 @@ const styles = StyleSheet.create({
   referTitle: {
     fontSize: fs(15), // 15
     fontWeight: '700',
-    color: '#92400e',
     fontFamily: 'Inter-Bold',
     marginBottom: hp(0.4), // 3
   },
   referSubtitle: {
     fontSize: fs(12), // 12
-    color: '#b45309',
     fontFamily: 'Inter-Medium',
   },
   tipCard: {

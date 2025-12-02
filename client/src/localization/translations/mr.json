@@ -202,7 +202,8 @@
   },
   "notifications": {
     "languageChanged": "भाषा यशस्वीरित्या बदलली",
-    "languageChangeFailed": "भाषा बदलण्यात अयशस्वी"
+    "languageChangeFailed": "भाषा बदलण्यात अयशस्वी",
+    "restartingApp": "लेआउट बदल लागू करण्यासाठी अॅप पुन्हा सुरू होत आहे..."
   },
   "errors": {
     "network": "नेटवर्क त्रुटी. कृपया तुमचे कनेक्शन तपासा",
@@ -235,7 +236,8 @@
       "referralApplied": "रेफरल बोनस लागू केला!",
       "bookingConfirmed": "बुकिंग यशस्वीरित्या पुष्टी केली",
       "codeCopied": "कोड क्लिपबोर्डवर कॉपी केला",
-      "linkCopied": "लिंक क्लिपबोर्डवर कॉपी केली"
+      "linkCopied": "लिंक क्लिपबोर्डवर कॉपी केली",
+      "profileImageUpdated":"प्रोफाइल फोटो यशस्वीरित्या अपडेट झाला आहे"
     },
     "error": {
       "fetchUserData": "वापरकर्ता डेटा मिळवण्यात त्रुटी",

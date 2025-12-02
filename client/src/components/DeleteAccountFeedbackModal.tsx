@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { X } from 'lucide-react-native';
 import { DeletionFeedback, DELETION_REASONS, DeletionReason } from '../types/account';
+import { useTheme } from '../context/ThemeContext';
 
 interface DeleteAccountFeedbackModalProps {
   visible: boolean;
@@ -26,6 +27,7 @@ export default function DeleteAccountFeedbackModal({
   onSubmit,
   loading = false,
 }: DeleteAccountFeedbackModalProps) {
+  const { colors, isDark } = useTheme();
   const [selectedReason, setSelectedReason] = useState<DeletionReason | null>(null);
   const [comments, setComments] = useState('');
   const [showError, setShowError] = useState(false);
@@ -71,12 +73,12 @@ export default function DeleteAccountFeedbackModal({
         style={styles.container}
       >
         <View style={styles.overlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: colors.modalBackground }]}>
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { borderBottomColor: colors.border }]}>
               <View style={styles.headerTextContainer}>
-                <Text style={styles.title}>We're sorry to see you go</Text>
-                <Text style={styles.subtitle}>
+                <Text style={[styles.title, { color: colors.text }]}>We're sorry to see you go</Text>
+                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
                   Help us improve by sharing why you're leaving
                 </Text>
               </View>
@@ -85,7 +87,7 @@ export default function DeleteAccountFeedbackModal({
                 style={styles.closeButton}
                 disabled={loading}
               >
-                <X size={24} color="#6b7280" />
+                <X size={24} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
@@ -96,7 +98,7 @@ export default function DeleteAccountFeedbackModal({
             >
               {/* Reason Selection */}
               <View style={styles.section}>
-                <Text style={styles.sectionLabel}>
+                <Text style={[styles.sectionLabel, { color: colors.text }]}>
                   Why did you decide to delete your account? *
                 </Text>
                 
@@ -105,21 +107,34 @@ export default function DeleteAccountFeedbackModal({
                     key={reason.value}
                     style={[
                       styles.radioOption,
-                      selectedReason === reason.value && styles.radioOptionSelected,
+                      {
+                        backgroundColor: selectedReason === reason.value 
+                          ? (isDark ? 'rgba(34, 197, 94, 0.15)' : '#f0fdf4')
+                          : colors.surface,
+                        borderColor: selectedReason === reason.value 
+                          ? colors.primary 
+                          : colors.border,
+                      }
                     ]}
                     onPress={() => handleReasonSelect(reason.value)}
                     disabled={loading}
                     activeOpacity={0.7}
                   >
-                    <View style={styles.radioButton}>
+                    <View style={[
+                      styles.radioButton,
+                      { borderColor: selectedReason === reason.value ? colors.primary : colors.border }
+                    ]}>
                       {selectedReason === reason.value && (
-                        <View style={styles.radioButtonInner} />
+                        <View style={[styles.radioButtonInner, { backgroundColor: colors.primary }]} />
                       )}
                     </View>
                     <Text
                       style={[
                         styles.radioLabel,
-                        selectedReason === reason.value && styles.radioLabelSelected,
+                        {
+                          color: selectedReason === reason.value ? colors.primary : colors.text,
+                          fontWeight: selectedReason === reason.value ? '600' : '400',
+                        }
                       ]}
                     >
                       {reason.label}
@@ -128,8 +143,14 @@ export default function DeleteAccountFeedbackModal({
                 ))}
 
                 {showError && (
-                  <View style={styles.errorContainer}>
-                    <Text style={styles.errorText}>
+                  <View style={[
+                    styles.errorContainer,
+                    {
+                      backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2',
+                      borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : '#fecaca',
+                    }
+                  ]}>
+                    <Text style={[styles.errorText, { color: colors.error }]}>
                       Please select a reason for deletion
                     </Text>
                   </View>
@@ -138,13 +159,20 @@ export default function DeleteAccountFeedbackModal({
 
               {/* Comments Section */}
               <View style={styles.section}>
-                <Text style={styles.sectionLabel}>
+                <Text style={[styles.sectionLabel, { color: colors.text }]}>
                   Additional comments (optional)
                 </Text>
                 <TextInput
-                  style={styles.textInput}
+                  style={[
+                    styles.textInput,
+                    {
+                      backgroundColor: colors.inputBackground,
+                      borderColor: colors.inputBorder,
+                      color: colors.inputText,
+                    }
+                  ]}
                   placeholder="Tell us more about your decision..."
-                  placeholderTextColor="#9ca3af"
+                  placeholderTextColor={colors.inputPlaceholder}
                   value={comments}
                   onChangeText={(text) => {
                     if (text.length <= 500) {
@@ -160,7 +188,10 @@ export default function DeleteAccountFeedbackModal({
                 <Text
                   style={[
                     styles.charCounter,
-                    remainingChars < 50 && styles.charCounterWarning,
+                    {
+                      color: remainingChars < 50 ? colors.warning : colors.textSecondary,
+                      fontWeight: remainingChars < 50 ? '500' : '400',
+                    }
                   ]}
                 >
                   {remainingChars} characters remaining
@@ -169,25 +200,35 @@ export default function DeleteAccountFeedbackModal({
             </ScrollView>
 
             {/* Action Buttons */}
-            <View style={styles.footer}>
+            <View style={[styles.footer, { borderTopColor: colors.border }]}>
               <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
+                style={[
+                  styles.button,
+                  styles.cancelButton,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  }
+                ]}
                 onPress={handleClose}
                 disabled={loading}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[
                   styles.button,
                   styles.submitButton,
-                  loading && styles.submitButtonDisabled,
+                  {
+                    backgroundColor: colors.error,
+                    opacity: loading ? 0.6 : 1,
+                  }
                 ]}
                 onPress={handleSubmit}
                 disabled={loading}
               >
-                <Text style={styles.submitButtonText}>
+                <Text style={[styles.submitButtonText, { color: '#ffffff' }]}>
                   {loading ? 'Submitting...' : 'Submit Feedback'}
                 </Text>
               </TouchableOpacity>
@@ -209,7 +250,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '90%',
@@ -223,7 +263,6 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
   },
   headerTextContainer: {
     flex: 1,
@@ -232,12 +271,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#111827',
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 14,
-    color: '#6b7280',
     lineHeight: 20,
   },
   closeButton: {
@@ -254,7 +291,6 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#374151',
     marginBottom: 12,
   },
   radioOption: {
@@ -262,23 +298,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 14,
     paddingHorizontal: 16,
-    backgroundColor: '#f9fafb',
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
     marginBottom: 10,
     minHeight: 56,
-  },
-  radioOptionSelected: {
-    backgroundColor: '#f0fdf4',
-    borderColor: '#16a34a',
   },
   radioButton: {
     width: 22,
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: '#d1d5db',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -287,51 +316,34 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#16a34a',
   },
   radioLabel: {
     flex: 1,
     fontSize: 15,
-    color: '#374151',
     lineHeight: 20,
-  },
-  radioLabelSelected: {
-    color: '#16a34a',
-    fontWeight: '600',
   },
   errorContainer: {
     marginTop: 8,
     padding: 12,
-    backgroundColor: '#fef2f2',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#fecaca',
   },
   errorText: {
     fontSize: 13,
-    color: '#dc2626',
     fontWeight: '500',
   },
   textInput: {
-    backgroundColor: '#f9fafb',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
     padding: 16,
     fontSize: 15,
-    color: '#111827',
     minHeight: 120,
     maxHeight: 180,
   },
   charCounter: {
     fontSize: 13,
-    color: '#9ca3af',
     marginTop: 8,
     textAlign: 'right',
-  },
-  charCounterWarning: {
-    color: '#f59e0b',
-    fontWeight: '500',
   },
   footer: {
     flexDirection: 'row',
@@ -339,7 +351,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
   },
   button: {
     flex: 1,
@@ -350,24 +361,17 @@ const styles = StyleSheet.create({
     minHeight: 52,
   },
   cancelButton: {
-    backgroundColor: '#f3f4f6',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
   },
   cancelButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#6b7280',
   },
   submitButton: {
-    backgroundColor: '#dc2626',
-  },
-  submitButtonDisabled: {
-    opacity: 0.6,
+    // Dynamic background color applied inline
   },
   submitButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#ffffff',
   },
 });

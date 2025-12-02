@@ -171,7 +171,7 @@
     "alreadyHaveAccount": "Already have an account? ",
     "signUpLink": "Sign Up →",
     "signInLink": "Sign In",
-    "trustedBy": "Trusted by 10,000+ users",
+    "trustedBy": "Trusted by 10k+ users",
     "secure": "100% Secure",
     "fastPayout": "Fast Payout",
     "bestRates": "Best Rates",
@@ -254,7 +254,7 @@
     "junkRemoval": "Junk Removal",
     "junkRemovalDescription": "Household and office junk removal",
     "referAndEarn": "Refer & Earn Rewards 🎁",
-    "referSubtitle": "Share with friends and earn ₹10 per referral!",
+    "referSubtitle": "Share with friends and earn ₹20 per referral!",
     "yourImpact": "Your Impact 🌍",
     "impactMessage": "You've helped save {{trees}} trees and reduced {{co2}}kg CO₂ emissions this year!",
     "onlineScrapPlatform": "Online Scrap",
@@ -386,7 +386,8 @@
   },
   "notifications": {
     "languageChanged": "Language changed successfully",
-    "languageChangeFailed": "Failed to change language"
+    "languageChangeFailed": "Failed to change language",
+    "restartingApp": "Restarting app to apply layout changes..."
   },
   "errors": {
     "network": "Network error. Please check your connection",
@@ -419,7 +420,8 @@
       "referralApplied": "Referral bonus applied!",
       "bookingConfirmed": "Booking confirmed successfully",
       "codeCopied": "Code copied to clipboard",
-      "linkCopied": "Link copied to clipboard"
+      "linkCopied": "Link copied to clipboard",
+      "profileImageUpdated":"Profile image updated successfully"
     },
     "error": {
       "fetchUserData": "Error fetching user data",

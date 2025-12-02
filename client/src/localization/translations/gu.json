@@ -202,7 +202,8 @@
   },
   "notifications": {
     "languageChanged": "ભાષા સફળતાપૂર્વક બદલાઈ ગઈ",
-    "languageChangeFailed": "ભાષા બદલવામાં નિષ્ફળ"
+    "languageChangeFailed": "ભાષા બદલવામાં નિષ્ફળ",
+    "restartingApp": "લેઆઉટ ફેરફારો લાગુ કરવા માટે એપ ફરીથી શરૂ થઈ રહી છે..."
   },
   "errors": {
     "network": "નેટવર્ક ભૂલ. કૃપા કરીને તમારું કનેક્શન તપાસો",
@@ -235,7 +236,8 @@
       "referralApplied": "રેફરલ બોનસ લાગુ થયો!",
       "bookingConfirmed": "બુકિંગ સફળતાપૂર્વક પુષ્ટિ થઈ",
       "codeCopied": "કોડ ક્લિપબોર્ડ પર કૉપિ થયો",
-      "linkCopied": "લિંક ક્લિપબોર્ડ પર કૉપિ થઈ"
+      "linkCopied": "લિંક ક્લિપબોર્ડ પર કૉપિ થઈ",
+      "profileImageUpdated":"પ્રોફાઇલ ફોટો સફળતાપૂર્વક અપડેટ થઈ ગયો છે"
     },
     "error": {
       "fetchUserData": "વપરાશકર્તા ડેટા મેળવવામાં ભૂલ",

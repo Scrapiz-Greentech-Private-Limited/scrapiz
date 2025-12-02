@@ -3,7 +3,7 @@
  * Defines supported languages and related constants
  */
 
-export type Language = 'en' | 'hi' | 'mr' | 'gu';
+export type Language = 'en' | 'hi' | 'mr' | 'gu' | 'ur'; 
 
 export interface LanguageOption {
   code: Language;
@@ -45,6 +45,13 @@ export const SUPPORTED_LANGUAGES: LanguageOption[] = [
     nativeName: 'ગુજરાતી',
     icon: 'આ',
     direction: 'ltr'
+  },
+  {
+    code: 'ur',
+    name: 'Urdu',
+    nativeName: 'اردو',
+    icon: 'آ',
+    direction: 'rtl'
   }
 ];
 

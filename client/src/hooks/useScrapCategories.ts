@@ -57,14 +57,27 @@ export const useScrapCategories = (products: ProductSummary[], categories: Categ
     };
     return categories.map(category => {
       const categoryProducts = categoryMap.get(category.id) || [];
-      const avgRate = categoryProducts.length > 0
-        ? categoryProducts.reduce((sum, p) => sum + ((p.max_rate + p.min_rate) / 2), 0) / categoryProducts.length
-        : 0;
+      
+      // Calculate min and max rates across all products in the category
+      let minRate = Infinity;
+      let maxRate = -Infinity;
+      let unit = 'kg';
+      
+      categoryProducts.forEach(product => {
+        if (product.min_rate < minRate) minRate = product.min_rate;
+        if (product.max_rate > maxRate) maxRate = product.max_rate;
+        unit = product.unit; // Use the unit from products
+      });
+      
+      // Format the rate as a range
+      const rateDisplay = categoryProducts.length > 0 && minRate !== Infinity
+        ? `₹${minRate}-${maxRate}/${unit}`
+        : 'N/A';
 
       return {
         id: category.id,
         name: category.name,
-        rate: avgRate > 0 ? `₹${Math.round(avgRate)}/${categoryProducts[0]?.unit || 'kg'}` : 'N/A',
+        rate: rateDisplay,
         icon: getCategoryImage(category),
         color: getColor(category.name),
         products: categoryProducts,
