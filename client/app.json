@@ -2,7 +2,7 @@
   "expo": {
     "name": "Scrapiz",
     "slug": "scrapiz-client",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "orientation": "portrait",
     "icon": "./assets/images/newapp.png",
     "scheme": "com.scrapiz.app",
@@ -45,7 +45,7 @@
       ],
       "package": "com.scrapiz.app",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 18
+      "versionCode": 19
     },
     "notification": {
       "icon": "./assets/images/foreground5.png",
@@ -112,7 +112,7 @@
         "projectId": "53993ab9-a554-4468-bbb9-e825c5646e77"
       }
     },
-    "runtimeVersion": {
+    "runtime": {
       "policy": "appVersion"
     },
     "updates": {
