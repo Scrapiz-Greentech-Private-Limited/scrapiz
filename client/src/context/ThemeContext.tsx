@@ -62,11 +62,17 @@ interface ThemeContextType {
   colors: ThemeColors;
   setThemeMode: (mode: ThemeMode) => Promise<void>;
   isDark: boolean;
+  headerGradient: string[];
+  headerText:string;
+  searchBarBackground: string;
 }
 
 const lightColors: ThemeColors = {
   // Backgrounds - Warm wheat/cream tones for softer appearance
-  background: '#fafff3',
+  background: '#f1f5f9',
+  headerGradient: ['#16a34a', '#15803d', '#166534'],
+  headerText: '#ffffff',
+  searchBarBackground: '#ffffff',
   surface: '#fefdfb',
   card: '#fefdfb',
   
@@ -123,6 +129,9 @@ const darkColors: ThemeColors = {
   card: '#1e293b',
   
   // Text
+  headerGradient: ['#022c22', '#064e3b', '#065f46'],
+  headerText: '#f1f5f9',
+  searchBarBackground: '#1e293b',
   text: '#f1f5f9',
   textSecondary: '#cbd5e1',
   textTertiary: '#94a3b8',

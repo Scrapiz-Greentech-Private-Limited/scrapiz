@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { AuthService, CategorySummary, ProductSummary } from '../../api/apiService';
 import { RemoteImage } from '../../components/RemoteImage';
+import TutorialOverlay from '@/src/components/TutorialOverlay';
+import { ratesTutorialConfig } from '@/src/config/tutorials/homeTutorial';
+import { useTutorialStore } from '@/src/store/tutorialStore';
 
 // Helper to get product image - checks S3 URL first, then falls back to local assets
 const getImageForProduct = (product: ProductSummary) => {
@@ -101,9 +104,62 @@ export default function RatesScreen(){
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Tutorial system integration
+  const { setStepTarget, currentScreen } = useTutorialStore();
+  const disclaimerRef = useRef<View>(null);
+  const categoryRef = useRef<View>(null);
+  const rateItemsRef = useRef<View>(null);
+  const priceFormatRef = useRef<View>(null);
+  const contactRef = useRef<View>(null);
+
   useEffect(()=>{
     loadData();
   },[])
+
+  // Measure element positions when tutorial is active
+  useEffect(() => {
+    if (currentScreen === 'rates') {
+      // Small delay to ensure elements are rendered
+      const measureTimeout = setTimeout(() => {
+        // Measure disclaimer card
+        disclaimerRef.current?.measure((x, y, width, height, pageX, pageY) => {
+          if (width > 0 && height > 0) {
+            setStepTarget('rates-disclaimer', { x: pageX, y: pageY, width, height });
+          }
+        });
+
+        // Measure category section
+        categoryRef.current?.measure((x, y, width, height, pageX, pageY) => {
+          if (width > 0 && height > 0) {
+            setStepTarget('rates-category', { x: pageX, y: pageY, width, height });
+          }
+        });
+
+        // Measure rate items
+        rateItemsRef.current?.measure((x, y, width, height, pageX, pageY) => {
+          if (width > 0 && height > 0) {
+            setStepTarget('rates-items', { x: pageX, y: pageY, width, height });
+          }
+        });
+
+        // Measure price format (using first rate item as example)
+        priceFormatRef.current?.measure((x, y, width, height, pageX, pageY) => {
+          if (width > 0 && height > 0) {
+            setStepTarget('rates-price-format', { x: pageX, y: pageY, width, height });
+          }
+        });
+
+        // Measure contact section
+        contactRef.current?.measure((x, y, width, height, pageX, pageY) => {
+          if (width > 0 && height > 0) {
+            setStepTarget('rates-contact', { x: pageX, y: pageY, width, height });
+          }
+        });
+      }, 100);
+
+      return () => clearTimeout(measureTimeout);
+    }
+  }, [currentScreen, setStepTarget, categories, products]);
 
     const loadData = async () => {
     try {
@@ -144,7 +200,7 @@ export default function RatesScreen(){
     return '#16a34a';
   };
 
-  const renderCategorySection = (category: CategorySummary) => {
+  const renderCategorySection = (category: CategorySummary, isFirstCategory: boolean) => {
     const categoryProducts = products.filter((p) => p.category === category.id);
     if (categoryProducts.length === 0) return null;
     const categoryIcon = getCategoryIcon(category.name);
@@ -152,6 +208,7 @@ export default function RatesScreen(){
     return(
       <View key={category.id} style={styles.categorySection}>
         <LinearGradient
+          ref={isFirstCategory ? categoryRef : null}
           colors={isDark ? ['#22c55e', '#16a34a'] : ['#16a34a', '#15803d']}
           style={styles.categoryHeader}
         >
@@ -162,8 +219,14 @@ export default function RatesScreen(){
           {categoryProducts.map((item, index) => {
             const productImage = getImageForProduct(item);
             const fallbackImage = getFallbackImageForProduct(item.name);
+            const isFirstItem = isFirstCategory && index === 0;
+            const isSecondItem = isFirstCategory && index === 1;
             return (
-              <View key={index} style={[styles.rateItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View 
+                key={index} 
+                ref={isFirstItem ? rateItemsRef : (isSecondItem ? priceFormatRef : null)}
+                style={[styles.rateItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              >
                 <View style={[
                   styles.itemIcon, 
                   productImage ? { 
@@ -277,7 +340,7 @@ if (error && categories.length === 0) {
         }
       >
         {/* Disclaimer */}
-        <View style={[styles.disclaimerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View ref={disclaimerRef} style={[styles.disclaimerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.disclaimerHeader}>
              <AlertCircle size={fs(20)} color={colors.primary} />
             <Text style={[styles.disclaimerTitle, { color: colors.text }]}>Important Note</Text>
@@ -309,7 +372,7 @@ if (error && categories.length === 0) {
 
         {/* Rate Categories */}
         {categories.length > 0 ? (
-          categories.map((category) => renderCategorySection(category))
+          categories.map((category, index) => renderCategorySection(category, index === 0))
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>No rates available</Text>
@@ -317,7 +380,7 @@ if (error && categories.length === 0) {
         )}
 
         {/* Contact Section */}
-        <View style={[styles.contactSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View ref={contactRef} style={[styles.contactSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.contactTitle, { color: colors.text }]}>Need Accurate Pricing?</Text>
           <Text style={[styles.contactText, { color: colors.textSecondary }]}>
             Get real-time quotes for your specific materials by scheduling a pickup.
@@ -331,6 +394,7 @@ if (error && categories.length === 0) {
         </View>
       </ScrollView>
       <Toast />
+      <TutorialOverlay />
     </View>
   )
 }

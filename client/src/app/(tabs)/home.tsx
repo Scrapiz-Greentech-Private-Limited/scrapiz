@@ -26,6 +26,7 @@ import CustomCarousel from '../../components/Carousel';
 import LocationSelector from '@/src/components/LocationSelector';
 import SearchBar from '@/src/components/SearchBar';
 import { RemoteImage } from '../../components/RemoteImage';
+import TutorialOverlay from '@/src/components/TutorialOverlay';
 //Hooks
 import { useHomeData } from '../../hooks/useHomeData';
 import { useScrapCategories } from '../../hooks/useScrapCategories';
@@ -34,6 +35,9 @@ import { useLocalization } from '../../context/LocalizationContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useEnvironmentalImpact } from '../../hooks/useImpact';
 import { wp, hp, fs } from '../../utils/responsive';
+//Tutorial
+import { homeTutorialConfig } from '@/src/config/tutorials/homeTutorial';
+import { useTutorialStore } from '@/src/store/tutorialStore';
 
 function formatAMPM(date: Date) {
   let hours = date.getHours();
@@ -87,6 +91,14 @@ export default function HomeScreen() {
   const { t } = useLocalization();
   const adScrollRef = useRef<ScrollView | null>(null);
   const [adIndex, setAdIndex] = useState(0);
+
+  // Tutorial system integration
+  const { setStepTarget, currentScreen } = useTutorialStore();
+  const locationRef = useRef<View>(null);
+  const searchRef = useRef<View>(null);
+  const quickActionsRef = useRef<View>(null);
+  const ratesRef = useRef<View>(null);
+  const servicesRef = useRef<View>(null);
 
 const services = useMemo(() => [
   { 
@@ -155,6 +167,51 @@ const services = useMemo(() => [
       });
     }
   }, [error]);
+
+  // Measure element positions when tutorial is active
+  useEffect(() => {
+    if (currentScreen === 'home') {
+      // Small delay to ensure elements are rendered
+      const measureTimeout = setTimeout(() => {
+        // Measure location selector
+        locationRef.current?.measure((x, y, width, height, pageX, pageY) => {
+          if (width > 0 && height > 0) {
+            setStepTarget('home-location', { x: pageX, y: pageY, width, height });
+          }
+        });
+
+        // Measure search bar
+        searchRef.current?.measure((x, y, width, height, pageX, pageY) => {
+          if (width > 0 && height > 0) {
+            setStepTarget('home-search', { x: pageX, y: pageY, width, height });
+          }
+        });
+
+        // Measure quick actions
+        quickActionsRef.current?.measure((x, y, width, height, pageX, pageY) => {
+          if (width > 0 && height > 0) {
+            setStepTarget('home-quick-actions', { x: pageX, y: pageY, width, height });
+          }
+        });
+
+        // Measure rates section
+        ratesRef.current?.measure((x, y, width, height, pageX, pageY) => {
+          if (width > 0 && height > 0) {
+            setStepTarget('home-rates', { x: pageX, y: pageY, width, height });
+          }
+        });
+
+        // Measure services section
+        servicesRef.current?.measure((x, y, width, height, pageX, pageY) => {
+          if (width > 0 && height > 0) {
+            setStepTarget('home-services', { x: pageX, y: pageY, width, height });
+          }
+        });
+      }, 100);
+
+      return () => clearTimeout(measureTimeout);
+    }
+  }, [currentScreen, setStepTarget]);
   const onRefresh = async () => {
     setRefreshing(true);
     await refetch();
@@ -191,21 +248,21 @@ const services = useMemo(() => [
       >
         {/* Combined Header Section with Green Background */}
         <LinearGradient 
-          colors={isDark ? ['#22c55e', '#16a34a', '#15803d'] : ['#16a34a', '#15803d', '#166534']} 
+          colors={colors.headerGradient} 
           style={styles.headerSection}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
           {/* Decorative circles */}
-v          <View style={styles.decorativeCircle1} />
-          <View style={styles.decorativeCircle2} />
-          <View style={styles.decorativeCircle3} />
+v          <View style={[styles.decorativeCircle1, { opacity: isDark ? 0.05 : 0.1 }]} />
+          <View style={[styles.decorativeCircle2, { opacity: isDark ? 0.05 : 0.08 }]} />
+          <View style={[styles.decorativeCircle3, { opacity: isDark ? 0.03 : 0.06 }]} />
           
           {/* Top Row: Location & Profile */}
           <View style={styles.topRow}>
             {/* Location Selector */}
-            <View style={styles.locationContainer}>
-              <LocationSelector />
+            <View style={styles.locationContainer} ref={locationRef}>
+              <LocationSelector  />
             </View>
 
             {/* Right Side: Profile */}
@@ -236,7 +293,11 @@ v          <View style={styles.decorativeCircle1} />
                   />
                 ) : user?.name ? (
                   <View style={styles.profileInitials}>
-                    <Text className='text-sm font-bold text-green-700'>
+                    <Text style={{ 
+                        fontSize: fs(14), 
+                        fontWeight: 'bold', 
+                        color: isDark ? '#ecfccb' : '#15803d' // Lighter text in dark mode
+                    }}>
                       {getInitials(user.name) || 'U'}
                     </Text>
                   </View>
@@ -250,19 +311,24 @@ v          <View style={styles.decorativeCircle1} />
           </View>
 
           {/* Search Bar */}
-          <View style={styles.searchBarContainer}>
-            <SearchBar />
+          <View style={styles.searchBarContainer} ref={searchRef}>
+            <View style={[
+                styles.searchInnerWrapper, 
+                { backgroundColor: colors.searchBarBackground }
+             ]}>
+                <SearchBar isDark={isDark} /> 
+             </View>
           </View>
         </LinearGradient>
 
         <CustomCarousel />
 
         {/* Quick Actions */}
-        <View style={styles.section}>
+        <View style={styles.section} ref={quickActionsRef}>
           <View style={styles.sectionHeaderRow}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('home.quickActions')}</Text>
-            <View style={[styles.sectionBadge, { backgroundColor: colors.primary }]}>
-              <Text style={[styles.sectionBadgeText, { color: 'white' }]}>{t('home.popular')}</Text>
+            <View style={[styles.sectionBadge, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#dcfce7' }]}>
+              <Text style={[styles.sectionBadgeText, { color: isDark ? '#4ade80' : '#15803d' }]}>{t('home.popular')}</Text>
             </View>
           </View>
           <View style={styles.actionsGrid}>
@@ -272,16 +338,16 @@ v          <View style={styles.decorativeCircle1} />
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={['#16a34a', '#15803d']}
+                colors={isDark ? ['#15803d', '#14532d'] : ['#16a34a', '#15803d']}
                 style={styles.actionCardGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
             >
-                <View style={[styles.actionIcon, { backgroundColor: 'white' }]}>
-                  <PackagePlus size={28} color="#16a34a" strokeWidth={2.5} />
+                <View style={[styles.actionIcon, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
+                  <PackagePlus size={28} color="#ffffff" strokeWidth={2.5} />
                 </View>
                 <Text style={[styles.actionTitle, { color: 'white' }]}>{t('home.sellScrap')}</Text>
-                <Text style={[styles.actionSubtitle, { color: '#d1fae5' }]}>{t('home.schedulePickup')}</Text>
+                <Text style={[styles.actionSubtitle, { color: 'rgba(255,255,255,0.7)' }]}>{t('home.schedulePickup')}</Text>
               </LinearGradient>
             </TouchableOpacity>
             <TouchableOpacity
@@ -289,24 +355,24 @@ v          <View style={styles.decorativeCircle1} />
               onPress={() => handleNavigate('/(tabs)/rates')}
               activeOpacity={0.8}
             >
-              <LinearGradient
-              colors={['#16a34a', '#15803d']}
-              style={styles.actionCardGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-                <View style={[styles.actionIcon, { backgroundColor: 'white' }]}>
-                  <AreaChart size={28} color="#16a34a" strokeWidth={2.5} />
+              <LinearGradient          
+                  colors={isDark ? ['#15803d', '#14532d'] : ['#16a34a', '#15803d']}
+                  style={styles.actionCardGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+             >
+                <View style={[styles.actionIcon, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
+                  <AreaChart size={28} color="#ffff" strokeWidth={2.5} />
                 </View>
                 <Text style={[styles.actionTitle, { color: 'white' }]}>{t('home.viewRates')}</Text>
-                <Text style={[styles.actionSubtitle, { color: 'white' }]}>{t('home.todaysPrices')}</Text>
+                <Text style={[styles.actionSubtitle, { color: 'rgba(255,255,255,0.7)' }]}>{t('home.todaysPrices')}</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Market Rates - Backend Data */}
-        <View style={styles.section}>
+        <View style={styles.section} ref={ratesRef}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('home.todaysMarketRates')}</Text>
             <TouchableOpacity onPress={() => handleNavigate('/(tabs)/rates')}>
@@ -375,7 +441,7 @@ v          <View style={styles.decorativeCircle1} />
         </View>
 
         {/* Services */}
-        <View style={styles.section}>
+        <View style={styles.section} ref={servicesRef}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('home.services')}</Text>
             <TouchableOpacity onPress={() => handleNavigate('/(tabs)/services')}>
@@ -386,25 +452,55 @@ v          <View style={styles.decorativeCircle1} />
             {services.map((service) => (
               <LinearGradient
                 key={service.id}
-                colors={serviceGradients[service.id as keyof typeof serviceGradients]}
-                style={styles.serviceCard}
+                // Updated: Passing the RGB color twice creates a solid background effect
+                colors={isDark 
+                  ? ['#064e3b', '#022c22'] 
+                  : ['rgb(241, 245, 249)', 'rgb(241, 245, 249)']
+                }
+                style={[
+                  styles.serviceCard, 
+                  { 
+                    borderWidth: 1, 
+                    // Note: If background and border are the same color, the border won't be visible
+                    borderColor: isDark ? 'rgba(34, 197, 94, 0.3)' : 'rgb(241, 245, 249)' 
+                  }
+                ]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
               >
                 <TouchableOpacity
                   style={styles.serviceCardTouchable}
                   onPress={() => handleNavigate(`/services/${service.id}`)}
                 >
-                  <View style={[styles.serviceIconContainer, { backgroundColor: 'white' }]}>
-                    <ServiceIcon iconName={service.icon} color={service.color} />
+                  <View style={[
+              styles.serviceIconContainer, 
+              { 
+                  backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#dcfce7' 
+              }
+          ]}>
+                    <ServiceIcon iconName={service.icon} color={isDark ? '#ffff' : '#16a34a'} />
                   </View>
                   <View className='flex-1'>
-                    <Text style={[styles.serviceTitle, { color: 'white' }]}>
+                    <Text style={[
+                      styles.serviceTitle, 
+                      { color: isDark ? '#f0fdf4' : '#111827' } // Nearly white vs Dark Grey
+                  ]}>
                       {service.title}
                     </Text>
-                    <Text style={[styles.serviceDescription, { color: 'white' }]}>
-                      {service.description}
-                    </Text>
+                    <Text 
+                numberOfLines={1} 
+                style={[
+                    styles.serviceDescription, 
+                    { color: isDark ? '#86efac' : '#64748b' } // Soft Green vs Grey
+                    ]}
+                >
+                  {service.description}
+            </Text>
                   </View>
-                  <ChevronRight size={18} color="#f1f5f9" />
+                  <ChevronRight 
+                    size={20} 
+                    color={isDark ? '#22c55e' : '#cbd5e1'} 
+                  />
                 </TouchableOpacity>
               </LinearGradient>
             ))}
@@ -506,6 +602,7 @@ v          <View style={styles.decorativeCircle1} />
         </View>
       </ScrollView>
       <Toast />
+      <TutorialOverlay />
     </View>
   );
 }
@@ -517,13 +614,24 @@ const styles = StyleSheet.create({
   },
   // New consolidated header section
   headerSection: {
-    paddingTop: hp(6.8), // 55
-    paddingHorizontal: wp(4.8), // 18
-    paddingBottom: hp(2.7), // 22
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingTop: hp(6.8),
+    paddingHorizontal: wp(4.8),
+    paddingBottom: hp(3.5), // Increased bottom padding slightly for visual balance
+    borderBottomLeftRadius: 28, // Slightly rounder looks more modern
+    borderBottomRightRadius: 28,
     overflow: 'hidden',
     position: 'relative',
+    // Remove shadow here, let the gradient do the work
+  },
+  searchInnerWrapper: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    // Shadow creates separation from the green header
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
   },
   decorativeCircle1: {
     position: 'absolute',
@@ -605,20 +713,14 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   profileButton: {
-    backgroundColor: 'white',
-    width: wp(10), // Reduced from 11.7
-    height: wp(10), // Reduced from 11.7
-    borderRadius: wp(5), // Reduced from 5.9
+    width: wp(10),
+    height: wp(10),
+    borderRadius: wp(5),
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#16a34a',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 5,
-    borderWidth: 2,
-    borderColor: 'rgba(22, 163, 74, 0.15)',
-    marginLeft: wp(1.1), // 4
+    // Removed hardcoded shadow/border colors to use inline styles based on mode
+    elevation: 4,
+    marginLeft: wp(1.1),
     overflow: 'hidden',
   },
   profileImage: {

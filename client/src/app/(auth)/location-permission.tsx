@@ -2,280 +2,330 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
+  Image,
   TouchableOpacity,
   TextInput,
   Animated,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
+  Dimensions,
+  Easing,
+  Keyboard,
+  TouchableWithoutFeedback
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { MapPin, ChevronRight } from 'lucide-react-native';
+import { MapPin, ArrowRight, CheckCircle2, Navigation } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-
 import { useLocation } from '../../context/LocationContext';
 import { useAuth } from '../../context/AuthContext';
 
+const { width } = Dimensions.get('window');
+const mapAsset = require('../../../assets/images/asset.png')
 export default function LocationPermissionScreen() {
   const router = useRouter();
-  const { setLocationFromPincode, serviceAvailable } = useLocation();
-  const { isAuthenticated } = useAuth();
+  const { setLocationFromPincode, serviceAvailable, getCurrentLocation, currentLocation, isLoading: locationLoading, error: locationError } = useLocation();
   const [pincode, setPincode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  
+  const [isFocused, setIsFocused] = useState(false);
+  const [isUsingGPS, setIsUsingGPS] = useState(false);
+
+  // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
+  const scaleAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const inputScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    // Entrance Animation
     Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.spring(slideAnim, {
+      Animated.timing(slideAnim, {
         toValue: 0,
-        tension: 50,
-        friction: 8,
+        duration: 600,
         useNativeDriver: true,
       }),
-    ]).start();
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 6,    // Lower friction = more bounce
+        tension: 40,    // Higher tension = faster snap
+        useNativeDriver: true,
+      }),
+    ]).start(() =>{
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.03, // Scale up just 3% (Very subtle)
+            duration: 3000, // Slow breath (3 seconds)
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 3000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    })
 
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
+    
   }, []);
 
+  // Handle location updates from GPS
+  useEffect(() => {
+    if (isUsingGPS && currentLocation && !locationLoading) {
+      // Location successfully retrieved
+      if (serviceAvailable) {
+        router.replace('/(auth)/login');
+      } else {
+        router.replace('/(auth)/service-unavailable');
+      }
+      setIsUsingGPS(false);
+    }
+  }, [currentLocation, serviceAvailable, locationLoading, isUsingGPS]);
+
+  // Handle location errors
+  useEffect(() => {
+    if (locationError && isUsingGPS) {
+      setError(locationError);
+      setIsUsingGPS(false);
+    }
+  }, [locationError, isUsingGPS]);
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    Animated.spring(inputScale, { toValue: 1.02, useNativeDriver: true }).start();
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    Animated.spring(inputScale, { toValue: 1, useNativeDriver: true }).start();
+  };
+
   const handleSubmit = async () => {
-    // Step 1: Validate input
     if (!pincode || pincode.length !== 6) {
       setError('Please enter a valid 6-digit PIN code');
       return;
     }
 
+    Keyboard.dismiss();
     setIsLoading(true);
     setError('');
 
     try {
-      // Step 2: Call LocationContext validation
       const success = await setLocationFromPincode(pincode);
-
       if (success) {
-        // ✅ Pincode is serviceable
-        // Always go to login screen for new location setup
-        // The index.tsx will handle authenticated users on next app launch
         router.replace('/(auth)/login');
       } else {
-        // ❌ Pincode not serviceable
         if (!serviceAvailable) {
-          // Navigate to fallback screen
-          router.replace('/(auth)/service-unavailable');
+            router.replace('/(auth)/service-unavailable');
         } else {
-          // Show inline error with retry
-          setError('Sorry, we don\'t service this PIN code yet. We\'re expanding soon!');
+            setError('We are not in this area yet, but we are coming soon!');
         }
       }
     } catch (error) {
-      console.error('Error validating pincode:', error);
-      setError('Network error. Please check your connection and try again.');
+      setError('Connection issue. Please check internet.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleTryAgain = () => {
+  const handleUseCurrentLocation = async () => {
+    setIsUsingGPS(true);
     setError('');
-    setPincode('');
+    Keyboard.dismiss();
+
+    try {
+      await getCurrentLocation();
+      
+      // Wait a bit for location to be set
+      setTimeout(() => {
+        if (locationError) {
+          setError(locationError);
+          setIsUsingGPS(false);
+          return;
+        }
+
+        if (currentLocation) {
+          // Check if service is available
+          if (serviceAvailable) {
+            router.replace('/(auth)/login');
+          } else {
+            router.replace('/(auth)/service-unavailable');
+          }
+        }
+        setIsUsingGPS(false);
+      }, 1000);
+    } catch (err) {
+      setError('Failed to get your location. Please try again or enter PIN code manually.');
+      setIsUsingGPS(false);
+    }
   };
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-slate-50"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView
-        contentContainerStyle={{
-          flexGrow: 1,
-          paddingHorizontal: 24,
-          paddingTop: 80,
-          paddingBottom: 40,
-          alignItems: 'center',
-        }}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Animated.View
-          className="w-full max-w-[400px] items-center"
-          style={{
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          }}
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <View className="flex-1 bg-white">
+        {/* Modern Background Gradient Mesh */}
+        <LinearGradient
+          colors={['#f0fdf4', '#ffffff']}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 0.6 }}
+          className="absolute w-full h-full"
+        />
+
+        {/* Decorative Circle Top Right */}
+        <View className="absolute -top-20 -right-20 w-64 h-64 bg-green-200/30 rounded-full blur-3xl" />
+        
+        {/* Decorative Circle Bottom Left */}
+        <View className="absolute bottom-0 -left-10 w-48 h-48 bg-emerald-200/20 rounded-full blur-2xl" />
+
+        <KeyboardAvoidingView
+          className="flex-1"
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          {/* Icon */}
-          <Animated.View
-            className="mb-8"
-            style={{
-              transform: [{ scale: pulseAnim }],
-              shadowColor: '#16a34a',
-              shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: 0.3,
-              shadowRadius: 16,
-              elevation: 12,
-            }}
+          <Animated.View 
+            className="flex-1 justify-center px-6"
+            style={{ transform: [{ translateY: slideAnim }] }}
           >
-            <LinearGradient
-              colors={['#16a34a', '#15803d', '#166534']}
-              className="w-36 h-36 rounded-full justify-center items-center border-4 border-white/30"
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <MapPin size={64} color="white" strokeWidth={2} />
-            </LinearGradient>
-          </Animated.View>
-
-          {/* Title */}
-          <Text className="text-[28px] font-extrabold text-gray-900 text-center mb-3 tracking-tight">
-            Enter Your PIN Code
-          </Text>
-          <Text className="text-base text-gray-500 text-center leading-6 max-w-xs mb-8">
-            We need your PIN code to check service availability in your area
-          </Text>
-
-          {/* Benefits */}
-          <View className="w-full bg-white rounded-[20px] p-6 mb-8 shadow-lg">
-            <View className="flex-row items-center mb-4">
-              <View className="w-7 h-7 rounded-full bg-green-100 justify-center items-center mr-3">
-                <Text className="text-base font-extrabold text-green-600">✓</Text>
-              </View>
-              <Text className="flex-1 text-[15px] text-gray-700 font-medium">
-                Check service availability
-              </Text>
-            </View>
-
-            <View className="flex-row items-center mb-4">
-              <View className="w-7 h-7 rounded-full bg-green-100 justify-center items-center mr-3">
-                <Text className="text-base font-extrabold text-green-600">✓</Text>
-              </View>
-              <Text className="flex-1 text-[15px] text-gray-700 font-medium">
-                Calculate accurate pickup rates
-              </Text>
-            </View>
-
-            <View className="flex-row items-center">
-              <View className="w-7 h-7 rounded-full bg-green-100 justify-center items-center mr-3">
-                <Text className="text-base font-extrabold text-green-600">✓</Text>
-              </View>
-              <Text className="flex-1 text-[15px] text-gray-700 font-medium">
-                Get best prices for your scrap
-              </Text>
-            </View>
-          </View>
-
-          {/* PIN Code Input */}
-          <View className="w-full mb-4">
-            <View className="flex-row items-center bg-white rounded-2xl border-2 border-gray-200 px-4 h-[58px] mb-2">
-              <MapPin size={20} color="#6b7280" style={{ marginRight: 12 }} />
-              <TextInput
-                className="flex-1 text-base text-gray-800 font-medium"
-                placeholder="Enter 6-digit PIN code"
-                placeholderTextColor="#9ca3af"
-                value={pincode}
-                onChangeText={(text) => {
-                  // Only allow numbers and max 6 digits
-                  const cleaned = text.replace(/[^0-9]/g, '').slice(0, 6);
-                  setPincode(cleaned);
-                  if (error) setError('');
+            
+            {/* --- HERO SECTION --- */}
+            <View className="items-center mb-10">
+              {/* Replacing the boxy image with a composite Icon Layer */}
+              <Animated.View 
+                style={{ 
+                  transform: [
+                    { scale: scaleAnim }, // The Entrance Pop
+                    { scale: pulseAnim }  // The Subtle Breath
+                  ] 
                 }}
-                keyboardType="numeric"
-                maxLength={6}
-                returnKeyType="done"
-                onSubmitEditing={handleSubmit}
-                editable={!isLoading}
-              />
+              >
+                <Image 
+                    source={mapAsset}
+                    resizeMode="contain"
+                    style={{
+                      width: width * 0.85, // 85% of screen width (Makes it huge)
+                      height: undefined,
+                      aspectRatio: 1.8,    // Maintains the 2:1 shape of your image
+                    }}
+                />
+                
+                
+              </Animated.View>
+
+              <Text className="text-3xl font-extrabold text-slate-800 text-center mb-2 tracking-tight">
+                What's your <Text className="text-green-600">Location?</Text>
+              </Text>
+              <Text className="text-base text-slate-500 text-center max-w-[280px] leading-relaxed">
+                Enter your area PIN code to check instant pickup availability.
+              </Text>
             </View>
 
-            {/* Error Message */}
-            {error && (
-              <View className="bg-red-50 border border-red-200 rounded-xl p-3 mb-2">
-                <Text className="text-sm text-red-600 text-center font-medium">
-                  {error}
+            {/* --- INPUT SECTION --- */}
+            <Animated.View 
+              style={{ transform: [{ scale: inputScale }] }}
+              className={`w-full bg-white rounded-3xl shadow-xl shadow-slate-200/60 border transition-all duration-300 ${
+                isFocused ? 'border-green-500 border-2' : error ? 'border-red-400 border-2' : 'border-white'
+              }`}
+            >
+              <View className="px-6 py-8 items-center">
+                <Text className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">
+                  Postal Code
                 </Text>
+                
+                <TextInput
+                  className="text-4xl font-black text-slate-800 w-full text-center tracking-[8px]"
+                  placeholder="000 000"
+                  placeholderTextColor="#cbd5e1"
+                  value={pincode}
+                  onChangeText={(t) => {
+                    const cleaned = t.replace(/[^0-9]/g, '').slice(0, 6);
+                    setPincode(cleaned);
+                    if(error) setError('');
+                  }}
+                  keyboardType="numeric"
+                  maxLength={6}
+                  onFocus={handleFocus}
+                  onBlur={handleBlur}
+                  selectionColor="#16a34a"
+                />
+              </View>
+            </Animated.View>
+
+            {/* --- ERROR MESSAGE --- */}
+            {error ? (
+              <Animated.View className="mt-4 bg-red-50 p-3 rounded-xl flex-row items-center justify-center gap-2">
+                 <View className="w-2 h-2 rounded-full bg-red-500" />
+                 <Text className="text-red-500 font-semibold text-sm">{error}</Text>
+              </Animated.View>
+            ) : (
+               /* Minimal Value Props instead of the big list */
+              <View className="mt-6 flex-row justify-center gap-6 opacity-60">
+                <View className="flex-row items-center gap-1.5">
+                  <CheckCircle2 size={14} color="#15803d" />
+                  <Text className="text-xs font-medium text-slate-600">Best Rates</Text>
+                </View>
+                <View className="w-[1px] h-4 bg-slate-300" />
+                <View className="flex-row items-center gap-1.5">
+                  <CheckCircle2 size={14} color="#15803d" />
+                  <Text className="text-xs font-medium text-slate-600">Instant Cash</Text>
+                </View>
               </View>
             )}
-          </View>
 
-          {/* Submit Button */}
-          <TouchableOpacity
-            className="w-full rounded-2xl overflow-hidden mb-4"
-            style={{
-              shadowColor: '#16a34a',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.3,
-              shadowRadius: 12,
-              elevation: 6,
-              opacity: isLoading || !pincode || pincode.length !== 6 ? 0.5 : 1,
-            }}
-            onPress={handleSubmit}
-            disabled={isLoading || !pincode || pincode.length !== 6}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={['#16a34a', '#15803d']}
-              className="flex-row items-center justify-center py-[18px] gap-2.5"
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            >
-              {isLoading ? (
-                <>
-                  <ActivityIndicator size="small" color="white" />
-                  <Text className="text-[17px] font-extrabold text-white tracking-[0.3px]">
-                    Checking availability...
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <Text className="text-[17px] font-extrabold text-white tracking-[0.3px]">
-                    Continue
-                  </Text>
-                  <ChevronRight size={22} color="white" strokeWidth={2.5} />
-                </>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
+            {/* --- ACTION BUTTON --- */}
+            <View className="mt-10">
+              <TouchableOpacity
+                onPress={handleSubmit}
+                disabled={isLoading || pincode.length !== 6}
+                activeOpacity={0.9}
+              >
+                <LinearGradient
+                  colors={pincode.length === 6 ? ['#16a34a', '#15803d'] : ['#cbd5e1', '#94a3b8']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  className="w-full h-16 rounded-2xl flex-row items-center justify-center shadow-lg shadow-green-200"
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <>
+                      <Text className="text-lg font-bold text-white mr-2">
+                         Check Availability 
+                      </Text>
+                      <ArrowRight size={24} color="white" strokeWidth={2.5} />
+                    </>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
 
-          {/* Try Again Button (shown when error) */}
-          {error && (
-            <TouchableOpacity
-              className="py-3"
-              onPress={handleTryAgain}
-              disabled={isLoading}
-            >
-              <Text className="text-[15px] text-green-600 font-semibold">
-                Try Again
-              </Text>
-            </TouchableOpacity>
-          )}
+              {/* Use current location button */}
+              <TouchableOpacity 
+                className="mt-6 flex-row items-center justify-center gap-2 py-3 px-4 bg-green-50 rounded-xl active:bg-green-100"
+                onPress={handleUseCurrentLocation}
+                disabled={isUsingGPS || locationLoading}
+                activeOpacity={0.7}
+              >
+                {isUsingGPS || locationLoading ? (
+                  <>
+                    <ActivityIndicator size="small" color="#16a34a" />
+                    <Text className="text-green-700 font-bold text-sm">Getting location...</Text>
+                  </>
+                ) : (
+                  <>
+                    <Navigation size={16} color="#16a34a" fill="#16a34a" />
+                    <Text className="text-green-700 font-bold text-sm">Use my current location</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
 
-          {/* Privacy Note */}
-          <Text className="text-xs text-gray-400 text-center mt-6 max-w-[300px] leading-[18px]">
-            🔒 Your location data is secure and used only for service delivery
-          </Text>
-        </Animated.View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </View>
+    </TouchableWithoutFeedback>
   );
 }

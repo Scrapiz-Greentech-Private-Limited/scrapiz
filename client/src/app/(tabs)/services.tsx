@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, StatusBar } from 'react-native';
 import { Hammer, Wrench, Building, Trash2, ChevronRight, FileText } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -6,6 +6,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { wp, hp, fs, spacing, responsiveValue } from '../../utils/responsive';
 import { useTheme } from '../../context/ThemeContext';
 import { useLocalization } from '../../context/LocalizationContext';
+import TutorialOverlay from '@/src/components/TutorialOverlay';
+import { servicesTutorialConfig } from '@/src/config/tutorials/servicesTutorial';
+import { useTutorialStore } from '@/src/store/tutorialStore';
 
 export const services = [
   { id: 'demolition', titleKey: 'services.demolitionTitle', descKey: 'services.demolitionDesc', icon: Hammer, color: '#16a34a', bgColor: '#f0fdf4' },
@@ -20,19 +23,72 @@ export default function ServicesScreen() {
   const { colors, isDark } = useTheme();
   const { t } = useLocalization();
 
+  // Tutorial system integration
+  const { setStepTarget, currentScreen } = useTutorialStore();
+  const overviewRef = useRef<View>(null);
+  const serviceCardsRef = useRef<View>(null);
+  const detailsRef = useRef<View>(null);
+  const bookingRef = useRef<View>(null);
+
+  // Measure element positions when tutorial is active
+  useEffect(() => {
+    if (currentScreen === 'services') {
+      // Small delay to ensure elements are rendered
+      const measureTimeout = setTimeout(() => {
+        // Measure services overview (header section)
+        overviewRef.current?.measure((x, y, width, height, pageX, pageY) => {
+          if (width > 0 && height > 0) {
+            setStepTarget('services-overview', { x: pageX, y: pageY, width, height });
+          }
+        });
+
+        // Measure service cards (first service card as representative)
+        serviceCardsRef.current?.measure((x, y, width, height, pageX, pageY) => {
+          if (width > 0 && height > 0) {
+            setStepTarget('services-cards', { x: pageX, y: pageY, width, height });
+          }
+        });
+
+        // Measure details section (info card)
+        detailsRef.current?.measure((x, y, width, height, pageX, pageY) => {
+          if (width > 0 && height > 0) {
+            setStepTarget('services-details', { x: pageX, y: pageY, width, height });
+          }
+        });
+
+        // Measure booking (first service card touchable as representative)
+        bookingRef.current?.measure((x, y, width, height, pageX, pageY) => {
+          if (width > 0 && height > 0) {
+            setStepTarget('services-booking', { x: pageX, y: pageY, width, height });
+          }
+        });
+      }, 100);
+
+      return () => clearTimeout(measureTimeout);
+    }
+  }, [currentScreen, setStepTarget]);
+
   const handleServiceSelect = (service: typeof services[0]) => {
     router.push(`/services/${service.id}`);
   };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
-      <LinearGradient
-        colors={isDark ? ['#22c55e', '#16a34a'] : ['#16a34a', '#15803d']}
-        style={styles.header}
+      <StatusBar 
+              barStyle={isDark ? "light-content" : "dark-content"}
+              backgroundColor="transparent"
+              translucent
+            />
+      <LinearGradient 
+        colors={colors.headerGradient} 
+        style={styles.headerSection}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
       >
-        <Text style={styles.headerTitle}>{t('services.title')}</Text>
-        <Text style={styles.headerSubtitle}>{t('services.subtitle')}</Text>
+        <View ref={overviewRef}>
+          <Text style={styles.headerTitle}>{t('services.title')}</Text>
+          <Text style={styles.headerSubtitle}>{t('services.subtitle')}</Text>
+        </View>
       </LinearGradient>
 
       <ScrollView 
@@ -40,8 +96,8 @@ export default function ServicesScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <View style={styles.servicesList}>
-          {services.map((service) => (
+        <View style={styles.servicesList} ref={serviceCardsRef}>
+          {services.map((service, index) => (
             <LinearGradient
               key={service.id}
               colors={['#16a34a', '#15803d', '#166534']}
@@ -50,6 +106,7 @@ export default function ServicesScreen() {
               style={styles.serviceCard}
             >
               <TouchableOpacity 
+                ref={index === 0 ? bookingRef : null}
                 style={styles.serviceCardTouchable}
                 onPress={() => handleServiceSelect(service)}
                 activeOpacity={0.8}
@@ -67,7 +124,7 @@ export default function ServicesScreen() {
           ))}
         </View>
 
-        <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View ref={detailsRef} style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.infoTitle, { color: colors.text }]}>{t('services.whyChooseUs')}</Text>
           <View style={styles.infoList}>
             <Text style={[styles.infoItem, { color: colors.textSecondary }]}>{t('services.benefit1')}</Text>
@@ -78,14 +135,16 @@ export default function ServicesScreen() {
           </View>
         </View>
       </ScrollView>
+      
+      <TutorialOverlay />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#f8fafc' 
+  container: {
+    flex: 1,
+    backgroundColor: '#f1f5f9',
   },
   header: { 
     paddingTop: Platform.select({ ios: hp(6.5), android: hp(5.5) }), // Reduced from 7.4/6.2
@@ -127,6 +186,16 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
     overflow: 'hidden',
+  },
+   headerSection: {
+    paddingTop: hp(6.8),
+    paddingHorizontal: wp(4.8),
+    paddingBottom: hp(3.5), // Increased bottom padding slightly for visual balance
+    borderBottomLeftRadius: 28, // Slightly rounder looks more modern
+    borderBottomRightRadius: 28,
+    overflow: 'hidden',
+    position: 'relative',
+    // Remove shadow here, let the gradient do the work
   },
   serviceCardTouchable: {
     flexDirection: 'row',

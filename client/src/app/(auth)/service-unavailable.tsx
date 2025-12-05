@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -17,8 +17,7 @@ import { useRouter } from 'expo-router';
 import { MapPin, Bell, Rocket } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocation } from '../../context/LocationContext';
-import { SERVICE_CITIES, getComingSoonCityInfo } from '../../constants/serviceArea';
-import { WaitlistService } from '../../api/apiService';
+import { WaitlistService, ServiceabilityAPI, ServiceableCity } from '../../api/apiService';
 
 import { useTheme } from '../../context/ThemeContext';
 
@@ -29,14 +28,36 @@ export default function ServiceUnavailableScreen() {
   const [phone, setPhone] = useState('');
   const { colors, isDark } = useTheme();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [comingSoonCities, setComingSoonCities] = useState<ServiceableCity[]>([]);
+  const [isLoadingCities, setIsLoadingCities] = useState(true);
 
   const cityName = currentLocation?.city || 'your city';
-  const comingSoonInfo = getComingSoonCityInfo(cityName);
 
-    // Animations
+  // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
   const bounceAnim = useRef(new Animated.Value(0)).current;
+
+  // Fetch coming soon cities from API
+  useEffect(() => {
+    const fetchComingSoonCities = async () => {
+      try {
+        setIsLoadingCities(true);
+        const cities = await ServiceabilityAPI.getCities();
+        const comingSoon = cities.filter(city => city.status === 'coming_soon');
+        setComingSoonCities(comingSoon);
+        console.log('✅ Fetched coming soon cities:', comingSoon);
+      } catch (error) {
+        console.error('❌ Failed to fetch coming soon cities:', error);
+        // Silently fail - we'll just not show the cities section
+        setComingSoonCities([]);
+      } finally {
+        setIsLoadingCities(false);
+      }
+    };
+
+    fetchComingSoonCities();
+  }, []);
 
   useEffect(() => {
     Animated.parallel([
@@ -230,17 +251,26 @@ return (
         </View>
 
         {/* Expanding Cities */}
-        <View style={styles.citiesContainer}>
-          <Text style={[styles.citiesTitle, { color: colors.text }]}>Expanding to:</Text>
-          <View style={styles.citiesGrid}>
-            {SERVICE_CITIES.comingSoon.slice(0, 6).map((city, index) => (
-              <View key={index} style={[styles.cityChip, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <MapPin size={14} color={colors.primary} />
-                <Text style={[styles.cityName, { color: colors.textSecondary }]}>{city.name}</Text>
-              </View>
-            ))}
+        {!isLoadingCities && comingSoonCities.length > 0 && (
+          <View style={styles.citiesContainer}>
+            <Text style={[styles.citiesTitle, { color: colors.text }]}>Expanding to:</Text>
+            <View style={styles.citiesGrid}>
+              {comingSoonCities.slice(0, 6).map((city) => (
+                <View key={city.id} style={[styles.cityChip, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <MapPin size={14} color={colors.primary} />
+                  <Text style={[styles.cityName, { color: colors.textSecondary }]}>{city.name}</Text>
+                </View>
+              ))}
+            </View>
           </View>
-        </View>
+        )}
+        
+        {isLoadingCities && (
+          <View style={styles.citiesContainer}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading cities...</Text>
+          </View>
+        )}
 
         {/* Footer Note */}
         <View className='px-4'>
@@ -417,5 +447,12 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     maxWidth: 320,
     marginTop: 24,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+    marginTop: 8,
   },
 });

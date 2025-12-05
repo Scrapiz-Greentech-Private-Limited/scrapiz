@@ -455,6 +455,130 @@
       "orderCreated": "Order created successfully"
     }
   },
+  "tutorial": {
+    "ui": {
+      "next": "Next",
+      "skip": "Skip Tutorial",
+      "finish": "Finish",
+      "stepIndicator": "{{current}}/{{total}}"
+    },
+    "confirmation": {
+      "title": "Start Tutorial?",
+      "message": "Would you like to start the {{screenName}} tutorial?",
+      "start": "Start",
+      "cancel": "Cancel"
+    },
+    "home": {
+      "location": {
+        "title": "Location Selector",
+        "description": "Tap here to change your service location and see rates specific to your area."
+      },
+      "search": {
+        "title": "Search Bar",
+        "description": "Quickly find scrap items, services, or information using the search feature."
+      },
+      "quickActions": {
+        "title": "Quick Actions",
+        "description": "Access frequently used features like scheduling a pickup or viewing current rates."
+      },
+      "rates": {
+        "title": "Market Rates",
+        "description": "View current scrap material prices in your area. Rates are updated regularly."
+      },
+      "services": {
+        "title": "Services",
+        "description": "Explore professional services available for scrap collection and recycling."
+      }
+    },
+    "profile": {
+      "header": {
+        "title": "Profile Header",
+        "description": "View and edit your profile information, including your name, photo, and contact details."
+      },
+      "settings": {
+        "title": "Account Settings",
+        "description": "Manage your account preferences, notifications, language, and privacy settings."
+      },
+      "orders": {
+        "title": "Orders Section",
+        "description": "View your order history, track active pickups, and review past transactions."
+      },
+      "referral": {
+        "title": "Referral Wallet",
+        "description": "Earn rewards by referring friends! Track your referral earnings and redeem them here."
+      },
+      "impact": {
+        "title": "Environmental Impact",
+        "description": "See the positive environmental impact you've made through recycling and scrap collection."
+      }
+    },
+    "rates": {
+      "disclaimer": {
+        "title": "Price Disclaimer",
+        "description": "Important: Rates shown are estimates and may vary based on material quality and market conditions."
+      },
+      "category": {
+        "title": "Category Section",
+        "description": "Browse scrap materials organized by category. Tap a category to see all items within it."
+      },
+      "items": {
+        "title": "Rate Items",
+        "description": "Each item shows the current price range. Tap an item for more details about pricing."
+      },
+      "priceFormat": {
+        "title": "Price Range Format",
+        "description": "Prices are shown as ranges (e.g., ₹40-50/kg) to account for quality variations."
+      },
+      "contact": {
+        "title": "Contact Section",
+        "description": "Have questions about pricing? Use the contact section to reach out to our team."
+      }
+    },
+    "sell": {
+      "stepIndicator": {
+        "title": "Step Indicator",
+        "description": "Track your progress through the pickup scheduling process. Each step must be completed to proceed."
+      },
+      "itemSelection": {
+        "title": "Item Selection",
+        "description": "Select the scrap items you want to sell. You can choose multiple items from different categories."
+      },
+      "quantity": {
+        "title": "Quantity Controls",
+        "description": "Specify the quantity for each item. Use the + and - buttons or enter the amount directly."
+      },
+      "datetime": {
+        "title": "Date & Time Selection",
+        "description": "Choose a convenient date and time for pickup. Available slots are shown based on your location."
+      },
+      "address": {
+        "title": "Address Selection",
+        "description": "Select your pickup address. You can choose from saved addresses or add a new one."
+      },
+      "summary": {
+        "title": "Order Summary",
+        "description": "Review your order details and estimated total amount before confirming the pickup."
+      }
+    },
+    "services": {
+      "overview": {
+        "title": "Services Overview",
+        "description": "Explore professional services for scrap collection, recycling, and waste management."
+      },
+      "cards": {
+        "title": "Service Cards",
+        "description": "Each card represents a different service. Tap a card to learn more about what's included."
+      },
+      "details": {
+        "title": "Service Details",
+        "description": "View detailed information about each service, including pricing, duration, and what's included."
+      },
+      "booking": {
+        "title": "Booking Process",
+        "description": "Ready to book? Tap the booking button to schedule a service at your convenience."
+      }
+    }
+  },
   "alerts": {
     "validation": {
       "missingName": "Please enter your full name",

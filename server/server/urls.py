@@ -22,6 +22,7 @@ urlpatterns = [
     path('api/notifications/', include('notifications.urls')),
     path('api/waitlist/',include('waitlist.urls')),
     path('api/content/', include('content.urls')),
+    path('api/serviceability/', include('serviceability.urls')),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

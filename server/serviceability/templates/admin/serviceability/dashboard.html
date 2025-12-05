@@ -1,0 +1,120 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block content %}
+<div style="padding: 20px;">
+    <h1>Serviceability Dashboard</h1>
+    
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 30px 0;">
+        <!-- Total Cities Card -->
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h3 style="margin: 0 0 10px 0; font-size: 16px; opacity: 0.9;">Total Cities</h3>
+            <p style="margin: 0; font-size: 36px; font-weight: bold;">{{ total_cities }}</p>
+        </div>
+        
+        <!-- Available Cities Card -->
+        <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h3 style="margin: 0 0 10px 0; font-size: 16px; opacity: 0.9;">Available Cities</h3>
+            <p style="margin: 0; font-size: 36px; font-weight: bold;">{{ available_cities }}</p>
+        </div>
+        
+        <!-- Coming Soon Cities Card -->
+        <div style="background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h3 style="margin: 0 0 10px 0; font-size: 16px; opacity: 0.9;">Coming Soon</h3>
+            <p style="margin: 0; font-size: 36px; font-weight: bold;">{{ coming_soon_cities }}</p>
+        </div>
+        
+        <!-- Total Pincodes Card -->
+        <div style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h3 style="margin: 0 0 10px 0; font-size: 16px; opacity: 0.9;">Total Pincodes</h3>
+            <p style="margin: 0; font-size: 36px; font-weight: bold;">{{ total_pincodes }}</p>
+        </div>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 30px;">
+        <!-- Cities by State -->
+        <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h2 style="margin-top: 0; color: #333; border-bottom: 2px solid #667eea; padding-bottom: 10px;">Cities by State</h2>
+            {% if cities_by_state %}
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #f8f9fa;">
+                            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">State</th>
+                            <th style="padding: 10px; text-align: right; border-bottom: 2px solid #dee2e6;">Cities</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in cities_by_state %}
+                        <tr style="border-bottom: 1px solid #dee2e6;">
+                            <td style="padding: 10px;">{{ item.state }}</td>
+                            <td style="padding: 10px; text-align: right; font-weight: bold; color: #667eea;">{{ item.count }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p style="color: #6c757d; font-style: italic;">No cities available</p>
+            {% endif %}
+        </div>
+        
+        <!-- Top Cities by Pincode Count -->
+        <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h2 style="margin-top: 0; color: #333; border-bottom: 2px solid #28a745; padding-bottom: 10px;">Top Cities by Pincodes</h2>
+            {% if top_cities %}
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #f8f9fa;">
+                            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #dee2e6;">City</th>
+                            <th style="padding: 10px; text-align: center; border-bottom: 2px solid #dee2e6;">Status</th>
+                            <th style="padding: 10px; text-align: right; border-bottom: 2px solid #dee2e6;">Pincodes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for city in top_cities %}
+                        <tr style="border-bottom: 1px solid #dee2e6;">
+                            <td style="padding: 10px;">
+                                <a href="{% url 'admin:serviceability_serviceablecity_change' city.id %}" style="color: #667eea; text-decoration: none;">
+                                    {{ city.name }}, {{ city.state }}
+                                </a>
+                            </td>
+                            <td style="padding: 10px; text-align: center;">
+                                {% if city.status == 'available' %}
+                                    <span style="background: #28a745; color: white; padding: 2px 8px; border-radius: 3px; font-size: 11px;">Available</span>
+                                {% else %}
+                                    <span style="background: #ffc107; color: white; padding: 2px 8px; border-radius: 3px; font-size: 11px;">Coming Soon</span>
+                                {% endif %}
+                            </td>
+                            <td style="padding: 10px; text-align: right; font-weight: bold; color: #28a745;">{{ city.pincode_count }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p style="color: #6c757d; font-style: italic;">No cities available</p>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea;">
+        <h3 style="margin-top: 0; color: #333;">Quick Actions</h3>
+        <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+            <a href="{% url 'admin:serviceability_serviceablecity_add' %}" 
+               style="background: #667eea; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; display: inline-block;">
+                ➕ Add New City
+            </a>
+            <a href="{% url 'admin:serviceability_serviceablecity_changelist' %}" 
+               style="background: #28a745; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; display: inline-block;">
+                📋 Manage Cities
+            </a>
+            <a href="{% url 'admin:serviceability_serviceablepincode_changelist' %}" 
+               style="background: #17a2b8; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; display: inline-block;">
+                📍 Manage Pincodes
+            </a>
+            <a href="{% url 'admin:serviceability_import_pincodes' %}" 
+               style="background: #ffc107; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; display: inline-block;">
+                📥 Import Pincodes
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

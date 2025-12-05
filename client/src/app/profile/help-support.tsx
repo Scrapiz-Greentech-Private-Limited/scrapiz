@@ -8,7 +8,7 @@ import {
   Linking,
   Alert,
 } from 'react-native';
-import { ArrowLeft,Shield, MessageCircle, Phone, Mail, CircleHelp as HelpCircle, FileText, ChevronRight } from 'lucide-react-native';
+import { ArrowLeft, Shield, Phone, Mail, CircleHelp as HelpCircle, FileText, ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,7 +16,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 export default function HelpSupport(){
     const router = useRouter();
     const { colors, isDark } = useTheme();
-      const handleContactSupport = async (method: string, value: string) => {
+
+    const handleContactSupport = async (method: string, value: string) => {
     try {
       let url = '';
       let canOpen = false;
@@ -233,10 +234,10 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
-    marginBottom: 16,
+    fontSize: 18,
+    fontWeight: '700',
+    fontFamily: 'Inter-Bold',
+    marginBottom: 12,
   },
   contactCard: {
     borderRadius: 16,

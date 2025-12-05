@@ -2,13 +2,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { 
-  isLocationserviceable, 
-  isCityServiceable, 
-  isPincodeServiceable,
-  getCityFromPincode,
-  getCityFromPincodeDetails 
-} from '../constants/serviceArea';
+import { ServiceabilityAPI, ServiceableCity } from '../api/apiService';
+import { CacheService } from '../services/serviceabilityCache';
 
 
 export interface LocationData {
@@ -62,9 +57,49 @@ export function LocationProvider({ children }: { children: React.ReactNode }){
   const [locationSet, setLocationSet] = useState(false); // Renamed from permissionGranted
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
   useEffect(()=>{
     loadStoredData();
+    initializeCache();
   },[])
+
+  /**
+   * Initialize cache on context mount
+   * Fetches fresh data from API if cache is expired or empty
+   */
+  const initializeCache = async () => {
+    try {
+      const isCacheValid = await CacheService.isCacheValid();
+      
+      if (!isCacheValid) {
+        console.log('🔄 Cache expired or empty, refreshing from API...');
+        await refreshCacheFromAPI();
+      } else {
+        console.log('✅ Cache is valid, using cached data');
+      }
+    } catch (error) {
+      console.error('❌ Failed to initialize cache:', error);
+      // Continue without cache - will fall back to API calls
+    }
+  };
+
+  /**
+   * Refresh cache with fresh data from API
+   */
+  const refreshCacheFromAPI = async () => {
+    try {
+      const [cities, pincodes] = await Promise.all([
+        ServiceabilityAPI.getCities(),
+        ServiceabilityAPI.getPincodes(),
+      ]);
+
+      await CacheService.refreshCache(cities, pincodes);
+      console.log('✅ Cache refreshed successfully');
+    } catch (error) {
+      console.error('❌ Failed to refresh cache:', error);
+      // Don't throw - allow app to continue with API calls
+    }
+  };
 
   const loadStoredData = async() =>{
     try {
@@ -132,38 +167,101 @@ export function LocationProvider({ children }: { children: React.ReactNode }){
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
       });
+      
+      // Check serviceability using backend API
+      let isServiceable = false;
+      let cityName = geocode.city || geocode.subregion || 'Unknown City';
+      let cityStatus: 'available' | 'coming_soon' | undefined;
+      
+      // Use backend API for serviceability check
+      try {
+        const serviceabilityResponse = await ServiceabilityAPI.checkCoordinates(
+          position.coords.latitude,
+          position.coords.longitude
+        );
+        
+        isServiceable = serviceabilityResponse.serviceable;
+        cityStatus = serviceabilityResponse.status;
+        
+        // Use city name from API if available
+        if (serviceabilityResponse.city) {
+          cityName = serviceabilityResponse.city.name;
+        }
+        
+        console.log('✅ Serviceability check via API:', {
+          serviceable: isServiceable,
+          city: cityName,
+          status: cityStatus,
+        });
+      } catch (apiError) {
+        console.warn('⚠️ API call failed, falling back to cache:', apiError);
+        
+        // Fallback to cached data
+        try {
+          const cachedData = await CacheService.getCachedData();
+          
+          if (cachedData && cachedData.cities.length > 0) {
+            // Check if coordinates are within any cached city's radius
+            for (const city of cachedData.cities) {
+              if (city.status !== 'available') continue;
+              
+              const distance = calculateDistance(
+                position.coords.latitude,
+                position.coords.longitude,
+                city.latitude,
+                city.longitude
+              );
+              
+              if (distance <= city.radius_km) {
+                isServiceable = true;
+                cityName = city.name;
+                cityStatus = city.status;
+                console.log('✅ Serviceability check via cache:', {
+                  serviceable: true,
+                  city: cityName,
+                  status: cityStatus,
+                });
+                break;
+              }
+            }
+          } else {
+            console.warn('⚠️ No cached data available for offline check');
+          }
+        } catch (cacheError) {
+          console.error('❌ Cache fallback failed:', cacheError);
+        }
+      }
+      
       const locationData: LocationData = {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         address: `${geocode.name || ''}, ${geocode.street || ''}`.trim() || 'Address not available',
-        city: geocode.city || geocode.subregion || 'Unknown City',
+        city: cityName,
         state: geocode.region || geocode.isoCountryCode || 'Unknown State',
         pincode: geocode.postalCode || '000000',
         area: geocode.subregion || geocode.district || geocode.name || 'Unknown Area',
       };
+      
       setCurrentLocation(locationData);
       await AsyncStorage.setItem(
         STORAGE_KEYS.CURRENT_LOCATION,
         JSON.stringify(locationData)
       )
-      const isServiceable = isLocationserviceable(
-        position.coords.latitude,
-        position.coords.longitude
-      )
+      
       setServiceAvailable(isServiceable)
       await AsyncStorage.setItem(STORAGE_KEYS.SERVICE_AVAILABLE, isServiceable.toString());
     } catch (error) {
         let errorMessage = 'Failed to get location. Please try again.';
-        if (err.code === 'E_LOCATION_UNAVAILABLE') {
+        if ((error as any).code === 'E_LOCATION_UNAVAILABLE') {
         errorMessage = 'Location services are unavailable. Please enable them in settings.';
-      } else if (err.code === 'E_LOCATION_TIMEOUT') {
+      } else if ((error as any).code === 'E_LOCATION_TIMEOUT') {
         errorMessage = 'Location request timed out. Please try again.';
-      } else if (err.message) {
-        errorMessage = err.message;
+      } else if ((error as any).message) {
+        errorMessage = (error as any).message;
       }
       
       setError(errorMessage);
-      console.error('Location error:', err);
+      console.error('Location error:', error);
     }finally{
         setIsLoading(false)
     }
@@ -182,53 +280,178 @@ export function LocationProvider({ children }: { children: React.ReactNode }){
     }
   };
 
+  /**
+   * Calculate distance between two coordinates using Haversine formula
+   */
+  const calculateDistance = (
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+  ): number => {
+    const R = 6371; // Radius of Earth in kilometers
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
   const validatePincode = (pincode: string): boolean => {
-    return isPincodeServiceable(pincode);
+    // Basic format validation
+    if (!pincode || !/^[1-9]\d{5}$/.test(pincode.trim())) {
+      return false;
+    }
+    return true;
   };
 
   const setLocationFromPincode = async (pincode: string): Promise<boolean> => {
     try {
-      // Validate pincode first
+      // Validate pincode format first
       if (!validatePincode(pincode)) {
-        setError('Invalid or unserviceable pin code');
+        setError('Invalid pin code format');
         setServiceAvailable(false);
         return false;
       }
 
-      // Get city details from pincode
-      const cityDetails = getCityFromPincodeDetails(pincode);
-      if (!cityDetails) {
-        setError('Could not determine city from pin code');
+      // Use backend API for serviceability check
+      let serviceabilityResponse;
+      
+      try {
+        serviceabilityResponse = await ServiceabilityAPI.checkPincode(pincode);
+        console.log('✅ Pincode check via API:', serviceabilityResponse);
+      } catch (apiError) {
+        console.warn('⚠️ API call failed, falling back to cache:', apiError);
+        
+        // Fallback to cached data
+        try {
+          const cachedData = await CacheService.getCachedData();
+          
+          if (cachedData && cachedData.pincodes.includes(pincode)) {
+            // Find the city for this pincode
+            const city = cachedData.cities.find(c => 
+              c.status === 'available'
+            );
+            
+            if (city) {
+              serviceabilityResponse = {
+                serviceable: true,
+                city: city,
+                status: 'available' as const,
+              };
+              console.log('✅ Pincode check via cache:', serviceabilityResponse);
+            } else {
+              // Check if it's a coming soon city
+              const comingSoonCity = cachedData.cities.find(c => 
+                c.status === 'coming_soon'
+              );
+              
+              if (comingSoonCity) {
+                serviceabilityResponse = {
+                  serviceable: false,
+                  city: comingSoonCity,
+                  status: 'coming_soon' as const,
+                  message: `Service coming soon to ${comingSoonCity.name}`,
+                };
+                console.log('✅ Coming soon city via cache:', serviceabilityResponse);
+              } else {
+                setError('Service not available in your area');
+                setServiceAvailable(false);
+                return false;
+              }
+            }
+          } else {
+            setError('Invalid or unserviceable pin code');
+            setServiceAvailable(false);
+            return false;
+          }
+        } catch (cacheError) {
+          console.error('❌ Cache fallback failed:', cacheError);
+          setError('Unable to verify pin code. Please check your internet connection.');
+          setServiceAvailable(false);
+          return false;
+        }
+      }
+
+      // Check if city exists in response
+      if (!serviceabilityResponse.city) {
+        setError('Service not available in your area');
         setServiceAvailable(false);
         return false;
       }
 
-      // Create location data from pincode
+      // Create location data from API response
       const locationData: LocationData = {
-        latitude: cityDetails.latitude,
-        longitude: cityDetails.longitude,
+        latitude: serviceabilityResponse.city.latitude,
+        longitude: serviceabilityResponse.city.longitude,
         address: 'Address to be provided',
-        city: cityDetails.name,
-        state: cityDetails.state,
+        city: serviceabilityResponse.city.name,
+        state: serviceabilityResponse.city.state,
         pincode: pincode,
-        area: cityDetails.name,
+        area: serviceabilityResponse.city.name,
       };
 
-      // Set location and mark service as available
+      // Set location data regardless of serviceability status
       setCurrentLocation(locationData);
-      setServiceAvailable(true);
       setLocationSet(true);
-      setError(null);
 
-      // Store in AsyncStorage
-      await Promise.all([
-        AsyncStorage.setItem(STORAGE_KEYS.CURRENT_LOCATION, JSON.stringify(locationData)),
-        AsyncStorage.setItem(STORAGE_KEYS.SERVICE_AVAILABLE, 'true'),
-        AsyncStorage.setItem(STORAGE_KEYS.LOCATION_SET, 'true'),
-      ]);
+      // Handle based on status
+      if (serviceabilityResponse.status === 'coming_soon') {
+        // City is coming soon - not serviceable yet
+        setServiceAvailable(false);
+        setError(serviceabilityResponse.message || `Service coming soon to ${serviceabilityResponse.city.name}`);
+        
+        await Promise.all([
+          AsyncStorage.setItem(STORAGE_KEYS.CURRENT_LOCATION, JSON.stringify(locationData)),
+          AsyncStorage.setItem(STORAGE_KEYS.SERVICE_AVAILABLE, 'false'),
+          AsyncStorage.setItem(STORAGE_KEYS.LOCATION_SET, 'true'),
+        ]);
 
-      console.log('✅ Location set from pincode:', { pincode, city: cityDetails.name });
-      return true;
+        console.log('⏳ Coming soon city from pincode:', { 
+          pincode, 
+          city: serviceabilityResponse.city.name,
+          status: 'coming_soon'
+        });
+        return false;
+      } else if (serviceabilityResponse.serviceable) {
+        // City is available and serviceable
+        setServiceAvailable(true);
+        setError(null);
+
+        await Promise.all([
+          AsyncStorage.setItem(STORAGE_KEYS.CURRENT_LOCATION, JSON.stringify(locationData)),
+          AsyncStorage.setItem(STORAGE_KEYS.SERVICE_AVAILABLE, 'true'),
+          AsyncStorage.setItem(STORAGE_KEYS.LOCATION_SET, 'true'),
+        ]);
+
+        console.log('✅ Location set from pincode:', { 
+          pincode, 
+          city: serviceabilityResponse.city.name,
+          status: 'available'
+        });
+        return true;
+      } else {
+        // Not serviceable and not coming soon
+        setServiceAvailable(false);
+        setError('Service not available in your area');
+        
+        await Promise.all([
+          AsyncStorage.setItem(STORAGE_KEYS.CURRENT_LOCATION, JSON.stringify(locationData)),
+          AsyncStorage.setItem(STORAGE_KEYS.SERVICE_AVAILABLE, 'false'),
+          AsyncStorage.setItem(STORAGE_KEYS.LOCATION_SET, 'true'),
+        ]);
+
+        console.log('❌ Service not available from pincode:', { 
+          pincode, 
+          city: serviceabilityResponse.city.name 
+        });
+        return false;
+      }
     } catch (err) {
       console.error('Error setting location from pincode:', err);
       setError('Failed to set location from pin code');
@@ -236,9 +459,11 @@ export function LocationProvider({ children }: { children: React.ReactNode }){
     }
   };
 
-    const checkServiceAvailability = (): boolean => {
+  const checkServiceAvailability = (): boolean => {
     if (currentLocation) {
-      return isLocationserviceable(currentLocation.latitude, currentLocation.longitude);
+      // Rely on the stored serviceAvailable state
+      // which is set by API calls in getCurrentLocation and setLocationFromPincode
+      return serviceAvailable;
     }
     return false;
   };

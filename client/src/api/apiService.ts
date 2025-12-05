@@ -812,3 +812,191 @@ export class WaitlistService {
     }
   }
 }
+
+// Serviceability types
+export interface ServiceableCity {
+  id: number;
+  name: string;
+  state: string;
+  latitude: number;
+  longitude: number;
+  radius_km: number;
+  status: 'available' | 'coming_soon';
+  pincode_count?: number;
+}
+
+export interface ServiceabilityResponse {
+  serviceable: boolean;
+  city?: ServiceableCity;
+  distance_km?: number;
+  nearest_city?: {
+    name: string;
+    state: string;
+    distance_km: number;
+  };
+  message?: string;
+  status?: 'available' | 'coming_soon';
+}
+
+export interface CheckPincodeRequest {
+  pincode: string;
+}
+
+export interface CheckCoordinatesRequest {
+  latitude: number;
+  longitude: number;
+}
+
+// Serviceability API Service
+export class ServiceabilityAPI {
+  private static readonly MAX_RETRIES = 2;
+  private static readonly RETRY_DELAY_MS = 1000;
+
+  /**
+   * Retry helper for API calls with exponential backoff
+   */
+  private static async retryWithBackoff<T>(
+    fn: () => Promise<T>,
+    retries: number = ServiceabilityAPI.MAX_RETRIES
+  ): Promise<T> {
+    try {
+      return await fn();
+    } catch (error: any) {
+      // Don't retry on client errors (4xx) except 429 (rate limit)
+      const status = error?.response?.status;
+      if (status && status >= 400 && status < 500 && status !== 429) {
+        throw error;
+      }
+
+      // Retry on network errors or server errors (5xx)
+      if (retries > 0) {
+        await new Promise(resolve => 
+          setTimeout(resolve, ServiceabilityAPI.RETRY_DELAY_MS * (ServiceabilityAPI.MAX_RETRIES - retries + 1))
+        );
+        return ServiceabilityAPI.retryWithBackoff(fn, retries - 1);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Check if a pincode is serviceable
+   * @param pincode - 6-digit Indian postal code
+   * @returns ServiceabilityResponse with serviceability status and city details
+   */
+  static async checkPincode(pincode: string): Promise<ServiceabilityResponse> {
+    try {
+      // Validate pincode format before making API call
+      if (!pincode || !/^[1-9]\d{5}$/.test(pincode)) {
+        throw new Error('Invalid pincode format. Pincode must be exactly 6 digits and start with 1-9');
+      }
+
+      const response = await ServiceabilityAPI.retryWithBackoff(async () => {
+        return await apiClient.post(
+          API_CONFIG.ENDPOINTS.SERVICEABILITY_CHECK_PINCODE,
+          { pincode }
+        );
+      });
+
+      return response.data as ServiceabilityResponse;
+    } catch (error: any) {
+      console.error('ServiceabilityAPI.checkPincode error:', error);
+      throw new Error(
+        error.response?.data?.error || 
+        error.message || 
+        'Failed to check pincode serviceability'
+      );
+    }
+  }
+
+  /**
+   * Check if coordinates are within serviceable area
+   * @param latitude - Latitude coordinate
+   * @param longitude - Longitude coordinate
+   * @returns ServiceabilityResponse with serviceability status and nearest city
+   */
+  static async checkCoordinates(
+    latitude: number,
+    longitude: number
+  ): Promise<ServiceabilityResponse> {
+    try {
+      // Validate coordinates
+      if (latitude < -90 || latitude > 90) {
+        throw new Error('Invalid latitude. Must be between -90 and 90');
+      }
+      if (longitude < -180 || longitude > 180) {
+        throw new Error('Invalid longitude. Must be between -180 and 180');
+      }
+
+      const response = await ServiceabilityAPI.retryWithBackoff(async () => {
+        return await apiClient.post(
+          API_CONFIG.ENDPOINTS.SERVICEABILITY_CHECK_COORDINATES,
+          { latitude, longitude }
+        );
+      });
+
+      return response.data as ServiceabilityResponse;
+    } catch (error: any) {
+      console.error('ServiceabilityAPI.checkCoordinates error:', error);
+      throw new Error(
+        error.response?.data?.error || 
+        error.message || 
+        'Failed to check coordinate serviceability'
+      );
+    }
+  }
+
+  /**
+   * Get list of all serviceable cities
+   * @returns Array of ServiceableCity objects
+   */
+  static async getCities(): Promise<ServiceableCity[]> {
+    try {
+      const response = await ServiceabilityAPI.retryWithBackoff(async () => {
+        return await apiClient.get(API_CONFIG.ENDPOINTS.SERVICEABILITY_CITIES);
+      });
+
+      return response.data as ServiceableCity[];
+    } catch (error: any) {
+      console.error('ServiceabilityAPI.getCities error:', error);
+      throw new Error(
+        error.response?.data?.error || 
+        error.message || 
+        'Failed to fetch serviceable cities'
+      );
+    }
+  }
+
+  /**
+   * Get list of all serviceable pincodes
+   * @returns Array of pincode strings
+   */
+  static async getPincodes(): Promise<string[]> {
+    try {
+      const response = await ServiceabilityAPI.retryWithBackoff(async () => {
+        return await apiClient.get(API_CONFIG.ENDPOINTS.SERVICEABILITY_PINCODES);
+      });
+
+      // Backend may return array of objects with pincode field or array of strings
+      const data = response.data;
+      if (Array.isArray(data)) {
+        // If it's an array of objects with pincode field, extract the pincode strings
+        if (data.length > 0 && typeof data[0] === 'object' && 'pincode' in data[0]) {
+          return data.map((item: any) => item.pincode);
+        }
+        // If it's already an array of strings, return as is
+        return data;
+      }
+
+      return [];
+    } catch (error: any) {
+      console.error('ServiceabilityAPI.getPincodes error:', error);
+      throw new Error(
+        error.response?.data?.error || 
+        error.message || 
+        'Failed to fetch serviceable pincodes'
+      );
+    }
+  }
+
+}

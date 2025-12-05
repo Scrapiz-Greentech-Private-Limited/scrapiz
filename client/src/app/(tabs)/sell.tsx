@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -43,6 +43,9 @@ import { useReferral } from '../../context/ReferralContext';
 import {useOrderCalculationStore} from '../../store/orderCalculationStore';
 import { RemoteImage } from '../../components/RemoteImage';
 import { useTheme } from '../../context/ThemeContext';
+import { sellTutorialConfig } from '../../config/tutorials/homeTutorial';
+import { useTutorialStore } from '../../store/tutorialStore';
+import TutorialOverlay from '../../components/TutorialOverlay';
 const { width, height } = Dimensions.get('window');
 
 type SelectedItem = {
@@ -139,6 +142,15 @@ export default function SellScreen() {
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
   const [loadingData, setLoadingData] = useState(false);
   const [submittingOrder, setSubmittingOrder] = useState(false);
+  
+  // Tutorial system integration
+  const { setStepTarget, currentScreen } = useTutorialStore();
+  const stepIndicatorRef = useRef<View>(null);
+  const itemSelectionRef = useRef<View>(null);
+  const quantityControlsRef = useRef<View>(null);
+  const dateTimeRef = useRef<View>(null);
+  const addressRef = useRef<View>(null);
+  const summaryRef = useRef<View>(null);
     const {
     items: selectedItems,
     estimatedValue,
@@ -185,6 +197,48 @@ export default function SellScreen() {
     loadData();
     loadUserData();
   }, []);
+  
+  // Tutorial system: Measure element positions when tutorial is active
+  useEffect(() => {
+    if (currentScreen === 'sell') {
+      // Small delay to ensure elements are rendered
+      const timer = setTimeout(() => {
+        // Measure step indicator
+        stepIndicatorRef.current?.measure((x, y, width, height, pageX, pageY) => {
+          setStepTarget('sell-step-indicator', { x: pageX, y: pageY, width, height });
+        });
+        
+        // Measure item selection (first category section)
+        itemSelectionRef.current?.measure((x, y, width, height, pageX, pageY) => {
+          setStepTarget('sell-item-selection', { x: pageX, y: pageY, width, height });
+        });
+        
+        // Measure quantity controls (if items are selected)
+        if (selectedItems.length > 0) {
+          quantityControlsRef.current?.measure((x, y, width, height, pageX, pageY) => {
+            setStepTarget('sell-quantity', { x: pageX, y: pageY, width, height });
+          });
+        }
+        
+        // Measure date/time selection
+        dateTimeRef.current?.measure((x, y, width, height, pageX, pageY) => {
+          setStepTarget('sell-datetime', { x: pageX, y: pageY, width, height });
+        });
+        
+        // Measure address section
+        addressRef.current?.measure((x, y, width, height, pageX, pageY) => {
+          setStepTarget('sell-address', { x: pageX, y: pageY, width, height });
+        });
+        
+        // Measure summary section
+        summaryRef.current?.measure((x, y, width, height, pageX, pageY) => {
+          setStepTarget('sell-summary', { x: pageX, y: pageY, width, height });
+        });
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [currentScreen, currentStep, selectedItems.length, setStepTarget]);
 
   const loadUserData = async () => {
     try {
@@ -304,8 +358,12 @@ export default function SellScreen() {
   const updateQuantity = (id: number, change: number) => {
     const item = selectedItems.find(i => i.id === id);
     if(item){
-       const newQuantity = Math.max(0, item.quantity + change);
-       updateItemQuantity(id, newQuantity);
+       const newQuantity = item.quantity + change;
+       if (newQuantity <= 0) {
+         removeItemFromStore(id);
+       } else {
+         updateItemQuantity(id, newQuantity);
+       }
     }
   };
 
@@ -578,7 +636,7 @@ export default function SellScreen() {
   };
 
   const renderStepIndicator = () => (
-    <View style={styles.stepIndicator}>
+    <View ref={stepIndicatorRef} style={styles.stepIndicator}>
       {[1, 2, 3, 4].map((step) => (
         <React.Fragment key={step}>
           <View style={[
@@ -628,8 +686,12 @@ export default function SellScreen() {
           nestedScrollEnabled={true}
           contentContainerStyle={{ paddingBottom: 16 }}
         >
-          {Object.entries(groupedProducts).map(([categoryId, categoryProducts]) => (
-            <View key={categoryId} style={styles.categorySection}>
+          {Object.entries(groupedProducts).map(([categoryId, categoryProducts], index) => (
+            <View 
+              key={categoryId} 
+              ref={index === 0 ? itemSelectionRef : null}
+              style={styles.categorySection}
+            >
               <LinearGradient
                 colors={isDark ? ['#22c55e', '#16a34a'] : ['#16a34a', '#15803d']}
                 style={styles.categoryHeaderSell}
@@ -643,11 +705,17 @@ export default function SellScreen() {
                 {categoryProducts.map((product) => {
                   const productImage = getImageForProduct(product);
                   const fallbackImage = getFallbackImageForProduct(product.name);
+                  const selectedItem = selectedItems.find(item => item.id === product.id);
+                  const isSelected = !!selectedItem;
+                  
                   return (
-                    <TouchableOpacity
+                    <View
                       key={product.id}
-                      style={[styles.itemCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                      onPress={() => addItem(product)}
+                      style={[
+                        styles.itemCard, 
+                        { backgroundColor: colors.surface, borderColor: colors.border },
+                        isSelected && { backgroundColor: isDark ? '#064e3b' : '#f0fdf4', borderColor: colors.primary, borderWidth: 2 }
+                      ]}
                     >
                       <View style={styles.itemLeft}>
                         {productImage && (
@@ -668,10 +736,40 @@ export default function SellScreen() {
                           </Text>
                         </View>
                       </View>
-                      <View style={[styles.addButton, { backgroundColor: colors.primary }]}>
-                        <Plus size={16} color="white" />
-                      </View>
-                    </TouchableOpacity>
+                      
+                      {isSelected ? (
+                        <View style={styles.quantityControls}>
+                          <TouchableOpacity
+                            style={[styles.quantityButton, { backgroundColor: colors.card }]}
+                            onPress={() => updateQuantity(product.id, -1)}
+                          >
+                            <Minus size={14} color="#6b7280" />
+                          </TouchableOpacity>
+                          <Text style={[styles.quantityText, { color: colors.primary }]}>
+                            {selectedItem.quantity}{product.unit}
+                          </Text>
+                          <TouchableOpacity
+                            style={[styles.quantityButton, { backgroundColor: colors.card }]}
+                            onPress={() => updateQuantity(product.id, 1)}
+                          >
+                            <Plus size={14} color="#6b7280" />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.removeButton}
+                            onPress={() => removeItem(product.id)}
+                          >
+                            <Trash2 size={14} color="#dc2626" />
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          style={[styles.addButton, { backgroundColor: colors.primary }]}
+                          onPress={() => addItem(product)}
+                        >
+                          <Plus size={16} color="white" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   );
                 })}
               </View>
@@ -683,7 +781,7 @@ export default function SellScreen() {
       {selectedItems.length > 0 && (
         <View style={styles.selectedItems}>
           <Text style={[styles.selectedItemsTitle, { color: colors.text }]}>Selected Items ({selectedItems.length})</Text>
-          {selectedItems.map((item) => {
+          {selectedItems.map((item, index) => {
             const fallbackImage = getFallbackImageForProduct(item.name);
             return (
               <View key={item.id} style={[styles.selectedItemCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -703,7 +801,10 @@ export default function SellScreen() {
                     </Text>
                   </View>
                 </View>
-                <View style={styles.quantityControls}>
+                <View 
+                  ref={index === 0 ? quantityControlsRef : null}
+                  style={styles.quantityControls}
+                >
                   <TouchableOpacity
                     style={styles.quantityButton}
                     onPress={() => updateQuantity(item.id, -1)}
@@ -741,7 +842,7 @@ export default function SellScreen() {
       <Text style={[styles.stepTitle, { color: colors.text }]}>Schedule Pickup</Text>
       <Text style={[styles.stepSubtitle, { color: colors.textSecondary }]}>Choose your preferred date and time</Text>
       
-      <View style={styles.dateSection}>
+      <View ref={dateTimeRef} style={styles.dateSection}>
         <Text style={[styles.sectionLabel, { color: colors.text }]}>Select Date</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.datesScroll}>
           {Array.from({ length: 7 }, (_, i) => {
@@ -810,7 +911,10 @@ export default function SellScreen() {
       <Text style={[styles.stepSubtitle, { color: colors.textSecondary }]}>Provide your contact details and pickup address</Text>
       
       {/* Contact Information */}
-      <View style={[styles.contactCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View 
+        ref={addressRef}
+        style={[styles.contactCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      >
         <View style={styles.contactHeader}>
           <User size={20} color={colors.text} />
           <Text style={[styles.contactHeaderTitle, { color: colors.text }]}>Contact Information</Text>
@@ -1080,7 +1184,10 @@ export default function SellScreen() {
       <Text style={[styles.stepTitle, { color: colors.text }]}>Order Summary</Text>
       <Text style={[styles.stepSubtitle, { color: colors.textSecondary }]}>Review your pickup details</Text>
       
-      <View style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View 
+        ref={summaryRef}
+        style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      >
         <Text style={[styles.summaryTitle, { color: colors.text }]}>Items</Text>
         {selectedItems.map((item) => {
           const fallbackImage = getFallbackImageForProduct(item.name);
@@ -1564,6 +1671,9 @@ export default function SellScreen() {
         </KeyboardAvoidingView>
       </Modal>
       <Toast />
+      
+      {/* Tutorial Overlay */}
+      <TutorialOverlay />
     </View>
   );
 }
@@ -1798,8 +1908,8 @@ const styles = StyleSheet.create({
   quantityText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#111827',
-    minWidth: 36,
+    color: '#16a34a',
+    minWidth: 40,
     textAlign: 'center',
   },
   removeButton: {

@@ -31,6 +31,8 @@ import {
   getSessionToken,
 } from '../config/mapConfig';
 
+// Debug: Log Mapbox token (first 20 chars only for security)
+console.log('Mapbox Token:', MAPBOX_API_KEY ? `${MAPBOX_API_KEY.substring(0, 20)}...` : 'MISSING');
 MapboxGL.setAccessToken(MAPBOX_API_KEY);
 
 interface KrutrimAutocompleteResult {
@@ -285,7 +287,8 @@ export default function MapLocationPicker({
     setIsSearching(true);
     
     try {
-      const url = buildReverseGeocodingUrl(longitude, latitude);
+      // Use Google Geocoding API instead of Krutrim
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_API_KEY}`;
       const response = await fetch(url);
       
       if (!response.ok) {
@@ -633,7 +636,7 @@ export default function MapLocationPicker({
           <TouchableOpacity onPress={onClose} style={styles.backButton}>
             <X size={24} color="#111827" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Select delivery location</Text>
+          <Text style={styles.headerTitle}>Select Pickup location</Text>
           <View style={{ width: 40 }} />
         </View>
 
@@ -644,13 +647,16 @@ export default function MapLocationPicker({
               <MapboxGL.MapView
                 ref={mapRef}
                 style={styles.map}
-                styleURL={DEFAULT_MAP_STYLE}
+                styleURL={MapboxGL.StyleURL.Street}
                 onPress={handleMapPress}
                 onCameraChanged={handleCameraChanged}
                 onMapIdle={handleMapIdle}
                 logoEnabled={false}
                 attributionEnabled={true}
                 attributionPosition={{ bottom: 8, left: 8 }}
+                onDidFailLoadingMap={(error) => {
+                  console.error('Map loading failed:', error);
+                }}
               >
                 <MapboxGL.Camera
                   ref={cameraRef}
@@ -755,7 +761,7 @@ export default function MapLocationPicker({
             <MapPin size={20} color="#111827" />
             <View style={styles.addressTextContainer}>
               <Text style={styles.addressTitle} numberOfLines={1}>
-                {selectedAddress ? "Delievery Location" : "Select Location"}
+                {selectedAddress ? "Pickup Location" : "Select Location"}
               </Text>
               <Text style={styles.addressSubtitle} numberOfLines={2}>
                 {selectedAddress || "Move the pin to select your delivery location"}

@@ -39,6 +39,12 @@ export const API_CONFIG = {
     INVENTORY_ORDERNOS: '/inventory/ordernos/',
     INVENTORY_CREATE_ORDER: '/inventory/create-order/',
     INVENTORY_CANCEL_ORDER: '/inventory/cancel-order/',
+    
+    // Serviceability
+    SERVICEABILITY_CITIES: '/serviceability/cities/',
+    SERVICEABILITY_CHECK_PINCODE: '/serviceability/check-pincode/',
+    SERVICEABILITY_CHECK_COORDINATES: '/serviceability/check-coordinates/',
+    SERVICEABILITY_PINCODES: '/serviceability/pincodes/',
   },
   HEADERS: {
     'Content-Type': 'application/json',

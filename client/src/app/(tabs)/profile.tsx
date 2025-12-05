@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -59,6 +59,8 @@ export default function Profile() {
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
 
+
+
   const loadUserProfile = useCallback(async () => {
     try {
       setLoading(true);
@@ -98,6 +100,8 @@ export default function Profile() {
       return total + totalOrder;
     }, 0)
   }, [user?.orders, products])
+
+
 
   const getInitials = (name: string): string => {
     return name
@@ -448,26 +452,29 @@ export default function Profile() {
   ]
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} showsVerticalScrollIndicator={false}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
-      <LinearGradient
-        colors={isDark ? ['#22c55e', '#16a34a'] : ['#16a34a', '#15803d']}
-        style={styles.header}
-      >
-        <TouchableOpacity
-          style={styles.themeToggleButton}
-          onPress={toggleTheme}
-          activeOpacity={0.7}
+    <ScrollView 
+      style={[styles.container, { backgroundColor: colors.background }]} 
+      showsVerticalScrollIndicator={false}
+    >
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+        <LinearGradient
+          colors={isDark ? ['#22c55e', '#16a34a'] : ['#16a34a', '#15803d']}
+          style={styles.header}
         >
-          <View style={styles.themeToggleIcon}>
-            {isDark ? (
-              <Sun size={fs(20)} color="#ffffff" strokeWidth={2.5} />
-            ) : (
-              <Moon size={fs(20)} color="#ffffff" strokeWidth={2.5} />
-            )}
-          </View>
-        </TouchableOpacity>
-        <View style={styles.profileContainer}>
+          <TouchableOpacity
+            style={styles.themeToggleButton}
+            onPress={toggleTheme}
+            activeOpacity={0.7}
+          >
+            <View style={styles.themeToggleIcon}>
+              {isDark ? (
+                <Sun size={fs(20)} color="#ffffff" strokeWidth={2.5} />
+              ) : (
+                <Moon size={fs(20)} color="#ffffff" strokeWidth={2.5} />
+              )}
+            </View>
+          </TouchableOpacity>
+          <View style={styles.profileContainer}>
           <View style={styles.avatarWrapper}>
             <View style={styles.avatar}>
               {updatingImage ? (
@@ -680,6 +687,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 6,
+    position: 'relative',
   },
 
   avatarImage: {

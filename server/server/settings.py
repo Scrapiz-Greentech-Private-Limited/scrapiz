@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'notifications',
     'waitlist',
+    'serviceability',
     'django_celery_beat'
 ]
 
@@ -236,3 +237,9 @@ PUSH_NOTIFICATION_MAX_RETRIES = int(os.getenv('PUSH_NOTIFICATION_MAX_RETRIES', '
 # ----------------------
 GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE')
 ADMIN_CALENDAR_ID = os.getenv('ADMIN_CALENDAR_ID', 'primary')
+
+# ----------------------
+# Feature Flags
+# ----------------------
+# Enable backend-managed serviceability (vs hardcoded frontend constants)
+USE_BACKEND_SERVICEABILITY = os.getenv('USE_BACKEND_SERVICEABILITY', 'false').lower() == 'true'

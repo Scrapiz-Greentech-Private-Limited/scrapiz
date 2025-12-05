@@ -91,7 +91,8 @@
       [
         "@rnmapbox/maps",
         {
-          "MBXAccessToken": "${env.EXPO_PUBLIC_MAPBOX_TOKEN}"
+          "MBXAccessToken": "${env.EXPO_PUBLIC_MAPBOX_TOKEN}",
+          "RNMapboxMapsDownloadToken": "{env.EXPO_MAPBOX_DOWNLOAD_TOKEN}"
         }
       ]
     ],
