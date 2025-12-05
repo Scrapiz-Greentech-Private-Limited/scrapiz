@@ -1,6 +1,7 @@
 from rest_framework import viewsets, permissions, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
+from django.conf import settings
 from .models import CarouselImage
 from .serializers import CarouselImageSerializer
 
@@ -68,3 +69,32 @@ class CarouselImageViewSet(viewsets.ModelViewSet):
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def app_config(request):
+    """
+    Public endpoint that returns app configuration flags.
+    Used for feature toggles and testing modes.
+    
+    GET /api/content/app-config/
+    
+    Returns:
+    {
+        "enable_location_skip": true/false,
+        "maintenance_mode": false,
+        "min_app_version": "1.0.0"
+    }
+    """
+    config = {
+        # Enable location skip for testers
+        # Can be controlled via Django settings or environment variable
+        'enable_location_skip': getattr(settings, 'ENABLE_LOCATION_SKIP', False),
+        
+        # Other app-wide configuration flags
+        'maintenance_mode': getattr(settings, 'MAINTENANCE_MODE', False),
+        'min_app_version': getattr(settings, 'MIN_APP_VERSION', '1.0.0'),
+    }
+    
+    return Response(config)

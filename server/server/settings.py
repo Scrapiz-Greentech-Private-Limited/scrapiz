@@ -243,3 +243,16 @@ ADMIN_CALENDAR_ID = os.getenv('ADMIN_CALENDAR_ID', 'primary')
 # ----------------------
 # Enable backend-managed serviceability (vs hardcoded frontend constants)
 USE_BACKEND_SERVICEABILITY = os.getenv('USE_BACKEND_SERVICEABILITY', 'false').lower() == 'true'
+
+# ----------------------
+# Testing/Development Features
+# ----------------------
+# Enable location skip for testers (bypasses location permission screen)
+# WARNING: Should NEVER be enabled in production
+ENABLE_LOCATION_SKIP = os.getenv('ENABLE_LOCATION_SKIP', 'false').lower() == 'true'
+
+# Minimum app version required (for future use)
+MIN_APP_VERSION = os.getenv('MIN_APP_VERSION', '1.0.0')
+
+# Maintenance mode flag (for future use)
+MAINTENANCE_MODE = os.getenv('MAINTENANCE_MODE', 'false').lower() == 'true'

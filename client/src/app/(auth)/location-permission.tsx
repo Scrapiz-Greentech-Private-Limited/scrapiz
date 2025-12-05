@@ -15,13 +15,17 @@ import {
   TouchableWithoutFeedback
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { MapPin, ArrowRight, CheckCircle2, Navigation } from 'lucide-react-native';
+import { MapPin, ArrowRight, CheckCircle2, Navigation, SkipForward } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocation } from '../../context/LocationContext';
 import { useAuth } from '../../context/AuthContext';
 
 const { width } = Dimensions.get('window');
 const mapAsset = require('../../../assets/images/asset.png')
+
+// Check if skip is enabled from environment variable
+const ENABLE_LOCATION_SKIP = process.env.EXPO_PUBLIC_ENABLE_LOCATION_SKIP === 'true';
+
 export default function LocationPermissionScreen() {
   const router = useRouter();
   const { setLocationFromPincode, serviceAvailable, getCurrentLocation, currentLocation, isLoading: locationLoading, error: locationError } = useLocation();
@@ -30,6 +34,7 @@ export default function LocationPermissionScreen() {
   const [error, setError] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [isUsingGPS, setIsUsingGPS] = useState(false);
+  const [canSkip, setCanSkip] = useState(false);
 
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -40,6 +45,9 @@ export default function LocationPermissionScreen() {
   const inputScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    // Check if skip is enabled (from env or backend)
+    checkSkipAvailability();
+
     // Entrance Animation
     Animated.parallel([
       Animated.timing(slideAnim, {
@@ -74,6 +82,35 @@ export default function LocationPermissionScreen() {
 
     
   }, []);
+
+  const checkSkipAvailability = async () => {
+    // First check environment variable
+    if (ENABLE_LOCATION_SKIP) {
+      setCanSkip(true);
+      return;
+    }
+
+    // Optionally check backend for skip permission
+    // This allows dynamic control without app updates
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/content/app-config/`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.enable_location_skip === true) {
+          setCanSkip(true);
+        }
+      }
+    } catch (error) {
+      // Silently fail - skip will remain disabled
+      console.log('Could not check skip availability from backend');
+    }
+  };
 
   // Handle location updates from GPS
   useEffect(() => {
@@ -164,6 +201,12 @@ export default function LocationPermissionScreen() {
       setError('Failed to get your location. Please try again or enter PIN code manually.');
       setIsUsingGPS(false);
     }
+  };
+
+  const handleSkip = () => {
+    // Set a default location for testing (Mumbai)
+    setLocationFromPincode('400001');
+    router.replace('/(auth)/login');
   };
 
   return (
@@ -321,6 +364,18 @@ export default function LocationPermissionScreen() {
                   </>
                 )}
               </TouchableOpacity>
+
+              {/* Skip button for testers - only shown when enabled */}
+              {canSkip && (
+                <TouchableOpacity 
+                  className="mt-4 flex-row items-center justify-center gap-2 py-3 px-4 bg-amber-50 rounded-xl active:bg-amber-100 border border-amber-200"
+                  onPress={handleSkip}
+                  activeOpacity={0.7}
+                >
+                  <SkipForward size={16} color="#d97706" />
+                  <Text className="text-amber-700 font-bold text-sm">Skip (Tester Mode)</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
           </Animated.View>

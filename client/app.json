@@ -106,7 +106,8 @@
         "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "515246444918-9i1en7elr36ogmjimmsu0durj7cr0aai.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_V2": "515246444918-vcupmtbkchia1qrqtp4sr6ge1qkkvlur.apps.googleusercontent.com",
         "EXPO_PUBLIC_MAP_TILER_API_KEY": "oEldgWNaTPZsPFgr6fab",
-        "EXPO_PUBLIC_GOOGLE_MAPS_KEY":"AIzaSyCXv6HR4agCc7eHo02CjVgN4yMVxbvQRqg"
+        "EXPO_PUBLIC_GOOGLE_MAPS_KEY":"AIzaSyCXv6HR4agCc7eHo02CjVgN4yMVxbvQRqg",
+        "EXPO_PUBLIC_ENABLE_LOCATION_SKIP":"true"
       },
       "router": {},
       "eas": {
