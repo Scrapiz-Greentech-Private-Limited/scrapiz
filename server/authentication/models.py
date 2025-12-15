@@ -33,6 +33,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     profile_image = models.URLField(max_length=500, null=True, blank=True)
     is_deleted = models.BooleanField(default=False , db_index=True)
     deleted_at = models.DateTimeField(null= True , blank = True)
+    apple_user_id = models.CharField(
+        max_length=255,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Apple's unique user identifier (sub claim)"
+    )
     
     # Push Notification Preference Fields
     push_notification_enabled = models.BooleanField(default=True)
@@ -60,6 +68,7 @@ class AuditLog(models.Model):
         ('login', 'Login'),
         ('logout', 'Logout'),
         ('oauth_login', 'OAuth Login'),
+        ('apple_oauth_login', 'Apple OAuth Login'),
         ('account_deleted', 'Account Deleted')
     ]
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)

@@ -13,6 +13,7 @@ import {
   Image,
   ScrollView,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import {
   Mail,
@@ -24,13 +25,17 @@ import {
   Shield,
   Zap,
   Chrome,
+  X,
+  Link as LinkIcon,
 } from 'lucide-react-native';
 import { Link, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import ScrapizLogo from '../../components/ScrapizLogo';
 import { AuthService } from '../../api/apiService';
 import Toast from 'react-native-toast-message';
 import { useGoogleAuth } from '../../hooks/useGoogleAuth';
+import { useAppleAuth, AppleAuthError, appleAuthErrorMessages } from '../../hooks/useAppleAuth';
 import { useLocalization } from '../../context/LocalizationContext';
 import {wp, hp, fs, spacing} from '../../utils/responsive'
 import {useTheme} from '../../context/ThemeContext.tsx';
@@ -47,6 +52,22 @@ export default function LoginScreen() {
 
   // Google Auth Hook
   const { signInWithGoogle, isLoading: isGoogleLoading, error: googleError, authSuccess } = useGoogleAuth();
+
+  // Apple Auth Hook (iOS only)
+  const {
+    signInWithApple,
+    confirmAccountLink,
+    isLoading: isAppleLoading,
+    error: appleError,
+    errorType: appleErrorType,
+    authSuccess: appleAuthSuccess,
+    isAvailable: isAppleAvailable,
+    pendingLinkEmail,
+    clearError: clearAppleError,
+  } = useAppleAuth();
+
+  // State for account linking confirmation modal
+  const [showLinkConfirmModal, setShowLinkConfirmModal] = useState(false);
 
   // Refs for input navigation
   const passwordInputRef = useRef<TextInput>(null);
@@ -85,6 +106,10 @@ export default function LoginScreen() {
         const { hasShownNotificationPermission } = await import('../../utils/notificationPermission');
         const hasShown = await hasShownNotificationPermission();
         
+        // Small delay to ensure auth state is fully propagated before navigation
+        // This prevents race conditions on iOS that can cause app crashes
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         if (!hasShown) {
           // Navigate to notification permission screen first
           router.replace('/notification-permission');
@@ -97,6 +122,41 @@ export default function LoginScreen() {
     
     handleAuthSuccess();
   }, [authSuccess, t]);
+
+  // Handle Apple auth success (Requirements: 1.5)
+  useEffect(() => {
+    const handleAppleAuthSuccess = async () => {
+      if (appleAuthSuccess) {
+        Toast.show({
+          type: 'success',
+          text1: t('common.success'),
+          text2: t('auth.appleSignInSuccess') || 'Signed in with Apple successfully',
+        });
+        
+        // Check if we should show notification permission screen
+        const { hasShownNotificationPermission } = await import('../../utils/notificationPermission');
+        const hasShown = await hasShownNotificationPermission();
+        
+        // Small delay to ensure auth state is fully propagated before navigation
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        if (!hasShown) {
+          router.replace('/notification-permission');
+        } else {
+          router.replace('/(tabs)/home');
+        }
+      }
+    };
+    
+    handleAppleAuthSuccess();
+  }, [appleAuthSuccess, t]);
+
+  // Show account linking confirmation modal when pendingLinkEmail is set (Requirements: 4.2)
+  useEffect(() => {
+    if (pendingLinkEmail) {
+      setShowLinkConfirmModal(true);
+    }
+  }, [pendingLinkEmail]);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -149,6 +209,10 @@ export default function LoginScreen() {
       const { hasShownNotificationPermission } = await import('../../utils/notificationPermission');
       const hasShown = await hasShownNotificationPermission();
       
+      // Small delay to ensure auth state is fully propagated before navigation
+      // This prevents race conditions on iOS that can cause app crashes
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       if (!hasShown) {
         // Navigate to notification permission screen first
         router.replace('/notification-permission');
@@ -182,6 +246,62 @@ export default function LoginScreen() {
     }
   };
 
+  /**
+   * Handle Apple Sign-In button press
+   * Task 8.2: Implement handleAppleLogin function
+   * Requirements: 1.1, 1.5, 7.1, 7.2, 7.3, 7.4
+   */
+  const handleAppleLogin = async () => {
+    try {
+      clearAppleError();
+      const success = await signInWithApple();
+      // Navigation will be handled by useEffect when appleAuthSuccess changes
+      // If success is false and pendingLinkEmail is set, modal will show
+      // Error toast will be shown by the error useEffect
+    } catch (error: any) {
+      console.error('Apple login error:', error);
+      Toast.show({
+        type: 'error',
+        text1: t('auth.signInFailed') || 'Sign In Failed',
+        text2: error.message || t('auth.unableToSignIn') || 'Unable to sign in. Please try again',
+      });
+    }
+  };
+
+  /**
+   * Handle account linking confirmation
+   * Task 8.3: Implement account linking confirmation dialog
+   * Requirements: 4.2
+   */
+  const handleConfirmLink = async (confirmed: boolean) => {
+    setShowLinkConfirmModal(false);
+    
+    if (!confirmed) {
+      // User declined linking
+      await confirmAccountLink(false);
+      return;
+    }
+    
+    try {
+      const success = await confirmAccountLink(true);
+      // Navigation will be handled by useEffect when appleAuthSuccess changes
+      if (!success) {
+        Toast.show({
+          type: 'error',
+          text1: t('auth.linkingFailed') || 'Linking Failed',
+          text2: t('auth.linkingFailedMessage') || 'Unable to link accounts. Please try again.',
+        });
+      }
+    } catch (error: any) {
+      console.error('Account linking error:', error);
+      Toast.show({
+        type: 'error',
+        text1: t('auth.linkingFailed') || 'Linking Failed',
+        text2: error.message || t('auth.linkingFailedMessage') || 'Unable to link accounts. Please try again.',
+      });
+    }
+  };
+
   // Show Google error toast
   useEffect(() => {
     if (googleError) {
@@ -193,7 +313,31 @@ export default function LoginScreen() {
     }
   }, [googleError]);
 
-  const isAnyLoading = isLoading || isGoogleLoading;
+  // Show Apple error toast (Requirements: 7.1, 7.2, 7.3, 7.4)
+  useEffect(() => {
+    if (appleError && appleErrorType) {
+      // Don't show toast for cancelled - user intentionally cancelled
+      if (appleErrorType === AppleAuthError.CANCELLED) {
+        return;
+      }
+      // Don't show toast for link cancelled - handled by modal
+      if (appleErrorType === AppleAuthError.LINK_CANCELLED) {
+        Toast.show({
+          type: 'info',
+          text1: t('auth.linkingCancelled') || 'Linking Cancelled',
+          text2: t('auth.linkingCancelledMessage') || 'You can create a new account instead',
+        });
+        return;
+      }
+      Toast.show({
+        type: 'error',
+        text1: t('auth.signInFailed') || 'Sign In Failed',
+        text2: appleError,
+      });
+    }
+  }, [appleError, appleErrorType, t]);
+
+  const isAnyLoading = isLoading || isGoogleLoading || isAppleLoading;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -405,6 +549,29 @@ export default function LoginScreen() {
                   </>
                 )}
               </TouchableOpacity>
+
+              {/* Apple Sign-In Button (iOS only) - Task 8.1 */}
+              {/* Requirements: 6.1, 6.2, 6.3 */}
+              {Platform.OS === 'ios' && isAppleAvailable && (
+                <View style={styles.appleButtonContainer}>
+                  {isAppleLoading ? (
+                    <View style={[styles.appleButtonLoading, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                      <ActivityIndicator color={colors.textSecondary} size="small" />
+                    </View>
+                  ) : (
+                    <AppleAuthentication.AppleAuthenticationButton
+                      buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                      buttonStyle={isDark 
+                        ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE 
+                        : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                      }
+                      cornerRadius={spacing(16)}
+                      style={styles.appleButton}
+                      onPress={handleAppleLogin}
+                    />
+                  )}
+                </View>
+              )}
             </Animated.View>
 
             {/* Footer */}
@@ -451,6 +618,73 @@ export default function LoginScreen() {
           </View>
         </KeyboardAvoidingView>
       </View>
+
+      {/* Account Linking Confirmation Modal - Task 8.3 */}
+      {/* Requirements: 4.2 */}
+      <Modal
+        visible={showLinkConfirmModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => handleConfirmLink(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => handleConfirmLink(false)}
+            >
+              <X size={24} color={colors.textSecondary} />
+            </TouchableOpacity>
+            
+            <View style={[styles.modalIconContainer, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
+              <LinkIcon size={32} color={colors.primary} />
+            </View>
+            
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {t('auth.linkAccountTitle') || 'Link Your Account?'}
+            </Text>
+            
+            <Text style={[styles.modalMessage, { color: colors.textSecondary }]}>
+              {t('auth.linkAccountMessage', { email: pendingLinkEmail }) || 
+                `An account with the email ${pendingLinkEmail} already exists. Would you like to link your Apple ID to this existing account?`}
+            </Text>
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButtonCancel, { borderColor: colors.border }]}
+                onPress={() => handleConfirmLink(false)}
+                disabled={isAppleLoading}
+              >
+                <Text style={[styles.modalButtonCancelText, { color: colors.textSecondary }]}>
+                  {t('common.cancel') || 'Cancel'}
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.modalButtonConfirm}
+                onPress={() => handleConfirmLink(true)}
+                disabled={isAppleLoading}
+              >
+                <LinearGradient
+                  colors={['#16a34a', '#15803d', '#14532d']}
+                  style={styles.modalButtonConfirmGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  {isAppleLoading ? (
+                    <ActivityIndicator color="white" size="small" />
+                  ) : (
+                    <Text style={styles.modalButtonConfirmText}>
+                      {t('auth.linkAccount') || 'Link Account'}
+                    </Text>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <Toast />
     </View>
   );
@@ -767,5 +1001,107 @@ const styles = StyleSheet.create({
   trustDivider: {
     width: 1,
     height: spacing(16),
+  },
+  // Apple Sign-In Button Styles (Task 8.1)
+  appleButtonContainer: {
+    marginBottom: spacing(16),
+  },
+  appleButton: {
+    width: '100%',
+    height: hp(6.9),
+  },
+  appleButtonLoading: {
+    width: '100%',
+    height: hp(6.9),
+    borderRadius: spacing(16),
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Account Linking Modal Styles (Task 8.3)
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing(24),
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: wp(90),
+    borderRadius: spacing(20),
+    padding: spacing(24),
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    top: spacing(16),
+    right: spacing(16),
+    padding: spacing(4),
+  },
+  modalIconContainer: {
+    width: wp(18),
+    height: wp(18),
+    borderRadius: wp(9),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing(16),
+  },
+  modalTitle: {
+    fontSize: fs(20),
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: spacing(12),
+  },
+  modalMessage: {
+    fontSize: fs(14),
+    textAlign: 'center',
+    lineHeight: fs(20),
+    marginBottom: spacing(24),
+    paddingHorizontal: spacing(8),
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: spacing(12),
+    width: '100%',
+  },
+  modalButtonCancel: {
+    flex: 1,
+    height: hp(6),
+    borderRadius: spacing(12),
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalButtonCancelText: {
+    fontSize: fs(15),
+    fontWeight: '600',
+  },
+  modalButtonConfirm: {
+    flex: 1,
+    height: hp(6),
+    borderRadius: spacing(12),
+    overflow: 'hidden',
+  },
+  modalButtonConfirmGradient: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalButtonConfirmText: {
+    fontSize: fs(15),
+    fontWeight: '700',
+    color: '#ffffff',
   },
 });

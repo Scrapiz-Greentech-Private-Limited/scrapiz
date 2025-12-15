@@ -50,11 +50,25 @@ export const useGoogleAuth = () => {
             console.log('Login successful, JWT received');
             console.log('User:', serverResponse.user);
             
+            // Wait for AsyncStorage to fully persist the token
+            // This prevents race conditions on iOS where the token might not be ready
+            await new Promise(resolve => setTimeout(resolve, 150));
+            
+            // Verify the token was actually stored
+            const isStored = await AuthService.isAuthenticated();
+            if (!isStored) {
+              console.warn('JWT was not stored properly, retrying...');
+              // Token wasn't stored, this shouldn't happen but handle gracefully
+              throw new Error('Failed to store authentication token');
+            }
+            
+            console.log('JWT verified in storage');
+            
             // Update authentication state
             setAuthenticatedState(true);
             
-            // Refresh auth status to ensure everything is in sync
-            await refreshAuthStatus();
+            // Note: Removed refreshAuthStatus() call to prevent race condition
+            // that was causing app crash on iOS after redirect to home
             
             setError(null);
             setAuthSuccess(true);

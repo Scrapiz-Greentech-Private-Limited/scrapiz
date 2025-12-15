@@ -223,9 +223,9 @@ const services = useMemo(() => [
 
   if (loading) {
     return (
-      <View style={[styles.container, styles.centerContent]}>
+      <View style={[styles.container, styles.centerContent, { backgroundColor: colors?.background || '#f1f5f9' }]}>
         <ActivityIndicator size="large" color="#16a34a" />
-        <Text style={styles.loadingText}>{t('home.loading')}</Text>
+        <Text style={[styles.loadingText, { color: colors?.text || '#111827' }]}>{t('home.loading')}</Text>
       </View>
     );
   }

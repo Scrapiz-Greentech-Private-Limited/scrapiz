@@ -46,6 +46,14 @@ import { useTheme } from '../../context/ThemeContext';
 import { sellTutorialConfig } from '../../config/tutorials/homeTutorial';
 import { useTutorialStore } from '../../store/tutorialStore';
 import TutorialOverlay from '../../components/TutorialOverlay';
+import { useLocation } from '../../context/LocationContext';
+import SellLocationGate from '../../components/SellLocationGate';
+import SellServiceUnavailable from '../../components/SellServiceUnavailable';
+import { 
+  hasSellServiceabilityBeenChecked, 
+  getSellServiceAvailability,
+  setSellServiceability 
+} from '../../utils/sellServiceability';
 const { width, height } = Dimensions.get('window');
 
 type SelectedItem = {
@@ -127,7 +135,91 @@ const getFallbackImageForProduct = (productName: string) => {
   return require('../../../assets/images/Scrap_Rates_Photos/TV.jpg');
 };
 
+// Gate states for serviceability check
+type SellScreenState = 'checking' | 'location_gate' | 'not_serviceable' | 'serviceable';
+
 export default function SellScreen() {
+  const router = useRouter();
+  const { colors, isDark } = useTheme();
+  const { locationSet, serviceAvailable } = useLocation();
+  
+  // Serviceability gate state
+  const [screenState, setScreenState] = useState<SellScreenState>('checking');
+  
+  // Check serviceability on mount
+  useEffect(() => {
+    checkServiceability();
+  }, []);
+
+  const checkServiceability = async () => {
+    // If location is already set and service is available from context, allow access
+    if (locationSet && serviceAvailable) {
+      await setSellServiceability(true);
+      setScreenState('serviceable');
+      return;
+    }
+
+    // Check if we've already done the serviceability check for sell
+    const hasChecked = await hasSellServiceabilityBeenChecked();
+    
+    if (hasChecked) {
+      const isAvailable = await getSellServiceAvailability();
+      if (isAvailable) {
+        setScreenState('serviceable');
+      } else {
+        setScreenState('not_serviceable');
+      }
+    } else {
+      // Need to show location gate
+      setScreenState('location_gate');
+    }
+  };
+
+  const handleServiceable = () => {
+    setScreenState('serviceable');
+  };
+
+  const handleNotServiceable = () => {
+    setScreenState('not_serviceable');
+  };
+
+  const handleGoHome = () => {
+    router.replace('/(tabs)/home');
+  };
+
+  // Show loading while checking
+  if (screenState === 'checking') {
+    return (
+      <View style={[styles.container, styles.centerContent, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.textSecondary, marginTop: 12 }]}>
+          Checking service availability...
+        </Text>
+      </View>
+    );
+  }
+
+  // Show location gate if not checked yet
+  if (screenState === 'location_gate') {
+    return (
+      <SellLocationGate 
+        onServiceable={handleServiceable}
+        onNotServiceable={handleNotServiceable}
+      />
+    );
+  }
+
+  // Show service unavailable screen
+  if (screenState === 'not_serviceable') {
+    return <SellServiceUnavailable onGoHome={handleGoHome} />;
+  }
+
+  // Continue with normal sell screen (serviceable)
+  return <SellScreenContent />;
+}
+
+// Extracted the original sell screen content into a separate component
+function SellScreenContent() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
   
@@ -727,7 +819,13 @@ export default function SellScreen() {
                           />
                         )}
                         <View style={styles.itemInfo}>
-                          <Text style={[styles.itemName, { color: colors.text }]}>{product.name}</Text>
+                          <Text
+                        style={[styles.itemName, { color: colors.text }]}
+                        numberOfLines={1}
+                    ellipsizeMode="tail"
+                      >
+                      {product.name}
+                          </Text>
                           <Text style={[styles.itemRate, { color: colors.primary }]}>
                             ₹{product.min_rate}-{product.max_rate}/{product.unit}
                           </Text>
@@ -795,7 +893,9 @@ export default function SellScreen() {
                     />
                   )}
                   <View>
-                    <Text style={[styles.selectedItemName, { color: colors.text }]}>{item.name}</Text>
+                    <Text style={[styles.selectedItemName, { color: colors.text } ]}
+                    numberOfLines={1}
+                    ellipsizeMode='tail'>{item.name}</Text>
                     <Text style={styles.selectedItemRate}>
                       ₹{Math.round(item.rate)}/{item.unit}
                     </Text>
@@ -1684,6 +1784,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   loadingContainer: {
     paddingVertical: 60,
     alignItems: 'center',
@@ -1815,8 +1919,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemInfo: {
-    flex: 1,
-  },
+  flex: 1,
+  flexShrink: 1,
+  marginRight: 8,
+},
+
   itemName: {
     fontSize: 14,
     fontWeight: '600',
@@ -1860,10 +1967,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   selectedItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
+  flexDirection: 'row',
+  alignItems: 'center',
+  flex: 1,
+  flexShrink: 1,
+  marginRight: 8,
+},
   selectedItemIconImage: {
     width: 36,
     height: 36,
@@ -1883,10 +1992,12 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   selectedItemName: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#111827',
-  },
+  fontSize: 14,
+  fontWeight: '500',
+  color: '#111827',
+  // helps on very small screens
+  flexShrink: 1,
+},
   selectedItemRate: {
     fontSize: 12,
     color: '#16a34a',

@@ -21,6 +21,8 @@ export const API_CONFIG = {
     PASSWORD_RESET: '/authentication/password-reset/',
     USER: '/authentication/user/',
     GOOGLE_LOGIN: '/authentication/google-login/',
+    APPLE_LOGIN: '/authentication/apple-login/',
+    APPLE_LOGIN_CONFIRM: '/authentication/apple-login/confirm-link/',
     USER_ADDRESSES: '/user/address/',
     USER_NOTIFICATION_SETTINGS: '/user/notification-settings/',
     SERVICE_BOOKINGS: '/services/bookings/',
@@ -136,4 +138,41 @@ export interface GoogleLoginResponse extends ApiResponse {
     email: string;
     name: string;
   };
+}
+
+// Apple OAuth types
+export interface AppleUserInfo {
+  firstName?: string | null;
+  lastName?: string | null;
+}
+
+export interface PlatformInfo {
+  os: string;
+  osVersion: string;
+  deviceModel?: string;
+}
+
+export interface AppleLoginRequest {
+  identity_token: string;
+  nonce: string;
+  user?: AppleUserInfo;
+  email?: string | null;
+  platform_info?: PlatformInfo;
+}
+
+export interface AppleLoginResponse extends ApiResponse {
+  jwt?: string;
+  user?: {
+    id: number;
+    email: string;
+    name: string;
+  };
+  requires_link_confirmation?: boolean;
+  existing_email?: string;
+}
+
+export interface AppleLoginConfirmRequest {
+  identity_token: string;
+  nonce: string;
+  confirmed: boolean;
 }

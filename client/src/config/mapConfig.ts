@@ -1,6 +1,7 @@
 import MapboxGL from '@rnmapbox/maps';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
+
 export const MAPBOX_API_KEY = process.env.EXPO_PUBLIC_MAPBOX_TOKEN || '';
 export const KRUTRIM_API_KEY = process.env.EXPO_PUBLIC_KRUTRIM_API_KEY || '';
 export const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY || '';
@@ -76,6 +77,16 @@ export function buildGeocodingUrl(
   }
 
   return `${KRUTRIM_API_URL}/autocomplete?${params.toString()}`;
+}
+
+export function buildKrutrimAutocompleteUrl(query: string) {
+  return `${KRUTRIM_API_URL}/autocomplete?input=${encodeURIComponent(query)}&api_key=${KRUTRIM_API_KEY}`;
+}
+export function buildKrutrimPlaceDetailsUrl(placeId: string) {
+  return `${KRUTRIM_API_URL}/details?place_id=${placeId}&api_key=${KRUTRIM_API_KEY}`;
+}
+export function buildGoogleReverseGeocodeUrl(latitude: number, longitude: number) {
+  return `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_API_KEY}`;
 }
 export function buildGoogleAutocompletePayload(
   query: string,

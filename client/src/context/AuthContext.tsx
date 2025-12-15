@@ -148,7 +148,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
       
-      // Clear authentication token from AsyncStorage
+      // Clear authentication token from SecureStore
       try {
         await AuthService.logout();
       } catch (logoutError) {

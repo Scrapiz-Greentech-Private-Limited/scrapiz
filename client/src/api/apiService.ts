@@ -1,8 +1,8 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_CONFIG, ApiResponse, RegisterRequest, LoginRequest, VerifyOtpRequest, PasswordResetRequest, NotificationSettings, ServiceBookingPayload, ServiceBooking, PushNotificationPreferences } from './config';
+import { API_CONFIG, ApiResponse, RegisterRequest, LoginRequest, VerifyOtpRequest, PasswordResetRequest, NotificationSettings, ServiceBookingPayload, ServiceBooking, PushNotificationPreferences, AppleUserInfo, PlatformInfo, AppleLoginResponse } from './config';
 import { ReferredUser, ReferralTransaction } from '../types/referral';
 import { DeletionFeedback } from '../types/account';
+import { SecureStorageService } from '../services/secureStorage';
 
 export type { NotificationSettings, ServiceBookingPayload, ServiceBooking, PushNotificationPreferences } from './config';
 export type { DeletionFeedback } from '../types/account';
@@ -117,7 +117,7 @@ apiClient.interceptors.request.use(
       (config.headers as any)['x-auth-app'] = frontendKey;
     }
 
-    const token = await AsyncStorage.getItem('authToken');
+    const token = await SecureStorageService.getAuthToken();
     if (token) {
       // Backend expects raw token in Authorization header (no "Bearer " prefix)
       if (!config.headers) config.headers = {} as any;
@@ -175,8 +175,8 @@ apiClient.interceptors.response.use(
     console.error('API Error:', data || error.message);
 
     if (status === 401 || status === 403) {
-      // Clear token on auth errors
-      try { await AsyncStorage.removeItem('authToken'); } catch {}
+      // Clear token on auth errors using SecureStore
+      try { await SecureStorageService.removeAuthToken(); } catch {}
       
       // Debounce to prevent multiple rapid triggers
       const now = Date.now();
@@ -268,7 +268,7 @@ export class AuthService {
     try {
       const response = await apiClient.post(API_CONFIG.ENDPOINTS.LOGIN, data);
       if (response.data.jwt) {
-        await AsyncStorage.setItem('authToken', response.data.jwt);
+        await SecureStorageService.setAuthToken(response.data.jwt);
       }
       return response.data;
     } catch (error: any) {
@@ -283,7 +283,7 @@ export class AuthService {
         id_token: idToken,
       });
       if (response.data.jwt) {
-        await AsyncStorage.setItem('authToken', response.data.jwt);
+        await SecureStorageService.setAuthToken(response.data.jwt);
       }
       return response.data;
     } catch (error: any) {
@@ -291,15 +291,83 @@ export class AuthService {
     }
   }
 
+  /**
+   * Apple OAuth login with nonce verification and platform metadata.
+   * 
+   * @param identityToken - Apple's identity JWT containing hashed nonce
+   * @param nonce - Raw (unhashed) nonce for backend verification
+   * @param user - Optional user info (name) from first sign-in
+   * @param email - Optional email from first sign-in
+   * @param platformInfo - Device/OS metadata for audit logging
+   * @returns AppleLoginResponse with JWT or requires_link_confirmation flag
+   */
+  static async appleLogin(
+    identityToken: string,
+    nonce: string,
+    user?: AppleUserInfo,
+    email?: string | null,
+    platformInfo?: PlatformInfo
+  ): Promise<AppleLoginResponse> {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.APPLE_LOGIN, {
+        identity_token: identityToken,
+        nonce: nonce,
+        user: user,
+        email: email,
+        platform_info: platformInfo,
+      });
+
+      // Store JWT in SecureStore on success (not when link confirmation required)
+      if (response.data.jwt) {
+        await SecureStorageService.setAuthToken(response.data.jwt);
+      }
+
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Apple login failed');
+    }
+  }
+
+  /**
+   * Confirm or reject Apple account linking to existing email account.
+   * 
+   * @param identityToken - Apple's identity JWT (re-verified for freshness)
+   * @param nonce - Raw nonce for verification
+   * @param confirmed - true to link accounts, false to cancel
+   * @returns AppleLoginResponse with JWT on success
+   */
+  static async appleLoginConfirmLink(
+    identityToken: string,
+    nonce: string,
+    confirmed: boolean
+  ): Promise<AppleLoginResponse> {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.APPLE_LOGIN_CONFIRM, {
+        identity_token: identityToken,
+        nonce: nonce,
+        confirmed: confirmed,
+      });
+
+      // Store JWT in SecureStore on successful link confirmation
+      if (response.data.jwt) {
+        await SecureStorageService.setAuthToken(response.data.jwt);
+      }
+
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Account linking failed');
+    }
+  }
+
   // Logout user
   static async logout(): Promise<ApiResponse> {
     try {
       const response = await apiClient.post(API_CONFIG.ENDPOINTS.LOGOUT);
-      await AsyncStorage.removeItem('authToken');
+      await SecureStorageService.removeAuthToken();
       return response.data;
     } catch (error: any) {
       // Even if logout fails, remove local token
-      await AsyncStorage.removeItem('authToken');
+      await SecureStorageService.removeAuthToken();
       throw new Error(error.response?.data?.error || 'Logout failed');
     }
   }
@@ -327,7 +395,7 @@ export class AuthService {
   // Check if user is authenticated
   static async isAuthenticated(): Promise<boolean> {
     try {
-      const token = await AsyncStorage.getItem('authToken');
+      const token = await SecureStorageService.getAuthToken();
       return !!token;
     } catch (error) {
       return false;
@@ -337,7 +405,7 @@ export class AuthService {
   // Get stored auth token
   static async getAuthToken(): Promise<string | null> {
     try {
-      return await AsyncStorage.getItem('authToken');
+      return await SecureStorageService.getAuthToken();
     } catch (error) {
       return null;
     }
@@ -412,7 +480,7 @@ export class AuthService {
         // If it's an S3 URL, don't include it (no change)
       }
 
-      const token = await AsyncStorage.getItem('authToken');
+      const token = await SecureStorageService.getAuthToken();
       const frontendKey = API_CONFIG.HEADERS['x-auth-app'] as string;
 
       const response = await apiClient.patch(
@@ -463,8 +531,8 @@ export class AuthService {
       
       console.log('✅ Account deletion response:', response.data);
       
-      // Clear local auth token on successful deletion
-      await AsyncStorage.removeItem('authToken');
+      // Clear local auth token on successful deletion using SecureStore
+      await SecureStorageService.removeAuthToken();
       
       return response.data as ApiResponse;
     } catch (error: any) {
@@ -626,7 +694,7 @@ export class AuthService {
         console.log('No images to upload');
       }
 
-      const token = await AsyncStorage.getItem('authToken');
+      const token = await SecureStorageService.getAuthToken();
       const frontendKey = API_CONFIG.HEADERS['x-auth-app'] as string;
 
       const response = await apiClient.post(

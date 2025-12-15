@@ -12,9 +12,10 @@ import {
   StatusBar,
   Image,
 } from 'react-native';
-import { User, MapPin, Bell, Sun, Camera, Moon, Shield, CircleHelp as HelpCircle, X, Star, Gift, ChevronRight, Award, LogOut, Phone, Mail, Package, Clock, CheckCircle, Trash2, Globe } from 'lucide-react-native';
+import { User, MapPin, Bell, Sun, Camera, Moon, Shield, CircleHelp as HelpCircle, X, Star, Gift, ChevronRight, Award, LogOut, Phone, Mail, Package, Clock, CheckCircle, Trash2, Globe, WifiOff } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import NetInfo from '@react-native-community/netinfo';
 import { wp, hp, fs, spacing, responsiveValue, MIN_TOUCH_SIZE } from '../../utils/responsive';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../context/ThemeContext';
@@ -58,11 +59,63 @@ export default function Profile() {
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
+  const [retryCountdown, setRetryCountdown] = useState(0);
+  const retryTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Check network connectivity
+  const checkNetworkAndLoad = useCallback(async () => {
+    const netState = await NetInfo.fetch();
+    if (!netState.isConnected) {
+      setIsOffline(true);
+      setLoading(false);
+      startRetryCountdown();
+      return false;
+    }
+    setIsOffline(false);
+    return true;
+  }, []);
 
+  // Start countdown timer for retry
+  const startRetryCountdown = useCallback(() => {
+    // Clear any existing timers
+    if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    
+    setRetryCountdown(5);
+    
+    // Countdown interval
+    countdownIntervalRef.current = setInterval(() => {
+      setRetryCountdown(prev => {
+        if (prev <= 1) {
+          if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    // Retry after 5 seconds
+    retryTimerRef.current = setTimeout(() => {
+      loadUserProfile();
+    }, 5000);
+  }, []);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    };
+  }, []);
 
   const loadUserProfile = useCallback(async () => {
     try {
+      // Check network first
+      const isConnected = await checkNetworkAndLoad();
+      if (!isConnected) return;
+      
       setLoading(true);
       setErrors(null);
       const [userData, productsData] = await Promise.all([
@@ -71,14 +124,21 @@ export default function Profile() {
       ]);
       setUser(userData);
       setProducts(productsData);
+      setIsOffline(false);
       setLoading(false);
-    } catch (error) {
-      setErrors("Failed to load user profile");
-      setLoading(false);
-    } finally {
+    } catch (error: any) {
+      // Check if it's a network error
+      const netState = await NetInfo.fetch();
+      if (!netState.isConnected || error.message?.includes('Network') || error.message?.includes('network')) {
+        setIsOffline(true);
+        setErrors(null);
+        startRetryCountdown();
+      } else {
+        setErrors("Failed to load user profile");
+      }
       setLoading(false);
     }
-  }, []);
+  }, [checkNetworkAndLoad, startRetryCountdown]);
 
   useFocusEffect(
     useCallback(() => {
@@ -396,16 +456,56 @@ export default function Profile() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
         <ActivityIndicator size="large" color="#16a34a" />
-        <Text style={styles.loadingText}>{t('profile.loadingProfile')}</Text>
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('profile.loadingProfile')}</Text>
+      </View>
+    );
+  }
+
+  // Offline state with countdown retry
+  if (isOffline) {
+    return (
+      <View style={[styles.offlineContainer, { backgroundColor: colors.background }]}>
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+        <View style={[styles.offlineCard, { backgroundColor: colors.surface }]}>
+          <View style={[styles.offlineIconContainer, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2' }]}>
+            <WifiOff size={48} color="#ef4444" strokeWidth={2} />
+          </View>
+          <Text style={[styles.offlineTitle, { color: colors.text }]}>
+            {t('profile.noInternet') || 'No Internet Connection'}
+          </Text>
+          <Text style={[styles.offlineMessage, { color: colors.textSecondary }]}>
+            {t('profile.checkConnection') || 'Please check your internet connection'}
+          </Text>
+          {retryCountdown > 0 && (
+            <View style={[styles.countdownContainer, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#f0fdf4' }]}>
+              <Text style={[styles.countdownText, { color: colors.primary }]}>
+                {t('profile.retryingIn') || 'Retrying in'} {retryCountdown}...
+              </Text>
+            </View>
+          )}
+          <TouchableOpacity 
+            style={[styles.retryNowButton, { backgroundColor: colors.primary }]} 
+            onPress={() => {
+              if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+              if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+              setRetryCountdown(0);
+              loadUserProfile();
+            }}
+          >
+            <Text style={styles.retryNowButtonText}>{t('profile.retryNow') || 'Retry Now'}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
   if (errors || !user) {
     return (
-      <View style={styles.errorContainer}>
+      <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
         <Text style={styles.errorText}>{errors || t('profile.failedToLoad')}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={loadUserProfile}>
           <Text style={styles.retryButtonText}>{t('profile.retry')}</Text>
@@ -653,6 +753,83 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#ffffff',
+  },
+  offlineContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing(24),
+  },
+  offlineCard: {
+    width: '100%',
+    borderRadius: spacing(20),
+    padding: spacing(32),
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  offlineIconContainer: {
+    width: wp(24),
+    height: wp(24),
+    borderRadius: wp(12),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing(20),
+  },
+  offlineTitle: {
+    fontSize: fs(20),
+    fontWeight: '700',
+    fontFamily: 'Inter-Bold',
+    textAlign: 'center',
+    marginBottom: spacing(8),
+  },
+  offlineMessage: {
+    fontSize: fs(14),
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+    marginBottom: spacing(20),
+    lineHeight: fs(20),
+  },
+  countdownContainer: {
+    paddingHorizontal: spacing(20),
+    paddingVertical: spacing(12),
+    borderRadius: spacing(12),
+    marginBottom: spacing(20),
+  },
+  countdownText: {
+    fontSize: fs(16),
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+    textAlign: 'center',
+  },
+  retryNowButton: {
+    paddingHorizontal: spacing(32),
+    paddingVertical: spacing(14),
+    borderRadius: spacing(12),
+    minWidth: wp(50),
+    alignItems: 'center',
+  },
+  retryNowButtonText: {
+    fontSize: fs(16),
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+    color: '#ffffff',
+  },
+  retryButton: {
+    backgroundColor: '#16a34a',
+    paddingHorizontal: spacing(24),
+    paddingVertical: spacing(12),
+    borderRadius: spacing(10),
+    marginTop: spacing(8),
+  },
+  retryButtonText: {
+    fontSize: fs(14),
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+    color: '#ffffff',
   },
   themeToggleIcon: {
     width: spacing(38), // Reduced from 42

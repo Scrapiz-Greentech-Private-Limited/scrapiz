@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { ServiceabilityAPI, ServiceableCity } from '../api/apiService';
 import { CacheService } from '../services/serviceabilityCache';
+import { resetSellServiceability } from '../utils/sellServiceability';
 
 
 export interface LocationData {
@@ -250,6 +251,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }){
       
       setServiceAvailable(isServiceable)
       await AsyncStorage.setItem(STORAGE_KEYS.SERVICE_AVAILABLE, isServiceable.toString());
+      await resetSellServiceability(); // Reset sell serviceability when location changes
     } catch (error) {
         let errorMessage = 'Failed to get location. Please try again.';
         if ((error as any).code === 'E_LOCATION_UNAVAILABLE') {
@@ -427,6 +429,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }){
           AsyncStorage.setItem(STORAGE_KEYS.CURRENT_LOCATION, JSON.stringify(locationData)),
           AsyncStorage.setItem(STORAGE_KEYS.SERVICE_AVAILABLE, 'true'),
           AsyncStorage.setItem(STORAGE_KEYS.LOCATION_SET, 'true'),
+          resetSellServiceability(), // Reset sell serviceability when location changes
         ]);
 
         console.log('✅ Location set from pincode:', { 
@@ -442,6 +445,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }){
         
         await Promise.all([
           AsyncStorage.setItem(STORAGE_KEYS.CURRENT_LOCATION, JSON.stringify(locationData)),
+          resetSellServiceability(), // Reset sell serviceability when location changes
           AsyncStorage.setItem(STORAGE_KEYS.SERVICE_AVAILABLE, 'false'),
           AsyncStorage.setItem(STORAGE_KEYS.LOCATION_SET, 'true'),
         ]);

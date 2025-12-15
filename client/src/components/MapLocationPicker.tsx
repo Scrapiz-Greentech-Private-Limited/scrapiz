@@ -29,6 +29,9 @@ import {
   buildGooglePlaceDetailsPayload,
   GOOGLE_API_KEY,
   getSessionToken,
+  buildKrutrimAutocompleteUrl,
+  buildGoogleReverseGeocodeUrl,
+  buildKrutrimPlaceDetailsUrl
 } from '../config/mapConfig';
 
 // Debug: Log Mapbox token (first 20 chars only for security)
@@ -237,40 +240,20 @@ export default function MapLocationPicker({
     setIsSearching(true);
     
     try {
-      const payload = buildGoogleAutocompletePayload(
-        query,
-        sessionTokenRef.current,
-        currentUserLocation
-      );
-
-      const response = await fetch(
-        'https://places.googleapis.com/v1/places:autocomplete',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Goog-Api-Key': GOOGLE_API_KEY,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
-
+      const url = buildKrutrimAutocompleteUrl(query);
+      const response = await fetch(url);
       const data = await response.json();
 
-      if (data.suggestions) {
-        const formattedResults: GoogleAutocompleteResult[] = data.suggestions.map((item: any) => ({
-          place_id: item.placePrediction.placeId,
-          description: item.placePrediction.text.text,
-          structured_formatting: {
-            main_text: item.placePrediction.structuredFormat?.mainText?.text || '',
-            secondary_text: item.placePrediction.structuredFormat?.secondaryText?.text || '',
-          },
-        }));
-        setSearchResults(formattedResults);
+     if (data.predictions && data.predictions.length > 0) {
+      setSearchResults(data.predictions.map((item: any) => ({
+          place_id: item.place_id,
+          description: item.description,
+          structured_formatting: item.structured_formatting,
+        })));
         setShowResults(true);
-      } else {
-        setSearchResults([]);
-      }
+     }else{
+      setSearchResults([]);
+     }
     } catch (error) {
       console.error('Geocoding search error:', error);
       setSearchResults([]);
@@ -282,51 +265,34 @@ export default function MapLocationPicker({
   const reverseGeocode = async (
     latitude: number,
     longitude: number,
-    updateSearchBox: boolean = true
+    updateSearchBox: boolean = true,
+    force:boolean = false
   ): Promise<KrutrimReverseGeocodeResult | null> => {
-    setIsSearching(true);
+    if (isSelectingFromSearch.current && !force) return null;
+  
     
     try {
       // Use Google Geocoding API instead of Krutrim
-      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_API_KEY}`;
+      const url = buildGoogleReverseGeocodeUrl(latitude, longitude);
       const response = await fetch(url);
-      
-      if (!response.ok) {
-        console.error('Reverse geocoding API error:', response.status);
-        if (updateSearchBox) {
-          setSelectedAddress('Location selected - please add details manually');
-          setSearchQuery('Location selected - please add details manually');
-        }
-        return null;
-      }
-      
       const data = await response.json();
-
-      if (data.results && data.results.length > 0) {
-        const result = data.results[0] as KrutrimReverseGeocodeResult;
+      if (data.status === 'OK' && data.results && data.results.length > 0) {
+        const result = data.results[0];
+        
         setSelectedAddress(result.formatted_address);
-        setSelectedAddressDetails(result);
+        setSelectedAddressDetails(result); // Store Google structure
         
-        if (updateSearchBox) {
-          setSearchQuery(result.formatted_address);
-        }
-        
-        return result;
+        // if (updateSearchBox) {
+        //   setSearchQuery(result.formatted_address);
+        // }
+      } else {
+        console.warn('Google Reverse Geocode failed/empty');
+        if (updateSearchBox) setSelectedAddress("Pinned Location");
       }
       
-      console.error('Reverse geocoding returned no results');
-      if (updateSearchBox) {
-        setSelectedAddress('Location selected - address unavailable');
-        setSearchQuery('Location selected - address unavailable');
       }
-      return null;
-    } catch (error) {
+    catch (error) {
       console.error('Reverse geocoding error:', error); 
-      if (updateSearchBox) {
-        setSelectedAddress('Location selected - address unavailable');
-        setSearchQuery('Location selected - address unavailable');
-      }
-      return null;
     } finally {
       setIsSearching(false);
     }
@@ -352,157 +318,131 @@ export default function MapLocationPicker({
   };
 
   const handleResultSelect = async (result: KrutrimAutocompleteResult) => {
-    setSearchQuery(result.description);
-    setShowResults(false);
-    Keyboard.dismiss();
+  // ✅ Search bar shows what the user tapped from suggestions
+  setSearchQuery(result.description);
+  setShowResults(false);
+  Keyboard.dismiss();
 
-    isSelectingFromSearch.current = true;
-    setIsSearching(true);
-    
-    try {
-      const response = await fetch(
-        `https://places.googleapis.com/v1/places/${result.place_id}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Goog-Api-Key': GOOGLE_API_KEY,
-            'X-Goog-FieldMask': 'location,formattedAddress,addressComponents',
-          },
-        }
-      );
+  isSelectingFromSearch.current = true;
+  setIsSearching(true);
 
-      const data = await response.json();
-      
-      // Reset session token after getting place details
-      sessionTokenRef.current = getSessionToken();
+  try {
+    const url = buildKrutrimPlaceDetailsUrl(result.place_id);
+    const response = await fetch(url);
+    const data = await response.json();
+    const locationData = data.result?.geometry?.location;
+    const formattedAddress = data.result?.formatted_address || result.description;
 
-      const locationData = data.location;
-      const formattedAddress = data.formattedAddress;
-      
-      if (locationData && formattedAddress) {
-        const coords: [number, number] = [locationData.longitude, locationData.latitude];
-        setSelectedCoords(coords);
-        setMarkerCoords(coords);
-        previousCenterRef.current = coords;
-        
-        // Set the address from Google Places API directly
-        setSelectedAddress(formattedAddress);
-        setSearchQuery(formattedAddress);
-        
-        // Convert Google address components to Krutrim format for compatibility
-        const addressComponents = data.addressComponents || [];
-        const mockKrutrimResult: KrutrimReverseGeocodeResult = {
-          formatted_address: formattedAddress,
-          address_components: addressComponents.map((comp: any) => ({
-            long_name: comp.longText || comp.shortText || '',
-            short_name: comp.shortText || '',
-            types: comp.types || [],
-          })),
-          place_id: result.place_id,
-        };
-        setSelectedAddressDetails(mockKrutrimResult);
-        
-        cameraRef.current?.flyTo(coords, MAP_SETTINGS.animationDuration);
-        
-        setTimeout(() => {
-          isSelectingFromSearch.current = false;
-          setIsSearching(false);
-        }, MAP_SETTINGS.animationDuration + 500);
-      } else {
-        console.warn('Could not get coordinates or address from Google Place Details');
+    if (locationData) {
+      const coords: [number, number] = [locationData.lng, locationData.lat];
+
+      setSelectedCoords(coords);
+      setMarkerCoords(coords);
+      previousCenterRef.current = coords;
+
+      // ✅ Pickup field gets the detailed address
+      setSelectedAddress(formattedAddress);
+      setSelectedAddressDetails(data.result);
+
+      cameraRef.current?.setCamera({
+        centerCoordinate: coords,
+        animationDuration: MAP_SETTINGS.animationDuration,
+      });
+
+      setTimeout(() => {
         isSelectingFromSearch.current = false;
         setIsSearching(false);
-      }
-    } catch (error) {
-      console.error('Error selecting result:', error);
-      isSelectingFromSearch.current = false;
-      setIsSearching(false);
+      }, MAP_SETTINGS.animationDuration + 800);
     }
-  };
+  } catch (error) {
+    console.error('Error resolving Krutrim place:', error);
+    isSelectingFromSearch.current = false;
+  } finally {
+    setIsSearching(false);
+  }
+};
 
-  const handleUseCurrentLocation = async () => {
-    setIsLoadingLocation(true);
-    setShowActionMenu(false);
-    
-    isSelectingFromSearch.current = true;
-    
-    try {
-      const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
-      
-      let finalStatus = existingStatus;
-      
-      if (existingStatus !== 'granted') {
-        const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
-        finalStatus = newStatus;
-      }
-      
-      if (finalStatus !== 'granted') {
-        console.error('GPS permission denied by user');
-        
-        Toast.show({
-          type: 'error',
-          text1: 'Permission Required',
-          text2: 'Location permission is needed to use this feature.',
-          visibilityTime: 5000,
-        });
-        
-        isSelectingFromSearch.current = false;
-        setIsLoadingLocation(false);
-        return;
-      }
+ const handleUseCurrentLocation = async () => {
+  setIsLoadingLocation(true);
+  setShowActionMenu(false);
 
-      try {
-        const position = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Highest,
-        });
+  // mark as selecting so other handlers don't step on us
+  isSelectingFromSearch.current = true;
 
-        const coords: [number, number] = [
-          position.coords.longitude,
-          position.coords.latitude,
-        ];
+  try {
+    const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== 'granted') {
+      const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
+      finalStatus = newStatus;
+    }
 
-        setSelectedCoords(coords);
-        setMarkerCoords(coords);
-        setCurrentUserLocation(coords);
-        previousCenterRef.current = coords; // Track this position
-
-        cameraRef.current?.flyTo(coords, MAP_SETTINGS.animationDuration);
-        await reverseGeocode(coords[1], coords[0]);
-        
-        setTimeout(() => {
-          isSelectingFromSearch.current = false;
-        }, MAP_SETTINGS.animationDuration + 500);
-      } catch (gpsError: any) {
-        console.error('GPS location acquisition error:', gpsError);
-        
-        Toast.show({
-          type: 'error',
-          text1: 'Location Error',
-          text2: 'Failed to get your current location.',
-          visibilityTime: 6000,
-        });
-        
-        isSelectingFromSearch.current = false;
-        setIsLoadingLocation(false);
-        return;
-      }
-    } catch (error: any) {
-      console.error('GPS permission error:', error);
-      
+    if (finalStatus !== 'granted') {
+      console.error('GPS permission denied by user');
       Toast.show({
         type: 'error',
-        text1: 'Permission Error',
-        text2: 'Failed to request location permission.',
+        text1: 'Permission Required',
+        text2: 'Location permission is needed to use this feature.',
         visibilityTime: 5000,
       });
-      
       isSelectingFromSearch.current = false;
-    } finally {
       setIsLoadingLocation(false);
+      return;
     }
-  };
 
+    try {
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Highest,
+      });
+
+      const coords: [number, number] = [
+        position.coords.longitude,
+        position.coords.latitude,
+      ];
+
+      setSelectedCoords(coords);
+      setMarkerCoords(coords);
+      setCurrentUserLocation(coords);
+      previousCenterRef.current = coords;
+
+      // Use setCamera for consistent programmatic movement
+      cameraRef.current?.setCamera({
+        centerCoordinate: coords,
+        animationDuration: MAP_SETTINGS.animationDuration,
+      });
+
+      // Force reverse geocode even though isSelectingFromSearch is true
+      await reverseGeocode(coords[1], coords[0], true, true);
+
+      // small delay then allow other handlers again
+      setTimeout(() => {
+        isSelectingFromSearch.current = false;
+      }, MAP_SETTINGS.animationDuration + 500);
+    } catch (gpsError: any) {
+      console.error('GPS location acquisition error:', gpsError);
+      Toast.show({
+        type: 'error',
+        text1: 'Location Error',
+        text2: 'Failed to get your current location.',
+        visibilityTime: 6000,
+      });
+      isSelectingFromSearch.current = false;
+      setIsLoadingLocation(false);
+      return;
+    }
+  } catch (error: any) {
+    console.error('GPS permission error:', error);
+    Toast.show({
+      type: 'error',
+      text1: 'Permission Error',
+      text2: 'Failed to request location permission.',
+      visibilityTime: 5000,
+    });
+    isSelectingFromSearch.current = false;
+  } finally {
+    setIsLoadingLocation(false);
+  }
+};
   const handleMapPress = async (feature: GeoJSON.Feature<GeoJSON.Point>) => {
     const { geometry } = feature;
     if (geometry && geometry.coordinates) {
@@ -647,7 +587,7 @@ export default function MapLocationPicker({
               <MapboxGL.MapView
                 ref={mapRef}
                 style={styles.map}
-                styleURL={MapboxGL.StyleURL.Street}
+                styleURL={DEFAULT_MAP_STYLE}
                 onPress={handleMapPress}
                 onCameraChanged={handleCameraChanged}
                 onMapIdle={handleMapIdle}
@@ -665,6 +605,11 @@ export default function MapLocationPicker({
                   animationMode="flyTo"
                   animationDuration={MAP_SETTINGS.animationDuration}
                 />
+                <MapboxGL.PointAnnotation id="selected-marker" coordinate={markerCoords}>
+          <View style={styles.markerOuter}>
+        <View style={styles.markerInner} />
+            </View>
+            </MapboxGL.PointAnnotation>
               </MapboxGL.MapView>
 
               {/* Search Bar Overlay */}
@@ -1141,4 +1086,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
   },
+  markerOuter: {
+  width: 36,
+  height: 36,
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: 'transparent',
+},
+markerInner: {
+  width: 14,
+  height: 14,
+  borderRadius: 7,
+  backgroundColor: '#16a34a',
+  borderWidth: 3,
+  borderColor: '#ffffff',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.2,
+  shadowRadius: 4,
+  elevation: 4,
+}
+
 });

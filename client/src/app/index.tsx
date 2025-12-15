@@ -1,10 +1,9 @@
-import { View, Text, Image, StyleSheet } from 'react-native';
-import React, { useEffect, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { View } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
 import { AuthService } from '../api/apiService';
-import { useLocation } from '../context/LocationContext';
 import { useLocalization } from '../context/LocalizationContext';
 import { useTheme } from '../context/ThemeContext';
 import SplashScreen from '../components/SplashScreen';
@@ -12,12 +11,13 @@ import SplashScreen from '../components/SplashScreen';
 
 export default function IndexScreen(){
   const router = useRouter();
-  const {currentLocation, locationSet, serviceAvailable, checkServiceAvailability} = useLocation();
+  const segments = useSegments();
   const {isLanguageSet, isLoading: isLanguageLoading} = useLocalization();
   const { colors, isDark } = useTheme();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthCheckDone, setIsAuthCheckDone] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
+  const hasNavigatedRef = useRef(false);
 
    useEffect(() => {
     let isActive = true;
@@ -46,11 +46,23 @@ export default function IndexScreen(){
     // Wait for splash screen, auth check, and language initialization to complete
     if (showSplash || !isAuthCheckDone || isLanguageLoading) return;
     
+    // Prevent duplicate navigation - only navigate once from index
+    if (hasNavigatedRef.current) {
+      console.log('🛑 Navigation already performed, skipping...');
+      return;
+    }
+    
+    // Check if we're still on the index route - if not, don't navigate
+    // This prevents race conditions when auth state changes after user already navigated
+    const currentRoute = '/' + segments.join('/');
+    if (segments.length > 0 && currentRoute !== '/') {
+      console.log('🛑 Already navigated away from index, skipping navigation. Current:', currentRoute);
+      hasNavigatedRef.current = true;
+      return;
+    }
+    
     console.log('🚀 Navigation Debug:', {
       isLanguageSet,
-      locationSet,
-      hasCurrentLocation: !!currentLocation,
-      serviceAvailable,
       isAuthenticated: isAuthenticated,
     });
     
@@ -58,19 +70,17 @@ export default function IndexScreen(){
     
     /**
      * Navigation Flow Priority:
-     * Priority 0: Language Selection (NEW - highest priority)
+     * Priority 0: Language Selection (highest priority)
      *   - First-time users must select language before anything else
      *   - Returning users skip this step (language already set)
      * 
-     * Priority 1: Location Permission
-     *   - Users need to set their location for service availability
-     * 
-     * Priority 2: Service Availability
-     *   - Check if service is available in user's location
-     * 
-     * Priority 3: Authentication
+     * Priority 1: Authentication
      *   - Authenticated users go to home
      *   - Non-authenticated users go to login
+     * 
+     * Note: Location/serviceability check is now handled in the Sell screen
+     * Users can browse the app freely, but will be prompted for location
+     * when they try to sell scrap.
      */
     
     // Priority 0: Check language selection first
@@ -78,17 +88,7 @@ export default function IndexScreen(){
       console.log('➡️ Navigating to: language-selection (no language set)');
       routeToNavigate = '/(auth)/language-selection';
     }
-    // Priority 1: Check location
-    else if (!locationSet || !currentLocation){
-      console.log('➡️ Navigating to: location-permission (no location set)');
-      routeToNavigate = '/(auth)/location-permission';
-    }
-    // Priority 2: Check if location is serviceable
-    else if (!serviceAvailable) {
-      console.log('➡️ Navigating to: service-unavailable');
-      routeToNavigate = '/(auth)/service-unavailable';
-    }
-    // Priority 3: Check authentication
+    // Priority 1: Check authentication
     else {
       if (isAuthenticated) {
         console.log('➡️ Navigating to: tabs/home (authenticated)');
@@ -99,17 +99,18 @@ export default function IndexScreen(){
       }
     }
     
-    if(routeToNavigate) router.replace(routeToNavigate)
+    if(routeToNavigate) {
+      hasNavigatedRef.current = true;
+      router.replace(routeToNavigate);
+    }
   },[
   showSplash,
   isAuthCheckDone,
   isLanguageLoading,
   isLanguageSet,
-  locationSet,
-  currentLocation,
-  serviceAvailable,
   isAuthenticated,
-  router
+  router,
+  segments
 ]);
 
 if(showSplash) return <SplashScreen onFinish={handleSplashFinish} />;

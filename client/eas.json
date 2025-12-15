@@ -6,18 +6,33 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "credentialsSource":"local",
-      "distribution": "internal"
-
+      "distribution": "internal",
+      "android": {
+        "credentialsSource": "local"
+      },
+      "ios": {
+        "credentialsSource": "remote"
+      }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "android": {
+        "credentialsSource": "local"
+      },
+      "ios": {
+        "credentialsSource": "remote"
+      }
     },
     "production": {
       "autoIncrement": true,
-      "credentialsSource":"local",
-      "environment":"production",
-      "channel":"production"
+      "environment": "production",
+      "channel": "production",
+      "android": {
+        "credentialsSource": "local"
+      },
+      "ios": {
+        "credentialsSource": "remote"
+      }
     }
   },
   "submit": {
