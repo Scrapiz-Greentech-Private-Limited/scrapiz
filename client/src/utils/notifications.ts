@@ -1,19 +1,52 @@
 import * as Notifications from 'expo-notifications';
-import { Linking } from 'react-native';
+import { Linking, Platform } from 'react-native';
+import { displayNotification, NotificationData } from '../services/notifeeService';
 
 /**
  * Configure notification handler for how notifications are displayed
- * when the app is in the foreground
+ * when the app is in the foreground.
+ * 
+ * On Android, we use Notifee to display notifications with rich features
+ * (large icon, big picture, etc.) instead of the default Expo display.
  */
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
+  handleNotification: async (notification) => {
+    // On Android, use Notifee for rich notification display
+    if (Platform.OS === 'android') {
+      const { title, body, data } = notification.request.content;
+      
+      try {
+        // Display using Notifee for rich features (large icon, etc.)
+        await displayNotification(
+          title || 'Scrapiz',
+          body || '',
+          data as NotificationData,
+          (data as NotificationData)?.image,
+          (data as NotificationData)?.largeIcon
+        );
+        
+        // Don't show Expo's default notification since Notifee handled it
+        return {
+          shouldShowAlert: false,
+          shouldPlaySound: false,
+          shouldShowBanner: false,
+          shouldShowList: false,
+          shouldSetBadge: true,
+        };
+      } catch (error) {
+        console.error('Notifee display failed, falling back to Expo:', error);
+      }
+    }
+    
+    // iOS or fallback: use default Expo notification display
+    return {
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldSetBadge: true,
+    };
+  },
 });
 
 /**

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,13 +17,14 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import Toast from 'react-native-toast-message';
 import { wp, hp, fs } from '../../utils/responsive';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { AuthService, CategorySummary, ProductSummary } from '../../api/apiService';
 import { RemoteImage } from '../../components/RemoteImage';
 import TutorialOverlay from '@/src/components/TutorialOverlay';
+import NetworkRetryOverlay from '../../components/NetworkRetryOverlay';
+import { useNetworkRetry } from '../../hooks/useNetworkRetry';
 import { ratesTutorialConfig } from '@/src/config/tutorials/homeTutorial';
 import { useTutorialStore } from '@/src/store/tutorialStore';
 
@@ -112,9 +113,61 @@ export default function RatesScreen(){
   const priceFormatRef = useRef<View>(null);
   const contactRef = useRef<View>(null);
 
-  useEffect(()=>{
-    loadData();
-  },[])
+  // Data loading function
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const [cats, prods] = await Promise.all([
+      AuthService.getCategories(),
+      AuthService.getProducts(),
+    ]);
+    setCategories(cats);
+    setProducts(prods);
+    setLoading(false);
+  }, []);
+
+  // Network retry hook
+  const {
+    showRetryOverlay,
+    countdown,
+    isRetrying,
+    hasFailedPermanently,
+    errorMessage,
+    retryNow,
+    startRetryFlow,
+    resetRetryState,
+    checkNetworkAndLoad,
+  } = useNetworkRetry({
+    fetchFn: loadData,
+    countdownSeconds: 5,
+    maxRetries: 3,
+  });
+
+  useEffect(() => {
+    const initLoad = async () => {
+      const isConnected = await checkNetworkAndLoad();
+      if (isConnected) {
+        try {
+          await loadData();
+        } catch (error: any) {
+          const errorMsg = error.message || 'Failed to load rates';
+          const isNetworkError = 
+            errorMsg.toLowerCase().includes('network') ||
+            errorMsg.toLowerCase().includes('internet') ||
+            errorMsg.toLowerCase().includes('connection');
+          
+          if (isNetworkError) {
+            startRetryFlow(errorMsg);
+          } else {
+            setError(errorMsg);
+            setLoading(false);
+          }
+        }
+      }
+    };
+    
+    initLoad();
+  }, []);
 
   // Measure element positions when tutorial is active
   useEffect(() => {
@@ -161,32 +214,24 @@ export default function RatesScreen(){
     }
   }, [currentScreen, setStepTarget, categories, products]);
 
-    const loadData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const [cats, prods] = await Promise.all([
-        AuthService.getCategories(),
-        AuthService.getProducts(),
-      ]);
-      setCategories(cats);
-      setProducts(prods);
-    } catch (e: any) {
-      const errorMsg = e.message || 'Failed to load rates';
-      setError(errorMsg);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: errorMsg,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    resetRetryState();
+    try {
+      await loadData();
+    } catch (error: any) {
+      const errorMsg = error.message || 'Failed to load rates';
+      const isNetworkError = 
+        errorMsg.toLowerCase().includes('network') ||
+        errorMsg.toLowerCase().includes('internet') ||
+        errorMsg.toLowerCase().includes('connection');
+      
+      if (isNetworkError) {
+        startRetryFlow(errorMsg);
+      } else {
+        setError(errorMsg);
+      }
+    }
     setRefreshing(false);
   };
 
@@ -393,7 +438,17 @@ if (error && categories.length === 0) {
           </TouchableOpacity>
         </View>
       </ScrollView>
-      <Toast />
+      
+      {/* Network Retry Overlay - handles network errors silently */}
+      <NetworkRetryOverlay
+        visible={showRetryOverlay}
+        countdown={countdown}
+        isRetrying={isRetrying}
+        hasFailedPermanently={hasFailedPermanently}
+        errorMessage={errorMessage || undefined}
+        onRetryNow={retryNow}
+      />
+      
       <TutorialOverlay />
     </View>
   )

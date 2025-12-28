@@ -18,6 +18,7 @@ import { ThemeProvider } from "../context/ThemeContext";
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { setupNotificationListener } from '../utils/notifications';
+import { initializeNotificationChannels, setupNotifeeEventHandler } from '../services/notifeeService';
 
 import '../localization/i18n';
 
@@ -31,12 +32,16 @@ SplashScreen.preventAutoHideAsync();
  */
 export async function setupAndroidChannel() {
   if (Platform.OS === 'android') {
+    // Initialize Expo notification channel
     await Notifications.setNotificationChannelAsync('default', {
       name: 'Default',
-      importance: Notifications.AndroidImportance.MAX, // <--- MAX is required for heads-up alerts
+      importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#FF231F7C',
     });
+    
+    // Initialize Notifee channels for rich notifications
+    await initializeNotificationChannels();
   }
 }
 
@@ -64,17 +69,29 @@ function AppContent() {
     const initNotifications = async() =>{
       try{
         await setupAndroidChannel();
+        console.log('Notification channels initialized successfully');
       }catch(error){
         console.error("Failed to set up notification channel:", error);
       }
     }
     initNotifications(); 
+    
+    // Set up Expo notification listener
     notificationListener.current = setupNotificationListener(router);
+    
+    // Set up Notifee event handler for rich notifications
+    let notifeeUnsubscribe: (() => void) | null = null;
+    if (Platform.OS === 'android') {
+      notifeeUnsubscribe = setupNotifeeEventHandler(router);
+    }
 
     // Cleanup on unmount
     return () => {
       if (notificationListener.current) {
         notificationListener.current.remove();
+      }
+      if (notifeeUnsubscribe) {
+        notifeeUnsubscribe();
       }
     };
   }, [router]);

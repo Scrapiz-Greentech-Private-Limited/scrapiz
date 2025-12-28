@@ -3,19 +3,57 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { AuthService } from '../api/apiService';
+import { 
+  initializeNotificationChannels, 
+  setupNotifeeEventHandler,
+  registerBackgroundHandler 
+} from '../services/notifeeService';
+
+// Register background handler at module level (required by Notifee)
+if (Platform.OS === 'android') {
+  registerBackgroundHandler();
+}
 
 /**
  * Hook for managing push notifications
- * Handles permission requests, token registration, and notification listeners
+ * Handles permission requests, token registration, notification listeners,
+ * and Notifee integration for rich notifications
  */
-export const useNotifications = () => {
+export const useNotifications = (router?: any) => {
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
   const [notification, setNotification] = useState<Notifications.Notification | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
   
   const notificationListener = useRef<Notifications.Subscription>();
   const responseListener = useRef<Notifications.Subscription>();
+  const notifeeUnsubscribe = useRef<(() => void) | null>(null);
+
+  /**
+   * Initialize Notifee channels and event handlers
+   */
+  useEffect(() => {
+    const initNotifee = async () => {
+      if (Platform.OS === 'android') {
+        await initializeNotificationChannels();
+        
+        // Set up Notifee foreground event handler if router is provided
+        if (router) {
+          notifeeUnsubscribe.current = setupNotifeeEventHandler(router);
+        }
+      }
+      setIsInitialized(true);
+    };
+
+    initNotifee();
+
+    return () => {
+      if (notifeeUnsubscribe.current) {
+        notifeeUnsubscribe.current();
+      }
+    };
+  }, [router]);
 
   /**
    * Register for push notifications
@@ -138,6 +176,7 @@ export const useNotifications = () => {
     notification,
     isRegistering,
     error,
+    isInitialized,
     registerForPushNotifications,
     unregisterPushToken,
   };

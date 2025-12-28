@@ -17,6 +17,8 @@ export interface ProductSummary {
   description: string;
   category: number;
   image_url?: string | null;
+  trees_saved_per_unit?: number;
+  co2_reduced_per_unit?: number;
 }
 
 export interface CategorySummary {
@@ -88,6 +90,9 @@ export interface UserProfile {
   referred_balance?: string; // Accumulated referral earnings
   has_completed_first_order?: boolean; // Whether user has completed their first order
   profile_image?: string; // URL to user's profile image
+  avatar_provider?: string | null; // Avatar service provider (e.g., 'dicebear')
+  avatar_style?: string | null; // DiceBear avatar style (e.g., 'avataaars', 'pixel-art')
+  avatar_seed?: string | null; // Seed for deterministic avatar generation
 }
 
 // Waitlist types
@@ -431,12 +436,15 @@ export class AuthService {
     }
   }
 
-  // Update user profile (name, phone, gender, and/or profile image)
+  // Update user profile (name, phone, gender, profile image, and/or avatar settings)
   static async updateUserProfile(data: { 
     name?: string; 
     phone_number?: string;
     gender?: 'male' | 'female' | 'prefer_not_to_say' | null;
-    profile_image?: string | null; 
+    profile_image?: string | null;
+    avatar_provider?: string | null;
+    avatar_style?: string | null;
+    avatar_seed?: string | null;
   }): Promise<UserProfile> {
     try {
       const formData = new FormData();
@@ -478,6 +486,21 @@ export class AuthService {
           } as any);
         }
         // If it's an S3 URL, don't include it (no change)
+      }
+
+      // Handle avatar_provider
+      if (data.avatar_provider !== undefined) {
+        formData.append('avatar_provider', data.avatar_provider === null ? '' : data.avatar_provider);
+      }
+
+      // Handle avatar_style
+      if (data.avatar_style !== undefined) {
+        formData.append('avatar_style', data.avatar_style === null ? '' : data.avatar_style);
+      }
+
+      // Handle avatar_seed
+      if (data.avatar_seed !== undefined) {
+        formData.append('avatar_seed', data.avatar_seed === null ? '' : data.avatar_seed);
       }
 
       const token = await SecureStorageService.getAuthToken();
@@ -1015,13 +1038,13 @@ export class ServiceabilityAPI {
   }
 
   /**
-   * Get list of all serviceable cities
+   * Get list of all serviceable cities (public endpoint for caching)
    * @returns Array of ServiceableCity objects
    */
   static async getCities(): Promise<ServiceableCity[]> {
     try {
       const response = await ServiceabilityAPI.retryWithBackoff(async () => {
-        return await apiClient.get(API_CONFIG.ENDPOINTS.SERVICEABILITY_CITIES);
+        return await apiClient.get(API_CONFIG.ENDPOINTS.SERVICEABILITY_PUBLIC_CITIES);
       });
 
       return response.data as ServiceableCity[];
@@ -1036,23 +1059,18 @@ export class ServiceabilityAPI {
   }
 
   /**
-   * Get list of all serviceable pincodes
+   * Get list of all serviceable pincodes (public endpoint for caching)
    * @returns Array of pincode strings
    */
   static async getPincodes(): Promise<string[]> {
     try {
       const response = await ServiceabilityAPI.retryWithBackoff(async () => {
-        return await apiClient.get(API_CONFIG.ENDPOINTS.SERVICEABILITY_PINCODES);
+        return await apiClient.get(API_CONFIG.ENDPOINTS.SERVICEABILITY_PUBLIC_PINCODES);
       });
 
-      // Backend may return array of objects with pincode field or array of strings
+      // Backend returns array of pincode strings directly
       const data = response.data;
       if (Array.isArray(data)) {
-        // If it's an array of objects with pincode field, extract the pincode strings
-        if (data.length > 0 && typeof data[0] === 'object' && 'pincode' in data[0]) {
-          return data.map((item: any) => item.pincode);
-        }
-        // If it's already an array of strings, return as is
         return data;
       }
 
@@ -1067,4 +1085,152 @@ export class ServiceabilityAPI {
     }
   }
 
+}
+
+
+// Feedback types
+export interface FeedbackQuestion {
+  id: number;
+  question_text: string;
+  question_type: 'rating' | 'text' | 'multiple_choice' | 'boolean';
+  context: string;
+  order: number;
+  is_required: boolean;
+  placeholder_text?: string | null;
+  options?: string[] | null;
+}
+
+export interface FeedbackResponseData {
+  question_id: number;
+  rating_value?: number;
+  text_value?: string;
+  boolean_value?: boolean;
+  choice_value?: string;
+}
+
+export interface SubmitFeedbackRequest {
+  order_id?: number | null;
+  context?: string;
+  responses: FeedbackResponseData[];
+}
+
+// Feedback API Service
+export class FeedbackService {
+  /**
+   * Get active feedback questions for a context
+   */
+  static async getQuestions(context: string = 'order_completion'): Promise<FeedbackQuestion[]> {
+    try {
+      const response = await apiClient.get(
+        `${API_CONFIG.ENDPOINTS.FEEDBACK_QUESTIONS}?context=${context}`
+      );
+      return response.data.questions as FeedbackQuestion[];
+    } catch (error: any) {
+      console.error('FeedbackService.getQuestions error:', error);
+      throw new Error(error.response?.data?.error || 'Failed to fetch feedback questions');
+    }
+  }
+
+  /**
+   * Submit feedback responses
+   */
+  static async submitFeedback(data: SubmitFeedbackRequest): Promise<{ success: boolean; session_id: number }> {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.FEEDBACK_SUBMIT, data);
+      return response.data;
+    } catch (error: any) {
+      console.error('FeedbackService.submitFeedback error:', error);
+      throw new Error(error.response?.data?.error || 'Failed to submit feedback');
+    }
+  }
+
+  /**
+   * Check if feedback has been submitted for an order
+   */
+  static async checkFeedbackStatus(orderId: number): Promise<boolean> {
+    try {
+      const response = await apiClient.get(
+        `${API_CONFIG.ENDPOINTS.FEEDBACK_STATUS}${orderId}/`
+      );
+      return response.data.has_feedback;
+    } catch (error: any) {
+      console.error('FeedbackService.checkFeedbackStatus error:', error);
+      return false;
+    }
+  }
+}
+
+// Rating types (re-exported from types/rating.ts)
+export type { 
+  RatingTag, 
+  PendingOrder, 
+  RatingCheck, 
+  RatingSubmission,
+  RatingResponse,
+  PendingRatingsResponse,
+  RatingCheckResponse
+} from '../types/rating';
+
+import type { 
+  PendingOrder, 
+  RatingCheck, 
+  RatingSubmission,
+  RatingResponse
+} from '../types/rating';
+
+// Order Rating API Service
+export class RatingService {
+  /**
+   * Get orders eligible for rating (completed orders without ratings)
+   * @returns Array of pending orders with agent information
+   */
+  static async getPendingRatings(): Promise<PendingOrder[]> {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.RATINGS_PENDING);
+      return response.data.pending_orders as PendingOrder[];
+    } catch (error: any) {
+      console.error('RatingService.getPendingRatings error:', error);
+      throw new Error(error.response?.data?.error || 'Failed to fetch pending ratings');
+    }
+  }
+
+  /**
+   * Check if an order has been rated
+   * @param orderId - The order ID to check
+   * @returns RatingCheck with is_rated status and agent name
+   */
+  static async checkOrderRating(orderId: number): Promise<RatingCheck> {
+    try {
+      const response = await apiClient.get(
+        `${API_CONFIG.ENDPOINTS.RATINGS_CHECK}${orderId}/`
+      );
+      return {
+        is_rated: response.data.is_rated,
+        agent_name: response.data.agent_name
+      } as RatingCheck;
+    } catch (error: any) {
+      console.error('RatingService.checkOrderRating error:', error);
+      throw new Error(error.response?.data?.error || 'Failed to check order rating');
+    }
+  }
+
+  /**
+   * Submit a rating for an order
+   * @param data - Rating submission data including order_id, rating, tags, and feedback
+   * @returns RatingResponse with success status and rating_id
+   */
+  static async submitRating(data: RatingSubmission): Promise<RatingResponse> {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.RATINGS_SUBMIT, {
+        order_id: data.order_id,
+        rating: data.rating,
+        tags: data.tags || [],
+        feedback: data.feedback || ''
+      });
+      return response.data as RatingResponse;
+    } catch (error: any) {
+      console.error('RatingService.submitRating error:', error);
+      throw new Error(error.response?.data?.error || 'Failed to submit rating');
+    }
+  }
 }

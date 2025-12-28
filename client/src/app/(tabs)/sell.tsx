@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -54,6 +54,9 @@ import {
   getSellServiceAvailability,
   setSellServiceability 
 } from '../../utils/sellServiceability';
+import FeedbackModal from '../../components/FeedbackModal';
+import NetworkRetryOverlay from '../../components/NetworkRetryOverlay';
+import { useNetworkRetry } from '../../hooks/useNetworkRetry';
 const { width, height } = Dimensions.get('window');
 
 type SelectedItem = {
@@ -235,6 +238,10 @@ function SellScreenContent() {
   const [loadingData, setLoadingData] = useState(false);
   const [submittingOrder, setSubmittingOrder] = useState(false);
   
+  // Feedback modal state
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [lastOrderId, setLastOrderId] = useState<number | null>(null);
+  
   // Tutorial system integration
   const { setStepTarget, currentScreen } = useTutorialStore();
   const stepIndicatorRef = useRef<View>(null);
@@ -279,6 +286,45 @@ function SellScreenContent() {
   // Referral wallet - use context
   const { walletBalance, setWalletBalance, updateBalanceAndCache, applyReferralDiscount } = useReferral();
   const [useReferralBalance, setUseReferralBalance] = useState(false);
+
+  // Data loading function wrapped in useCallback for network retry
+  const loadDataFn = useCallback(async () => {
+    setLoadingData(true);
+    try {
+      const [prods, cats, addrs] = await Promise.all([
+        AuthService.getProducts(),
+        AuthService.getCategories(),
+        AuthService.getAddresses()
+      ]);
+      setProducts(prods);
+      setCategories(cats);
+      setAddresses(addrs);
+      
+      if (addrs.length > 0) {
+        setSelectedAddressId(addrs[0].id);
+        setUseNewAddress(false);
+      }
+    } finally {
+      setLoadingData(false);
+    }
+  }, []);
+
+  // Network retry hook for handling connection issues
+  const {
+    showRetryOverlay,
+    countdown,
+    isRetrying,
+    hasFailedPermanently,
+    errorMessage,
+    retryNow,
+    startRetryFlow,
+    resetRetryState,
+    checkNetworkAndLoad,
+  } = useNetworkRetry({
+    fetchFn: loadDataFn,
+    countdownSeconds: 5,
+    maxRetries: 3,
+  });
 
    useEffect(()=>{
     setAvailableReferralBalance(walletBalance);
@@ -345,29 +391,23 @@ function SellScreenContent() {
  
 
   const loadData = async () => {
-    setLoadingData(true);
-    try {
-      const [prods, cats, addrs] = await Promise.all([
-        AuthService.getProducts(),
-        AuthService.getCategories(),
-        AuthService.getAddresses()
-      ]);
-      setProducts(prods);
-      setCategories(cats);
-      setAddresses(addrs);
-      
-      if (addrs.length > 0) {
-        setSelectedAddressId(addrs[0].id);
-        setUseNewAddress(false);
+    const isConnected = await checkNetworkAndLoad();
+    if (isConnected) {
+      try {
+        await loadDataFn();
+      } catch (error: any) {
+        const errorMsg = error.message || 'Failed to load data';
+        const isNetworkError = 
+          errorMsg.toLowerCase().includes('network') ||
+          errorMsg.toLowerCase().includes('internet') ||
+          errorMsg.toLowerCase().includes('connection');
+        
+        if (isNetworkError) {
+          startRetryFlow(errorMsg);
+        }
+        // Non-network errors are logged but not shown as disruptive toasts
+        console.log('Load data error:', errorMsg);
       }
-    } catch (error: any) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: error.message || 'Failed to load data'
-      });
-    } finally {
-      setLoadingData(false);
     }
   };
 
@@ -684,6 +724,8 @@ function SellScreenContent() {
         ? `Your scrap pickup has been scheduled successfully!\n\n📋 Order: ${orderNumber}\n💰 Estimated Value: ₹${Math.round(orderEstimatedValue)}\n🎁 Referral Bonus: +₹${Math.round(orderReferralBonus)}\n💸 Total Payout: ₹${Math.round(orderTotalPayout)}\n📅 Pickup: ${selectedDate} at ${selectedTime}\n\nOur team will arrive at your doorstep at the scheduled time.`
         : `Your scrap pickup has been scheduled successfully!\n\n📋 Order: ${orderNumber}\n💰 Total Amount: ₹${Math.round(orderEstimatedValue)}\n📅 Pickup: ${selectedDate} at ${selectedTime}\n\nOur team will arrive at your doorstep at the scheduled time.`;
 
+      // Store order ID for feedback
+      setLastOrderId(orderId);
 
       Alert.alert(
         '✅ Booking Confirmed!', 
@@ -700,6 +742,10 @@ function SellScreenContent() {
             text: '✨ Schedule Another',
             onPress: () => {
               resetForm();
+              // Show feedback modal after a short delay
+              setTimeout(() => {
+                setShowFeedbackModal(true);
+              }, 500);
             }
           }
         ]
@@ -1042,7 +1088,7 @@ function SellScreenContent() {
               <Phone size={16} color={colors.textSecondary} style={styles.mobileIcon} />
               <TextInput
                 style={[styles.mobileInput, { color: colors.text }, errors.mobile && styles.formInputError]}
-                placeholder="+91 98765 43210"
+                placeholder="Enter your mobile number"
                 placeholderTextColor={colors.textSecondary}
                 value={contactForm.mobile}
                 onChangeText={(text) => {
@@ -1770,10 +1816,32 @@ function SellScreenContent() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      
+      {/* Network Retry Overlay - handles network errors silently */}
+      <NetworkRetryOverlay
+        visible={showRetryOverlay}
+        countdown={countdown}
+        isRetrying={isRetrying}
+        hasFailedPermanently={hasFailedPermanently}
+        errorMessage={errorMessage || undefined}
+        onRetryNow={retryNow}
+      />
+      
       <Toast />
       
       {/* Tutorial Overlay */}
       <TutorialOverlay />
+      
+      {/* Feedback Modal */}
+      <FeedbackModal
+        visible={showFeedbackModal}
+        onClose={() => setShowFeedbackModal(false)}
+        orderId={lastOrderId}
+        context="order_completion"
+        onSubmitSuccess={() => {
+          setLastOrderId(null);
+        }}
+      />
     </View>
   );
 }

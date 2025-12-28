@@ -23,6 +23,8 @@ import { useLocalization } from '../../context/LocalizationContext';
 import { AuthService, ServiceBookingPayload, AddressSummary } from '../../api/apiService';
 import { services } from '../(tabs)/services';
 import MapLocationPicker from '../../components/MapLocationPicker';
+import NetworkRetryOverlay from '../../components/NetworkRetryOverlay';
+import { useNetworkRetry } from '../../hooks/useNetworkRetry';
 import { populateFormFromLocation, LocationResult } from '../../utils/addressHelpers';
 import { 
   ArrowLeft, 
@@ -98,23 +100,71 @@ export default function BookingScreen() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
 
+  // Combined data loading function for retry
+  const loadInitialData = async () => {
+    setLoadingUser(true);
+    setLoadingAddresses(true);
+    
+    const [user, addressData] = await Promise.all([
+      AuthService.getUser(),
+      AuthService.getAddresses()
+    ]);
+    
+    setName(user.name || '');
+    setAddresses(addressData);
+    
+    // Auto-select first address if available
+    if (addressData.length > 0 && !selectedAddress) {
+      setSelectedAddress(addressData[0]);
+    }
+    
+    setLoadingUser(false);
+    setLoadingAddresses(false);
+  };
+
+  // Network retry hook
+  const {
+    showRetryOverlay,
+    countdown,
+    isRetrying,
+    hasFailedPermanently,
+    errorMessage,
+    retryNow,
+    startRetryFlow,
+    resetRetryState,
+    checkNetworkAndLoad,
+  } = useNetworkRetry({
+    fetchFn: loadInitialData,
+    countdownSeconds: 5,
+    maxRetries: 3,
+  });
+
   // Load user data and addresses
   useEffect(() => {
-    loadUserData();
-    loadAddresses();
+    const initLoad = async () => {
+      const isConnected = await checkNetworkAndLoad();
+      if (isConnected) {
+        try {
+          await loadInitialData();
+        } catch (error: any) {
+          const errorMsg = error.message || 'Failed to load data';
+          const isNetworkError = 
+            errorMsg.toLowerCase().includes('network') ||
+            errorMsg.toLowerCase().includes('internet') ||
+            errorMsg.toLowerCase().includes('connection');
+          
+          if (isNetworkError) {
+            startRetryFlow(errorMsg);
+          } else {
+            setLoadingUser(false);
+            setLoadingAddresses(false);
+          }
+        }
+      }
+    };
+    
+    initLoad();
   }, []);
-
-  const loadUserData = async () => {
-    try {
-      setLoadingUser(true);
-      const user = await AuthService.getUser();
-      setName(user.name || '');
-    } catch (error) {
-      console.error('Error loading user data:', error);
-    } finally {
-      setLoadingUser(false);
-    }
-  };
 
   const loadAddresses = async () => {
     try {
@@ -534,6 +584,16 @@ export default function BookingScreen() {
         />
 
         <Toast />
+
+        {/* Network Retry Overlay - Shows when network issues occur */}
+        <NetworkRetryOverlay
+          visible={showRetryOverlay}
+          countdown={countdown}
+          isRetrying={isRetrying}
+          hasFailedPermanently={hasFailedPermanently}
+          errorMessage={errorMessage || undefined}
+          onRetryNow={retryNow}
+        />
       </KeyboardAvoidingView>
     </View>
   );

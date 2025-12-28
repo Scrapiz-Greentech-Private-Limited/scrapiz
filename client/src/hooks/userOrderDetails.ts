@@ -11,7 +11,7 @@ export interface OrderWithDetails extends OrderSummary {
 export const useOrderDetails = (orders: OrderSummary[], products: ProductSummary[]) => {
   const ordersWithDetails = useMemo(() => {
     return orders.map(order => {
-      const statusName = (order.status?.name || 'unknown').toLowerCase().replace(' ', '_');
+      const statusName = (order.status?.name || 'pending').toLowerCase().replace(' ', '_');
 
       // Total Amount
       const totalAmount = order.orders.reduce((sum, item) => {

@@ -42,11 +42,24 @@ export const API_CONFIG = {
     INVENTORY_CREATE_ORDER: '/inventory/create-order/',
     INVENTORY_CANCEL_ORDER: '/inventory/cancel-order/',
     
+    // Feedback
+    FEEDBACK_QUESTIONS: '/feedback/questions/',
+    FEEDBACK_SUBMIT: '/feedback/submit/',
+    FEEDBACK_STATUS: '/feedback/status/',
+    
+    // Order Ratings
+    RATINGS_PENDING: '/feedback/ratings/pending/',
+    RATINGS_CHECK: '/feedback/ratings/check/',
+    RATINGS_SUBMIT: '/feedback/ratings/submit/',
+    
     // Serviceability
     SERVICEABILITY_CITIES: '/serviceability/cities/',
     SERVICEABILITY_CHECK_PINCODE: '/serviceability/check-pincode/',
     SERVICEABILITY_CHECK_COORDINATES: '/serviceability/check-coordinates/',
     SERVICEABILITY_PINCODES: '/serviceability/pincodes/',
+    // Public endpoints for mobile caching (no auth required)
+    SERVICEABILITY_PUBLIC_CITIES: '/serviceability/public/cities/',
+    SERVICEABILITY_PUBLIC_PINCODES: '/serviceability/public/pincodes/',
   },
   HEADERS: {
     'Content-Type': 'application/json',

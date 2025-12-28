@@ -12,7 +12,8 @@ import {
   StatusBar,
   Image,
 } from 'react-native';
-import { User, MapPin, Bell, Sun, Camera, Moon, Shield, CircleHelp as HelpCircle, X, Star, Gift, ChevronRight, Award, LogOut, Phone, Mail, Package, Clock, CheckCircle, Trash2, Globe, WifiOff } from 'lucide-react-native';
+import { Image as ExpoImage } from 'expo-image';
+import { User, MapPin, Bell, Sun, Moon, CircleHelp as HelpCircle, Gift, ChevronRight, LogOut, Package, Trash2, Globe, WifiOff } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import NetInfo from '@react-native-community/netinfo';
@@ -22,11 +23,16 @@ import { useTheme } from '../../context/ThemeContext';
 import { AuthService, UserProfile, OrderSummary, ProductSummary, DeletionFeedback } from '../../api/apiService'
 import { useEnvironmentalImpact } from '../../hooks/useImpact';
 import DeleteAccountFeedbackModal from '../../components/DeleteAccountFeedbackModal';
+import AvatarSelectorModal from '../../components/AvatarSelectorModal';
+import AvatarOptionsBottomSheet from '../../components/AvatarOptionsBottomSheet';
+import NetworkRetryOverlay from '../../components/NetworkRetryOverlay';
 import { useAuth } from '../../context/AuthContext';
 import { useLocalization } from '../../context/LocalizationContext';
 import LanguageChangeModal from '../../components/LanguageChangeModal';
 import { SUPPORTED_LANGUAGES } from '../../localization/languages';
 import Toast from 'react-native-toast-message';
+import { getAvatarSource } from '../../utils/avatarUtils';
+import { useNetworkRetry } from '../../hooks/useNetworkRetry';
 
 type MenuItem = {
   icon: any;
@@ -59,91 +65,68 @@ export default function Profile() {
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
-  const [isOffline, setIsOffline] = useState(false);
-  const [retryCountdown, setRetryCountdown] = useState(0);
-  const retryTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [avatarModalVisible, setAvatarModalVisible] = useState(false);
+  const [avatarOptionsVisible, setAvatarOptionsVisible] = useState(false);
 
-  // Check network connectivity
-  const checkNetworkAndLoad = useCallback(async () => {
-    const netState = await NetInfo.fetch();
-    if (!netState.isConnected) {
-      setIsOffline(true);
-      setLoading(false);
-      startRetryCountdown();
-      return false;
-    }
-    setIsOffline(false);
-    return true;
-  }, []);
-
-  // Start countdown timer for retry
-  const startRetryCountdown = useCallback(() => {
-    // Clear any existing timers
-    if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-    
-    setRetryCountdown(5);
-    
-    // Countdown interval
-    countdownIntervalRef.current = setInterval(() => {
-      setRetryCountdown(prev => {
-        if (prev <= 1) {
-          if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    
-    // Retry after 5 seconds
-    retryTimerRef.current = setTimeout(() => {
-      loadUserProfile();
-    }, 5000);
-  }, []);
-
-  // Cleanup timers on unmount
-  useEffect(() => {
-    return () => {
-      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-    };
-  }, []);
-
+  // Data loading function
   const loadUserProfile = useCallback(async () => {
-    try {
-      // Check network first
-      const isConnected = await checkNetworkAndLoad();
-      if (!isConnected) return;
-      
-      setLoading(true);
-      setErrors(null);
-      const [userData, productsData] = await Promise.all([
-        AuthService.getUser(),
-        AuthService.getProducts()
-      ]);
-      setUser(userData);
-      setProducts(productsData);
-      setIsOffline(false);
-      setLoading(false);
-    } catch (error: any) {
-      // Check if it's a network error
-      const netState = await NetInfo.fetch();
-      if (!netState.isConnected || error.message?.includes('Network') || error.message?.includes('network')) {
-        setIsOffline(true);
-        setErrors(null);
-        startRetryCountdown();
-      } else {
-        setErrors("Failed to load user profile");
-      }
-      setLoading(false);
-    }
-  }, [checkNetworkAndLoad, startRetryCountdown]);
+    setLoading(true);
+    setErrors(null);
+    const [userData, productsData] = await Promise.all([
+      AuthService.getUser(),
+      AuthService.getProducts()
+    ]);
+    setUser(userData);
+    setProducts(productsData);
+    setLoading(false);
+  }, []);
+
+  // Network retry hook
+  const {
+    showRetryOverlay,
+    countdown,
+    isRetrying,
+    hasFailedPermanently,
+    errorMessage,
+    retryNow,
+    startRetryFlow,
+    resetRetryState,
+    checkNetworkAndLoad,
+  } = useNetworkRetry({
+    fetchFn: loadUserProfile,
+    countdownSeconds: 5,
+    maxRetries: 3,
+  });
 
   useFocusEffect(
     useCallback(() => {
-      loadUserProfile();
-    }, [loadUserProfile])
+      // Reset image error state when screen gains focus (e.g., after profile edit)
+      setImageError(false);
+      
+      const initLoad = async () => {
+        const isConnected = await checkNetworkAndLoad();
+        if (isConnected) {
+          try {
+            await loadUserProfile();
+          } catch (error: any) {
+            const errorMsg = error.message || 'Failed to load profile';
+            const isNetworkError = 
+              errorMsg.toLowerCase().includes('network') ||
+              errorMsg.toLowerCase().includes('internet') ||
+              errorMsg.toLowerCase().includes('connection');
+            
+            if (isNetworkError) {
+              startRetryFlow(errorMsg);
+            } else {
+              setErrors(errorMsg);
+              setLoading(false);
+            }
+          }
+        }
+      };
+      
+      initLoad();
+    }, [loadUserProfile, checkNetworkAndLoad, startRetryFlow])
   );
 
   const environmentalImpact = useEnvironmentalImpact(user?.orders || []);
@@ -350,6 +333,55 @@ export default function Profile() {
     }
   };
 
+  /**
+   * Opens the avatar selector modal
+   * Requirements: 4.3
+   */
+  const handleOpenAvatarSelector = () => {
+    setAvatarModalVisible(true);
+  };
+
+  /**
+   * Handles saving the avatar configuration
+   * Updates local user state and shows success toast
+   * Requirements: 3.7, 4.4, 4.5
+   */
+  const handleAvatarSave = async (style: string, seed: string) => {
+    try {
+      const updateData = {
+        avatar_provider: 'dicebear',
+        avatar_style: style,
+        avatar_seed: seed,
+      };
+
+      const updatedUser = await AuthService.updateUserProfile(updateData);
+
+      // Update local user state with new avatar configuration
+      setUser(prevUser => ({
+        ...prevUser!,
+        avatar_provider: updatedUser.avatar_provider || 'dicebear',
+        avatar_style: updatedUser.avatar_style || style,
+        avatar_seed: updatedUser.avatar_seed || seed,
+      }));
+
+      // Reset image error state in case it was set
+      setImageError(false);
+
+      Toast.show({
+        type: 'success',
+        text1: t('toasts.success.avatarUpdated') || 'Avatar updated successfully',
+        text2: '',
+      });
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: t('alerts.titles.error'),
+        text2: error.message || t('toasts.error.updateAvatar') || 'Failed to update avatar',
+      });
+      throw error; // Re-throw to keep modal open
+    }
+  };
+
   const handleLogout = () => {
     Alert.alert(
       t('profile.logoutConfirmTitle'),
@@ -464,52 +496,24 @@ export default function Profile() {
     );
   }
 
-  // Offline state with countdown retry
-  if (isOffline) {
-    return (
-      <View style={[styles.offlineContainer, { backgroundColor: colors.background }]}>
-        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
-        <View style={[styles.offlineCard, { backgroundColor: colors.surface }]}>
-          <View style={[styles.offlineIconContainer, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2' }]}>
-            <WifiOff size={48} color="#ef4444" strokeWidth={2} />
-          </View>
-          <Text style={[styles.offlineTitle, { color: colors.text }]}>
-            {t('profile.noInternet') || 'No Internet Connection'}
-          </Text>
-          <Text style={[styles.offlineMessage, { color: colors.textSecondary }]}>
-            {t('profile.checkConnection') || 'Please check your internet connection'}
-          </Text>
-          {retryCountdown > 0 && (
-            <View style={[styles.countdownContainer, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#f0fdf4' }]}>
-              <Text style={[styles.countdownText, { color: colors.primary }]}>
-                {t('profile.retryingIn') || 'Retrying in'} {retryCountdown}...
-              </Text>
-            </View>
-          )}
-          <TouchableOpacity 
-            style={[styles.retryNowButton, { backgroundColor: colors.primary }]} 
-            onPress={() => {
-              if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-              if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-              setRetryCountdown(0);
-              loadUserProfile();
-            }}
-          >
-            <Text style={styles.retryNowButtonText}>{t('profile.retryNow') || 'Retry Now'}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
   if (errors || !user) {
     return (
       <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
         <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
         <Text style={styles.errorText}>{errors || t('profile.failedToLoad')}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={loadUserProfile}>
+        <TouchableOpacity style={styles.retryButton} onPress={retryNow}>
           <Text style={styles.retryButtonText}>{t('profile.retry')}</Text>
         </TouchableOpacity>
+        
+        {/* Network Retry Overlay */}
+        <NetworkRetryOverlay
+          visible={showRetryOverlay}
+          countdown={countdown}
+          isRetrying={isRetrying}
+          hasFailedPermanently={hasFailedPermanently}
+          errorMessage={errorMessage || undefined}
+          onRetryNow={retryNow}
+        />
       </View>
     );
   }
@@ -575,37 +579,58 @@ export default function Profile() {
             </View>
           </TouchableOpacity>
           <View style={styles.profileContainer}>
-          <View style={styles.avatarWrapper}>
+          {/* Clean Avatar - Tap to open options */}
+          <TouchableOpacity 
+            style={styles.avatarWrapper}
+            onPress={() => !updatingImage && setAvatarOptionsVisible(true)}
+            activeOpacity={0.8}
+            disabled={updatingImage}
+            accessibilityLabel={t('profile.changeProfilePhoto') || 'Change profile photo'}
+            accessibilityRole="button"
+          >
             <View style={styles.avatar}>
               {updatingImage ? (
                 <ActivityIndicator size="large" color="#ffffff" />
-              ) : user.profile_image && !imageError ? (
-                <Image
-                  source={{ uri: user.profile_image }}
-                  style={styles.avatarImage}
-                  onError={() => setImageError(true)}
-                />
-              ) : (
-                <Text style={styles.avatarText}>{getInitials(user.name)}</Text>
-              )}
+              ) : (() => {
+                // Use getAvatarSource to determine avatar display
+                // Priority: profile_image > DiceBear avatar > initials
+                const avatarSource = getAvatarSource({
+                  profile_image: imageError ? null : user.profile_image,
+                  avatar_provider: user.avatar_provider,
+                  avatar_style: user.avatar_style,
+                  avatar_seed: user.avatar_seed,
+                }, 200);
+
+                if (avatarSource) {
+                  // Check if it's a DiceBear URL (for using ExpoImage with better caching)
+                  const isDiceBearUrl = avatarSource.uri.includes('api.dicebear.com');
+                  
+                  if (isDiceBearUrl) {
+                    return (
+                      <ExpoImage
+                        source={{ uri: avatarSource.uri }}
+                        style={styles.avatarImage}
+                        contentFit="cover"
+                        transition={200}
+                        onError={() => setImageError(true)}
+                      />
+                    );
+                  }
+                  
+                  return (
+                    <Image
+                      source={{ uri: avatarSource.uri }}
+                      style={styles.avatarImage}
+                      onError={() => setImageError(true)}
+                    />
+                  );
+                }
+                
+                // Fallback to initials
+                return <Text style={styles.avatarText}>{getInitials(user.name)}</Text>;
+              })()}
             </View>
-            {user.profile_image && !imageError && !updatingImage && (
-              <TouchableOpacity
-                style={styles.removeImageButton}
-                onPress={handleRemoveImage}
-                disabled={updatingImage}
-              >
-                <X size={16} color="white" />
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={styles.cameraButton}
-              onPress={handlePickImage}
-              disabled={updatingImage}
-            >
-              <Camera size={18} color="white" />
-            </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{user.name}</Text>
             <Text style={styles.profileEmail}>{user.email}</Text>
@@ -705,6 +730,33 @@ export default function Profile() {
         currentLanguage={currentLanguage}
         onClose={() => setLanguageModalVisible(false)}
         onLanguageChange={handleLanguageChange}
+      />
+
+      <AvatarSelectorModal
+        visible={avatarModalVisible}
+        currentStyle={user?.avatar_style || null}
+        currentSeed={user?.avatar_seed || null}
+        onClose={() => setAvatarModalVisible(false)}
+        onSave={handleAvatarSave}
+      />
+
+      <AvatarOptionsBottomSheet
+        visible={avatarOptionsVisible}
+        hasExistingImage={!!(user?.profile_image && !imageError)}
+        onClose={() => setAvatarOptionsVisible(false)}
+        onChooseFromGallery={handlePickImage}
+        onPickCustomAvatar={handleOpenAvatarSelector}
+        onRemovePhoto={handleRemoveImage}
+      />
+
+      {/* Network Retry Overlay - Shows when network issues occur */}
+      <NetworkRetryOverlay
+        visible={showRetryOverlay}
+        countdown={countdown}
+        isRetrying={isRetrying}
+        hasFailedPermanently={hasFailedPermanently}
+        errorMessage={errorMessage || undefined}
+        onRetryNow={retryNow}
       />
     </ScrollView>
   );
@@ -846,25 +898,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarWrapper: {
-    position: 'relative',
-    marginRight: spacing(14), // Reduced from 16
+    marginRight: spacing(14),
   },
   avatar: {
-    width: wp(28),
-    height: wp(28),
-    borderRadius: wp(14),
+    width: wp(24), // ~90px on standard screens (88-96px per design guidelines)
+    height: wp(24),
+    borderRadius: wp(12),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 4,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-    position: 'relative',
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
 
   avatarImage: {
@@ -879,67 +929,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textAlign: 'center',
   },
-  cameraButton: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#16a34a',
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-
-  // Remove Image Button (Top Right of Avatar)
-  removeImageButton: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    backgroundColor: '#dc2626',
-    borderRadius: 14,
-    width: 28,
-    height: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#ffffff',
-    shadowColor: '#dc2626',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  plusIconContainer: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: wp(5.5), // Reduced from 6.4
-    height: wp(5.5), // Reduced from 6.4
-    borderRadius: wp(2.75), // Reduced from 3.2
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#16a34a',
-  },
-  avatarText: {
-    color: 'white',
-    fontSize: fs(22), // Reduced from 24
-    fontFamily: 'Inter-Bold',
-  },
+  // Removed floating button styles - now using bottom sheet
   profileInfo: {
     flex: 1,
   },
   profileName: {
-    fontSize: fs(20), // Reduced from 22
+    fontSize: fs(20),
     fontWeight: 'bold',
     fontFamily: 'Inter-Bold',
     color: 'white',

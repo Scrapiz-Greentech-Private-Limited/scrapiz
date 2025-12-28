@@ -11,15 +11,15 @@ import {
   Image,
   StatusBar,
 } from 'react-native';
-import { ArrowLeft, User, Mail, Phone as PhoneIcon, MapPin, Save, Camera, X, ChevronRight } from 'lucide-react-native';
+import { ArrowLeft, User, Mail, Phone as PhoneIcon, MapPin, Save, Camera, X, ChevronRight, Lock, Shield } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthService, UserProfile } from '../../api/apiService';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalization } from '../../context/LocalizationContext';
 import { useTheme } from '../../context/ThemeContext';
 import GenderSelectionModal from '../../components/GenderSelectionModal';
+import ChangePasswordModal from '../../components/ChangePasswordModal';
 
 
 export default function EditProfileScreen(){
@@ -47,6 +47,7 @@ export default function EditProfileScreen(){
     const [isFetching , setIsFetching] = useState(true);
     const [imageError, setImageError] = useState(false);
     const [showGenderModal, setShowGenderModal] = useState(false);
+    const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
 
     useEffect(()=>{
         loadUserData();
@@ -61,15 +62,11 @@ export default function EditProfileScreen(){
         ? `${primaryAddress.room_number}, ${primaryAddress.street}, ${primaryAddress.area}, ${primaryAddress.city} - ${primaryAddress.pincode}`
         : '';
         
-        // Load from AsyncStorage if not in database
-        const storedPhone = await AsyncStorage.getItem('@user_phone');
-        const storedGender = await AsyncStorage.getItem('@user_gender');
-        
         const data = {
             fullName:userData.name || '',
             email:userData.email || '',
-            phone: userData.phone_number || storedPhone || '',
-            gender: (userData.gender || storedGender || '') as 'male' | 'female' | 'prefer_not_to_say' | '',
+            phone: userData.phone_number || '',
+            gender: (userData.gender || '') as 'male' | 'female' | 'prefer_not_to_say' | '',
             address:addressString || '',
             profileImage: userData.profile_image || '',
         };
@@ -187,11 +184,6 @@ export default function EditProfileScreen(){
                 setFormData(updatedFormData);
                 setOriginalData(updatedFormData);
                 
-                // Save ALL fields to AsyncStorage as backup
-                await AsyncStorage.setItem('@user_name', updatedFormData.fullName);
-                await AsyncStorage.setItem('@user_phone', updatedFormData.phone);
-                await AsyncStorage.setItem('@user_gender', updatedFormData.gender);
-                
                 Toast.show({
                     type: 'success',
                     text1: t('toasts.success.profileUpdated'),
@@ -202,23 +194,12 @@ export default function EditProfileScreen(){
                     router.back();
                 }, 1000);
             } catch (apiError: any) {
-                // If API fails, save to AsyncStorage
-                console.error('API update failed, saving to AsyncStorage:', apiError);
-                
-                // Save all changed fields to AsyncStorage
-                await AsyncStorage.setItem('@user_name', formData.fullName);
-                await AsyncStorage.setItem('@user_phone', formData.phone);
-                await AsyncStorage.setItem('@user_gender', formData.gender);
-                
+                console.error('API update failed:', apiError);
                 Toast.show({
-                    type: 'info',
-                    text1: 'Profie',
-                    text2: 'Update SuccessFul. ',
+                    type: 'error',
+                    text1: t('alerts.titles.error'),
+                    text2: apiError.message || t('toasts.error.updateProfile'),
                 });
-                
-                setTimeout(() => {
-                    router.back();
-                }, 1000);
             }
         } else {
             Toast.show({
@@ -349,7 +330,7 @@ export default function EditProfileScreen(){
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>{t('profile.phoneNumber')} <Text style={[styles.optionalText, { color: colors.textTertiary }]}>{t('profile.optional')}</Text></Text>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>{t('profile.phoneNumber')}</Text>
             <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <PhoneIcon size={20} color={colors.textSecondary} style={styles.inputIcon} />
               <TextInput
@@ -365,7 +346,7 @@ export default function EditProfileScreen(){
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.text }]}>{t('profile.gender')} <Text style={[styles.optionalText, { color: colors.textTertiary }]}>{t('profile.optional')}</Text></Text>
+            <Text style={[styles.inputLabel, { color: colors.text }]}>{t('profile.gender')}</Text>
             <TouchableOpacity
               style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}
               onPress={() => setShowGenderModal(true)}
@@ -378,6 +359,31 @@ export default function EditProfileScreen(){
               <ChevronRight size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
+        </View>
+
+        {/* Security Section */}
+        <View style={styles.securitySection}>
+          <View style={styles.sectionHeader}>
+            <Shield size={18} color={colors.textSecondary} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Security</Text>
+          </View>
+          
+          <TouchableOpacity
+            style={[styles.securityButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => setShowChangePasswordModal(true)}
+            disabled={isLoading}
+          >
+            <View style={[styles.securityIconContainer, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.1)' : '#f0fdf4' }]}>
+              <Lock size={20} color={colors.primary} />
+            </View>
+            <View style={styles.securityTextContainer}>
+              <Text style={[styles.securityButtonTitle, { color: colors.text }]}>Change Password</Text>
+              <Text style={[styles.securityButtonSubtitle, { color: colors.textSecondary }]}>
+                Update your account password
+              </Text>
+            </View>
+            <ChevronRight size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity
@@ -396,6 +402,12 @@ export default function EditProfileScreen(){
         selectedGender={formData.gender || null}
         onClose={() => setShowGenderModal(false)}
         onSelect={(gender) => setFormData((prev) => ({ ...prev, gender }))}
+      />
+      
+      <ChangePasswordModal
+        visible={showChangePasswordModal}
+        onClose={() => setShowChangePasswordModal(false)}
+        userEmail={formData.email}
       />
       
       <Toast />
@@ -559,9 +571,48 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: 'Inter-SemiBold',
   },
-  optionalText: {
-    fontSize: 12,
-    fontWeight: '400',
+  securitySection: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  securityButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  securityIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  securityTextContainer: {
+    flex: 1,
+  },
+  securityButtonTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+    marginBottom: 2,
+  },
+  securityButtonSubtitle: {
+    fontSize: 13,
     fontFamily: 'Inter-Regular',
   },
 });

@@ -579,6 +579,35 @@
       "orderCreated": "آرڈر کامیابی سے بن گیا"
     }
   },
+  "appRating": {
+    "title": "Scrapiz پسند آ رہا ہے؟",
+    "message": "کیا آپ Play Store پر ہمیں ریٹ کرنا چاہیں گے؟",
+    "rateNow": "ابھی ریٹ کریں",
+    "remindLater": "بعد میں یاد دلائیں",
+    "neverAskAgain": "دوبارہ کبھی نہ پوچھیں",
+    "thankYou": "آپ کی رائے کا شکریہ!",
+    "openingStore": "Play Store کھول رہے ہیں...",
+    "errorOpeningStore": "Play Store نہیں کھول سکے۔ براہ کرم بعد میں دوبارہ کوشش کریں۔"
+  },
+  "avatar": {
+    "title": "اوتار منتخب کریں",
+    "subtitle": "ایک انداز منتخب کریں اور اپنا اوتار حسب ضرورت بنائیں",
+    "useCustomAvatar": "کسٹم اوتار استعمال کریں",
+    "randomize": "بے ترتیب بنائیں",
+    "preview": "پیش نظارہ",
+    "selectStyle": "انداز منتخب کریں",
+    "saving": "محفوظ ہو رہا ہے...",
+    "saveSuccess": "اوتار کامیابی سے محفوظ ہو گیا",
+    "saveError": "اوتار محفوظ کرنے میں ناکامی",
+    "styles": {
+      "avataaars": "اوتارز",
+      "pixelArt": "پکسل آرٹ",
+      "bottts": "بوٹس",
+      "lorelei": "لوریلائی",
+      "adventurer": "ایڈونچرر",
+      "funEmoji": "مزاحیہ ایموجی"
+    }
+  },
   "alerts": {
     "validation": {
       "missingName": "براہ کرم اپنا پورا نام درج کریں",

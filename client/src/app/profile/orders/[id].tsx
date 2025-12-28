@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,63 +11,90 @@ import {
   ImageSourcePropType,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
-import { ArrowLeft, MapPin, Calendar, Clock, Phone, IndianRupee, Package, CheckCircle, X } from 'lucide-react-native';
+import { ArrowLeft, MapPin, Calendar, Clock, Phone, IndianRupee, Package, CheckCircle, X, Hash, User, Star } from 'lucide-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { AuthService, OrderSummary, ProductSummary, AddressSummary } from '../../../api/apiService';
+import { AuthService, OrderSummary, ProductSummary, AddressSummary, RatingService } from '../../../api/apiService';
 import { useLocalization } from '../../../context/LocalizationContext';
 import { RemoteImage } from '../../../components/RemoteImage';
 import { useTheme } from '../../../context/ThemeContext';
+import { OrderProgressTimeline } from '../../../components/OrderProgressTimeline';
+import InlineStarRating from '../../../components/InlineStarRating';
+import OrderRatingFeedbackModal from '../../../components/OrderRatingFeedbackModal';
 
-export default function OrderDetails(){
-    const router = useRouter();
-    const {id} = useLocalSearchParams();
-    const { t } = useLocalization();
-    const { colors, isDark } = useTheme();
-    const [order, setOrder] = useState<OrderSummary | null>(null);
-    const [products , setProducts] = useState<ProductSummary[]>([]);
-    const [address, setAddress] = useState<AddressSummary | null>(null);
+export default function OrderDetails() {
+  const router = useRouter();
+  const { id } = useLocalSearchParams();
+  const { t } = useLocalization();
+  const { colors, isDark } = useTheme();
+  const [order, setOrder] = useState<OrderSummary | null>(null);
+  const [products, setProducts] = useState<ProductSummary[]>([]);
+  const [address, setAddress] = useState<AddressSummary | null>(null);
 
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-    // Extract order ID (handle array case from useLocalSearchParams)
-    const orderId = Array.isArray(id) ? id[0] : id;
+  // Rating state
+  const [isRated, setIsRated] = useState<boolean | null>(null);
+  const [agentName, setAgentName] = useState<string>('');
+  const [ratingLoading, setRatingLoading] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [selectedRating, setSelectedRating] = useState<number>(0);
 
-    useEffect(()=>{
-        if (orderId) {
-            loadDetails();
-        } else {
-            setError('Invalid order ID');
-            setLoading(false);
-        }
-    },[orderId])
+  const orderId = Array.isArray(id) ? id[0] : id;
+
+  useEffect(() => {
+    if (orderId) {
+      loadDetails();
+    } else {
+      setError('Invalid order ID');
+      setLoading(false);
+    }
+  }, [orderId]);
+
+  /**
+   * Check if the order has been rated
+   * Per requirement 4.4: Show "Thanks for your feedback!" for rated orders
+   */
+  const checkRatingStatus = useCallback(async (orderIdNum: number, orderStatus: string) => {
+    const statusName = orderStatus.toLowerCase();
+    // Only check rating status for completed orders
+    if (statusName !== 'completed') {
+      setIsRated(null);
+      return;
+    }
+
+    setRatingLoading(true);
+    try {
+      const ratingCheck = await RatingService.checkOrderRating(orderIdNum);
+      setIsRated(ratingCheck.is_rated);
+      setAgentName(ratingCheck.agent_name || '');
+    } catch (error: any) {
+      console.error('Error checking rating status:', error);
+      // If we can't check, assume not rated to allow rating attempt
+      setIsRated(false);
+    } finally {
+      setRatingLoading(false);
+    }
+  }, []);
 
   const loadDetails = async () => {
     try {
       setLoading(true);
       setError(null);
-      
-      console.log('Loading order details for ID:', orderId);
-      
+
       const [ordersData, productsData, addressesData] = await Promise.all([
         AuthService.getOrderNos(),
         AuthService.getProducts(),
         AuthService.getAddresses(),
       ]);
 
-      console.log('Orders data:', ordersData);
-      console.log('Looking for order with ID:', orderId);
-
       const foundOrder = ordersData.find(o => o.id.toString() === orderId);
-      
+
       if (!foundOrder) {
-        console.log('Order not found. Available order IDs:', ordersData.map(o => o.id));
         setError('Order not found');
         setLoading(false);
         return;
       }
-
-      console.log('Found order:', foundOrder);
 
       const orderAddress = addressesData.find(a => a.id === foundOrder.address) || null;
       const relatedProducts = productsData.filter(p =>
@@ -77,6 +104,12 @@ export default function OrderDetails(){
       setOrder(foundOrder);
       setProducts(relatedProducts);
       setAddress(orderAddress);
+
+      // Check rating status for completed orders
+      const statusName = (typeof foundOrder.status === 'string' ? foundOrder.status : foundOrder.status?.name || '').toLowerCase();
+      if (statusName === 'completed') {
+        await checkRatingStatus(foundOrder.id, statusName);
+      }
     } catch (error: any) {
       console.error('Error loading order details:', error);
       setError('Failed to load order details');
@@ -88,93 +121,35 @@ export default function OrderDetails(){
   const getStatusColor = (status: any) => {
     const statusName = (typeof status === 'string' ? status : status?.name || '').toLowerCase();
     switch (statusName) {
-    case 'pending':
-      return '#f59e0b';
-    case 'scheduled':
-      return '#3b82f6';
-    case 'transit':
-      return '#8b5cf6';
-    case 'completed':
-      return '#16a34a';
-    case 'cancelled':
-      return '#dc2626';
-    default:
-      return '#6b7280';
-    }
-  };
-  const getStatusText = (status: any): string => {
-    const statusName = (
-      typeof status === 'string' ? status : status?.name || ''
-    ).toLowerCase();
-    switch (statusName) {
-      case 'pending':
-        return 'Pending';
-      case 'scheduled':
-        return 'Scheduled';
-      case 'transit':
-        return 'In Transit';
-      case 'completed':
-        return 'Completed';
-      case 'cancelled':
-        return 'Cancelled';
-      default:
-        return 'Unknown';
+      case 'pending': return '#f59e0b';
+      case 'scheduled': return '#3b82f6';
+      case 'transit': return '#8b5cf6';
+      case 'completed': return '#16a34a';
+      case 'cancelled': return '#dc2626';
+      default: return '#6b7280';
     }
   };
 
-  const getStatusIcon = (status: any) => {
-    const statusName = (
-      typeof status === 'string' ? status : status?.name || ''
-    ).toLowerCase();
+  const getStatusText = (status: any): string => {
+    const statusName = (typeof status === 'string' ? status : status?.name || '').toLowerCase();
     switch (statusName) {
-      case 'pending':
-        return <Clock size={20} color={getStatusColor(status)} />;
-      case 'scheduled':
-        return <Calendar size={20} color={getStatusColor(status)} />;
-      case 'completed':
-        return <CheckCircle size={20} color={getStatusColor(status)} />;
-      case 'transit':
-        return <CheckCircle size={20} color={getStatusColor(status)} />;
-      case 'cancelled':
-        return <X size={20} color={getStatusColor(status)} />;
-      default:
-        return <Package size={20} color={getStatusColor(status)} />;
+      case 'pending': return 'Pending';
+      case 'scheduled': return 'Scheduled';
+      case 'transit': return 'In Transit';
+      case 'completed': return 'Completed';
+      case 'cancelled': return 'Cancelled';
+      default: return 'Unknown';
     }
   };
 
   const getProductImage = (product: ProductSummary): { uri: string } | ImageSourcePropType => {
-    // Priority 1: Use S3 image if available
     if (product.image_url) {
       return { uri: product.image_url };
     }
-    
-    // Priority 2: Fallback to local assets based on name
-    const name = product.name.toLowerCase();
-    if (name.includes('newspaper')) return require('../../../../assets/images/Scrap_Rates_Photos/Newspaper.jpg');
-    if (name.includes('cardboard') || name.includes('corrugated')) return require('../../../../assets/images/Scrap_Rates_Photos/Cardboard.jpg');
-    if (name.includes('book') || name.includes('paper')) return require('../../../../assets/images/Scrap_Rates_Photos/Book.jpg');
-    if (name.includes('plastic')) return require('../../../../assets/images/Scrap_Rates_Photos/Plastics.jpg');
-    if (name.includes('iron') || name.includes('steel')) return require('../../../../assets/images/Scrap_Rates_Photos/Iron.jpg');
-    if (name.includes('aluminum') || name.includes('aluminium')) return require('../../../../assets/images/Scrap_Rates_Photos/Aluminium.jpg');
-    if (name.includes('copper')) return require('../../../../assets/images/Scrap_Rates_Photos/Copper.jpg');
-    if (name.includes('brass')) return require('../../../../assets/images/Scrap_Rates_Photos/Brass.jpg');
-    if (name.includes('tin')) return require('../../../../assets/images/Scrap_Rates_Photos/Tin.jpg');
-    if (name.includes('refrigerator')) return require('../../../../assets/images/Scrap_Rates_Photos/fridge.jpg');
-    if (name.includes('battery')) return require('../../../../assets/images/Scrap_Rates_Photos/Battery.jpg');
-    if (name.includes('front load machine')) return require('../../../../assets/images/Scrap_Rates_Photos/FrontLoadMachine.jpg');
-    if (name.includes('tv') || name.includes('television')) return require('../../../../assets/images/Scrap_Rates_Photos/TV.jpg');
-    if (name.includes('laptops')) return require('../../../../assets/images/Scrap_Rates_Photos/Laptops.jpg');
-    if (name.includes('windowac')) return require('../../../../assets/images/Scrap_Rates_Photos/WindowAC.jpg');
-    if (name.includes('printer')) return require('../../../../assets/images/Scrap_Rates_Photos/Printer.jpg');
-    if (name.includes('microwave')) return require('../../../../assets/images/Scrap_Rates_Photos/Microwave.jpg');
-    if (name.includes('glass')) return require('../../../../assets/images/Scrap_Rates_Photos/glass.jpg');
-    
-    // Default fallback
-    return require('../../../../assets/images/Scrap_Rates_Photos/Book.jpg');
+    return getProductImageFallback(product.name);
   };
 
   const getProductImageFallback = (productName: string): ImageSourcePropType => {
-    // Get fallback asset based on product name
     const name = productName.toLowerCase();
     if (name.includes('newspaper')) return require('../../../../assets/images/Scrap_Rates_Photos/Newspaper.jpg');
     if (name.includes('cardboard') || name.includes('corrugated')) return require('../../../../assets/images/Scrap_Rates_Photos/Cardboard.jpg');
@@ -194,20 +169,14 @@ export default function OrderDetails(){
     if (name.includes('printer')) return require('../../../../assets/images/Scrap_Rates_Photos/Printer.jpg');
     if (name.includes('microwave')) return require('../../../../assets/images/Scrap_Rates_Photos/Microwave.jpg');
     if (name.includes('glass')) return require('../../../../assets/images/Scrap_Rates_Photos/glass.jpg');
-    
-    // Default fallback
     return require('../../../../assets/images/Scrap_Rates_Photos/Book.jpg');
   };
 
-
   const totalAmount = useMemo(() => {
     if (!order || !products.length) return 0;
-    
-    // Use estimated_order_value from backend if available, otherwise calculate
     if (order.estimated_order_value !== undefined && order.estimated_order_value !== null && order.estimated_order_value > 0) {
       return Number(order.estimated_order_value);
     }
-    
     return order.orders.reduce((sum, item) => {
       const product = products.find(p => p.id === item.product.id);
       const rate = product ? (product.max_rate + product.min_rate) / 2 : 0;
@@ -216,38 +185,57 @@ export default function OrderDetails(){
     }, 0);
   }, [order, products]);
 
-  // Get referral bonus applied to this order
   const referralBonus = useMemo(() => {
     if (!order) return 0;
     return Number(order.redeemed_referral_bonus) || 0;
   }, [order]);
 
-  // Calculate total payout (estimated value + referral bonus)
   const totalPayoutAmount = useMemo(() => {
     return totalAmount + referralBonus;
   }, [totalAmount, referralBonus]);
 
-   const canCancelOrder = useMemo(() => {
+  const canCancelOrder = useMemo(() => {
     if (!order) return false;
     const statusName = (typeof order.status === 'string' ? order.status : order.status?.name || '').toLowerCase();
-    console.log('Order status for cancel check:', statusName);
-    console.log('Raw status object:', order.status);
-    // Allow cancellation for pending, scheduled, or unknown status
     const cancellableStatuses = ['transit', 'scheduled'];
-    const canCancel = cancellableStatuses.includes(statusName) || statusName === '';
-    console.log('Can cancel:', canCancel);
-    return canCancel;
+    return cancellableStatuses.includes(statusName) || statusName === '';
   }, [order]);
 
-const handleCancelOrder = () => {
+  /**
+   * Check if order is completed and eligible for rating
+   * Per requirement 4.1: Display inline star rating for completed unrated orders
+   */
+  const isCompletedOrder = useMemo(() => {
+    if (!order) return false;
+    const statusName = (typeof order.status === 'string' ? order.status : order.status?.name || '').toLowerCase();
+    return statusName === 'completed';
+  }, [order]);
+
+  /**
+   * Handle star rating selection
+   * Per requirement 4.3: Open feedback modal on star selection
+   */
+  const handleRatingSelect = useCallback((rating: number) => {
+    setSelectedRating(rating);
+    setShowFeedbackModal(true);
+  }, []);
+
+  /**
+   * Handle successful rating submission
+   * Per requirement 5.5: Refresh UI on success
+   */
+  const handleRatingSubmitSuccess = useCallback(() => {
+    setIsRated(true);
+    setShowFeedbackModal(false);
+    setSelectedRating(0);
+  }, []);
+
+  const handleCancelOrder = () => {
     Alert.alert(
       'Cancel Order',
       'Are you sure you want to cancel this order?',
       [
-        {
-          text: 'No',
-          style: 'cancel',
-        },
+        { text: 'No', style: 'cancel' },
         {
           text: 'Yes, Cancel',
           style: 'destructive',
@@ -281,18 +269,21 @@ const handleCancelOrder = () => {
     });
   };
 
+  const formatTime = (dateString: string): string => {
+    return new Date(dateString).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
 
-if (loading) {
+  if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: colors.surface }]}>
-          <TouchableOpacity
-            style={[styles.backButton, { backgroundColor: colors.card }]}
-            onPress={() => router.back()}
-          >
-            <ArrowLeft size={24} color={colors.text} />
+        <View style={[styles.header, { backgroundColor: colors.primary }]}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <ArrowLeft size={24} color="#fff" />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Loading...</Text>
+          <Text style={styles.headerTitle}>Loading...</Text>
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -302,17 +293,14 @@ if (loading) {
     );
   }
 
-if (error || !order) {
+  if (error || !order) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: colors.surface }]}>
-          <TouchableOpacity
-            style={[styles.backButton, { backgroundColor: colors.card }]}
-            onPress={() => router.back()}
-          >
-            <ArrowLeft size={24} color={colors.text} />
+        <View style={[styles.header, { backgroundColor: colors.primary }]}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <ArrowLeft size={24} color="#fff" />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Order Not Found</Text>
+          <Text style={styles.headerTitle}>Order Not Found</Text>
         </View>
         <View style={styles.errorContainer}>
           <Text style={[styles.errorText, { color: colors.textSecondary }]}>{error || 'Order not found'}</Text>
@@ -324,225 +312,483 @@ if (error || !order) {
     );
   }
 
+  const statusName = typeof order.status === 'string' ? order.status : order.status?.name || 'pending';
 
   return (
-<View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.surface }]}>
-        <TouchableOpacity
-          style={[styles.backButton, { backgroundColor: colors.card }]}
-          onPress={() => router.back()}
-        >
-          <ArrowLeft size={24} color={colors.text} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Header with gradient feel */}
+      <View style={[styles.header, { backgroundColor: colors.primary }]}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <ArrowLeft size={24} color="#fff" />
         </TouchableOpacity>
         <View style={styles.headerContent}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Order Details</Text>
-          <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>#{order.order_number}</Text>
+          <Text style={styles.headerTitle}>ORDER PROGRESS</Text>
+          <View style={styles.orderIdRow}>
+            <Hash size={14} color="rgba(255,255,255,0.8)" />
+            <Text style={styles.orderIdText}>{order.order_number}</Text>
+          </View>
         </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Order Status */}
-        <View style={[styles.statusCard, { backgroundColor: colors.surface }]}>
-          <View style={styles.statusHeader}>
-            {getStatusIcon(order.status)}
-            <Text style={[styles.statusTitle, { color: colors.text }]}>Order Status</Text>
+        {/* Order Progress Timeline Card */}
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
+          <View style={styles.cardHeader}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Order Status</Text>
+            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) + '20' }]}>
+              <Text style={[styles.statusBadgeText, { color: getStatusColor(order.status) }]}>
+                {getStatusText(order.status)}
+              </Text>
+            </View>
           </View>
-          <View
-            style={[
-              styles.statusBadge,
-              { backgroundColor: getStatusColor(order.status) + (isDark ? '40' : '20') },
-            ]}
-          >
-            <Text
-              style={[
-                styles.statusText,
-                { color: getStatusColor(order.status) },
-              ]}
-            >
-              {getStatusText(order.status)}
+          <OrderProgressTimeline 
+            status={statusName} 
+            orderDate={order.created_at}
+            completedDate={statusName === 'completed' ? order.updated_at : undefined}
+          />
+        </View>
+
+        {/* Rating Section - Per requirements 4.1, 4.3, 4.4 */}
+        {isCompletedOrder && (
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>
+              {t('orderRating.feedbackTitle', { defaultValue: 'Your Feedback' })}
             </Text>
+            
+            {ratingLoading ? (
+              <View style={styles.ratingLoadingContainer}>
+                <ActivityIndicator size="small" color={colors.primary} />
+              </View>
+            ) : isRated ? (
+              /* Per requirement 4.4: Show "Thanks for your feedback!" for rated orders */
+              <View style={styles.ratedContainer}>
+                <View style={[styles.ratedIconContainer, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#dcfce7' }]}>
+                  <CheckCircle size={24} color={colors.primary} />
+                </View>
+                <Text style={[styles.ratedText, { color: colors.text }]}>
+                  {t('orderRating.thanksForFeedback', { defaultValue: 'Thanks for your feedback!' })}
+                </Text>
+                <Text style={[styles.ratedSubtext, { color: colors.textSecondary }]}>
+                  {t('orderRating.feedbackHelps', { defaultValue: 'Your feedback helps us improve our service' })}
+                </Text>
+              </View>
+            ) : (
+              /* Per requirement 4.1: Display inline star rating for completed unrated orders */
+              <View style={styles.unratedContainer}>
+                <InlineStarRating
+                  onRatingSelect={handleRatingSelect}
+                  label={t('orderRating.rateYourExperience', { defaultValue: 'Rate your experience' })}
+                />
+                {agentName && (
+                  <Text style={[styles.agentNameText, { color: colors.textSecondary }]}>
+                    {t('orderRating.withAgent', { defaultValue: 'with {{agentName}}', agentName })}
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Order Info Card */}
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Order Information</Text>
+          <View style={styles.infoGrid}>
+            <View style={styles.infoItem}>
+              <View style={[styles.infoIconContainer, { backgroundColor: '#dcfce7' }]}>
+                <Calendar size={18} color="#16a34a" />
+              </View>
+              <View style={styles.infoTextContainer}>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Order Date</Text>
+                <Text style={[styles.infoValue, { color: colors.text }]}>{formatDate(order.created_at)}</Text>
+              </View>
+            </View>
+            <View style={styles.infoItem}>
+              <View style={[styles.infoIconContainer, { backgroundColor: '#dbeafe' }]}>
+                <Clock size={18} color="#3b82f6" />
+              </View>
+              <View style={styles.infoTextContainer}>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Order Time</Text>
+                <Text style={[styles.infoValue, { color: colors.text }]}>{formatTime(order.created_at)}</Text>
+              </View>
+            </View>
           </View>
         </View>
 
         {/* Order Items */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Items ({order.orders.length})</Text>
-          <View style={[styles.itemsCard, { backgroundColor: colors.surface }]}>
-            {order.orders.map((item, index) => {
-              const product = products.find((p) => p.id === item.product.id);
-              const rate = product ? (product.max_rate + product.min_rate) / 2 : 0;
-              const quantity = parseFloat(item.quantity) || 0;
-              const itemTotal = rate * quantity;
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Items ({order.orders.length})</Text>
+          {order.orders.map((item, index) => {
+            const product = products.find((p) => p.id === item.product.id);
+            const rate = product ? (product.max_rate + product.min_rate) / 2 : 0;
+            const quantity = parseFloat(item.quantity) || 0;
+            const itemTotal = rate * quantity;
 
-              return (
-                <View key={index} style={styles.itemRow}>
-                  <View style={styles.itemLeft}>
-                    <RemoteImage
-                      source={getProductImage(item.product)}
-                      fallback={getProductImageFallback(item.product.name)}
-                      style={styles.itemIconImage}
-                    />
-                    <View style={styles.itemInfo}>
-                      <Text style={[styles.itemName, { color: colors.text }]}>{item.product.name}</Text>
-                      <Text style={[styles.itemRate, { color: colors.textSecondary }]}>
-                        ₹{Math.round(rate)}/{item.product.unit}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.itemRight}>
-                    <Text style={[styles.itemQuantity, { color: colors.textSecondary }]}>
-                      {quantity}
-                      {item.product.unit}
-                    </Text>
-                    <Text style={[styles.itemTotal, { color: colors.primary }]}>₹{Math.round(itemTotal)}</Text>
-                  </View>
+            return (
+              <View key={index} style={[styles.itemRow, index !== order.orders.length - 1 && styles.itemRowBorder, { borderBottomColor: colors.border }]}>
+                <RemoteImage
+                  source={getProductImage(item.product)}
+                  fallback={getProductImageFallback(item.product.name)}
+                  style={styles.itemImage}
+                />
+                <View style={styles.itemInfo}>
+                  <Text style={[styles.itemName, { color: colors.text }]}>{item.product.name}</Text>
+                  <Text style={[styles.itemRate, { color: colors.textSecondary }]}>
+                    ₹{Math.round(rate)}/{item.product.unit}
+                  </Text>
                 </View>
-              );
-            })}
-            <View style={[styles.totalRow, { borderTopColor: colors.border }]}>
-              <Text style={[styles.totalLabel, { color: colors.text }]}>Estimated Order Value</Text>
-              <View style={styles.totalAmount}>
-                <IndianRupee size={18} color={colors.textSecondary} />
-                <Text style={[styles.totalValue, { color: colors.text }]}>₹{totalAmount.toFixed(2)}</Text>
+                <View style={styles.itemRight}>
+                  <Text style={[styles.itemQuantity, { color: colors.textSecondary }]}>
+                    {quantity} {item.product.unit}
+                  </Text>
+                  <Text style={[styles.itemTotal, { color: colors.primary }]}>₹{Math.round(itemTotal)}</Text>
+                </View>
               </View>
+            );
+          })}
+          
+          {/* Totals */}
+          <View style={[styles.totalSection, { borderTopColor: colors.border }]}>
+            <View style={styles.totalRow}>
+              <Text style={[styles.totalLabel, { color: colors.text }]}>Estimated Value</Text>
+              <Text style={[styles.totalValue, { color: colors.text }]}>₹{totalAmount.toFixed(2)}</Text>
             </View>
             {referralBonus > 0 && (
-              <View style={styles.bonusRow}>
-                <Text style={[styles.bonusLabel, { color: colors.primary }]}>Referral Bonus Applied</Text>
-                <View style={styles.bonusAmount}>
-                  <Text style={[styles.bonusPrefix, { color: colors.primary }]}>+</Text>
-                  <IndianRupee size={16} color={colors.primary} />
-                  <Text style={[styles.bonusValue, { color: colors.primary }]}>₹{referralBonus.toFixed(2)}</Text>
-                </View>
+              <View style={styles.totalRow}>
+                <Text style={[styles.bonusLabel, { color: colors.primary }]}>Referral Bonus</Text>
+                <Text style={[styles.bonusValue, { color: colors.primary }]}>+₹{referralBonus.toFixed(2)}</Text>
               </View>
             )}
             {referralBonus > 0 && (
               <View style={[styles.finalTotalRow, { borderTopColor: colors.primary }]}>
                 <Text style={[styles.finalTotalLabel, { color: colors.text }]}>Total Payout</Text>
-                <View style={styles.finalTotalAmount}>
-                  <IndianRupee size={20} color={colors.primary} />
-                  <Text style={[styles.finalTotalValue, { color: colors.primary }]}>₹{totalPayoutAmount.toFixed(2)}</Text>
-                </View>
+                <Text style={[styles.finalTotalValue, { color: colors.primary }]}>₹{totalPayoutAmount.toFixed(2)}</Text>
               </View>
             )}
           </View>
         </View>
 
-        {/* Pickup Details */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Pickup Details</Text>
-          <View style={[styles.detailsCard, { backgroundColor: colors.surface }]}>
-            <View style={styles.detailRow}>
-              <Calendar size={20} color={colors.textSecondary} />
-              <View style={styles.detailInfo}>
-                <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Order Date</Text>
-                <Text style={[styles.detailValue, { color: colors.text }]}>
-                  {formatDate(order.created_at)}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.detailRow}>
-              <Clock size={20} color={colors.textSecondary} />
-              <View style={styles.detailInfo}>
-                <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Status Updated</Text>
-                <Text style={[styles.detailValue, { color: colors.text }]}>
-                  {formatDate(order.created_at)}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Address Details */}
+        {/* Address Card */}
         {address && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Pickup Address</Text>
-            <View style={[styles.addressCard, { backgroundColor: colors.surface }]}>
-              <View style={styles.addressHeader}>
-                <MapPin size={20} color={colors.text} />
-                <Text style={[styles.addressTitle, { color: colors.text }]}>{address.name}</Text>
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Pickup Address</Text>
+            <View style={styles.addressContent}>
+              <View style={[styles.addressIconContainer, { backgroundColor: '#fef3c7' }]}>
+                <MapPin size={20} color="#f59e0b" />
               </View>
-              <Text style={[styles.addressText, { color: colors.textSecondary }]}>
-                {address.room_number}, {address.street}, {address.area},{' '}
-                {address.city}, {address.state} - {address.pincode}
-              </Text>
-              {address.delivery_suggestion && (
-                <View style={[styles.notesCard, { 
-                  backgroundColor: isDark ? 'rgba(251, 191, 36, 0.15)' : '#fef9f0',
-                  borderColor: isDark ? 'rgba(251, 191, 36, 0.4)' : '#fbbf24'
-                }]}>
-                  <Text style={[styles.notesText, { color: colors.text }]}>
-                    Note: {address.delivery_suggestion}
-                  </Text>
+              <View style={styles.addressTextContainer}>
+                <Text style={[styles.addressName, { color: colors.text }]}>{address.name}</Text>
+                <Text style={[styles.addressText, { color: colors.textSecondary }]}>
+                  {address.room_number}, {address.street}, {address.area}
+                </Text>
+                <Text style={[styles.addressText, { color: colors.textSecondary }]}>
+                  {address.city}, {address.state} - {address.pincode}
+                </Text>
+                <View style={styles.phoneRow}>
+                  <Phone size={14} color={colors.textSecondary} />
+                  <Text style={[styles.phoneText, { color: colors.text }]}>{address.phone_number}</Text>
                 </View>
-              )}
-              <View style={[styles.addressContactRow, { borderTopColor: colors.border }]}>
-                <Phone size={16} color={colors.textSecondary} />
-                <Text style={[styles.addressContact, { color: colors.text }]}>{address.phone_number}</Text>
               </View>
             </View>
+            {address.delivery_suggestion && (
+              <View style={[styles.noteBox, { backgroundColor: isDark ? 'rgba(251, 191, 36, 0.15)' : '#fef9f0', borderColor: '#fbbf24' }]}>
+                <Text style={[styles.noteText, { color: colors.text }]}>
+                  Note: {address.delivery_suggestion}
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
-        {/* Order Timeline */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Order Timeline</Text>
-          <View style={[styles.timelineCard, { backgroundColor: colors.surface }]}>
-            <View style={styles.timelineItem}>
-              <View style={[styles.timelineDot, { backgroundColor: colors.primary }]} />
-              <View style={styles.timelineContent}>
-                <Text style={[styles.timelineTitle, { color: colors.text }]}>Order Placed</Text>
-                <Text style={[styles.timelineDate, { color: colors.textSecondary }]}>
-                  {formatDate(order.created_at)}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.timelineItem}>
-              <View
-                style={[
-                  styles.timelineDot,
-                  { backgroundColor: getStatusColor(order.status) },
-                ]}
-              />
-              <View style={styles.timelineContent}>
-                <Text style={[styles.timelineTitle, { color: colors.text }]}>
-                  {getStatusText(order.status)}
-                </Text>
-                <Text style={[styles.timelineDate, { color: colors.textSecondary }]}>
-                  {formatDate(order.created_at)}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Action Buttons */}
+        {/* Cancel Button */}
         {canCancelOrder && (
-          <View style={styles.actionsSection}>
-            <TouchableOpacity
-              style={[styles.cancelButton, { 
-                backgroundColor: colors.surface,
-                borderColor: colors.error 
-              }]}
-              onPress={handleCancelOrder}
-            >
-              <X size={20} color={colors.error} />
-              <Text style={[styles.cancelButtonText, { color: colors.error }]}>Cancel Order</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={[styles.cancelButton, { backgroundColor: colors.surface, borderColor: '#dc2626' }]}
+            onPress={handleCancelOrder}
+          >
+            <X size={20} color="#dc2626" />
+            <Text style={styles.cancelButtonText}>Cancel Order</Text>
+          </TouchableOpacity>
         )}
+
+        <View style={styles.bottomSpacer} />
       </ScrollView>
+
+      {/* Order Rating Feedback Modal - Per requirements 5.1, 5.2, 5.3, 5.5 */}
+      {order && (
+        <OrderRatingFeedbackModal
+          visible={showFeedbackModal}
+          onClose={() => {
+            setShowFeedbackModal(false);
+            setSelectedRating(0);
+          }}
+          orderId={order.id}
+          agentName={agentName}
+          rating={selectedRating}
+          onSubmitSuccess={handleRatingSubmitSuccess}
+        />
+      )}
+
       <Toast />
     </View>
   );
-
-
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  header: {
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  headerContent: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    fontFamily: 'Inter-Bold',
+    color: '#fff',
+    letterSpacing: 1,
+  },
+  orderIdRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  orderIdText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: 'rgba(255,255,255,0.9)',
+    marginLeft: 4,
+  },
+  content: {
+    flex: 1,
+    padding: 16,
+  },
+  card: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+    marginBottom: 12,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+  },
+  infoGrid: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  infoItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  infoIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  infoTextContainer: {
+    flex: 1,
+  },
+  infoLabel: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+    marginTop: 2,
+  },
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  itemRowBorder: {
+    borderBottomWidth: 1,
+  },
+  itemImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  itemInfo: {
+    flex: 1,
+  },
+  itemName: {
+    fontSize: 15,
+    fontWeight: '500',
+    fontFamily: 'Inter-Medium',
+  },
+  itemRate: {
+    fontSize: 13,
+    fontFamily: 'Inter-Regular',
+    marginTop: 2,
+  },
+  itemRight: {
+    alignItems: 'flex-end',
+  },
+  itemQuantity: {
+    fontSize: 13,
+    fontFamily: 'Inter-Regular',
+  },
+  itemTotal: {
+    fontSize: 15,
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+    marginTop: 2,
+  },
+  totalSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  totalLabel: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+  },
+  totalValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+  },
+  bonusLabel: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+  },
+  bonusValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+  },
+  finalTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+    marginTop: 8,
+    borderTopWidth: 2,
+  },
+  finalTotalLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+  },
+  finalTotalValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    fontFamily: 'Inter-Bold',
+  },
+  addressContent: {
+    flexDirection: 'row',
+  },
+  addressIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  addressTextContainer: {
+    flex: 1,
+  },
+  addressName: {
+    fontSize: 15,
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+    marginBottom: 4,
+  },
+  addressText: {
+    fontSize: 13,
+    fontFamily: 'Inter-Regular',
+    lineHeight: 18,
+  },
+  phoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  phoneText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    marginLeft: 6,
+  },
+  noteBox: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  noteText: {
+    fontSize: 13,
+    fontFamily: 'Inter-Regular',
+    fontStyle: 'italic',
+  },
+  cancelButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    marginBottom: 16,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+    color: '#dc2626',
+    marginLeft: 8,
+  },
+  bottomSpacer: {
+    height: 20,
   },
   loadingContainer: {
     flex: 1,
@@ -554,355 +800,42 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Regular',
   },
-  header: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    flexDirection: 'row',
+  // Rating section styles
+  ratingLoadingContainer: {
+    paddingVertical: 20,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  ratedContainer: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  ratedIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginBottom: 12,
   },
-  headerContent: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 24,
+  ratedText: {
+    fontSize: 16,
     fontWeight: '600',
     fontFamily: 'Inter-SemiBold',
     marginBottom: 4,
   },
-  headerSubtitle: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  statusCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  statusCard: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  statusHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
-    marginLeft: 8,
-  },
-  statusBadge: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  statusText: {
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
-  },
-  section: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
-    marginBottom: 12,
-  },
-  itemsCard: {
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  itemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  itemIconImage: {
-    width: 36,
-    height: 36,
-    marginRight: 12,
-    borderRadius: 6,
-  },
-  itemInfo: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 16,
-    fontWeight: '500',
-    fontFamily: 'Inter-Medium',
-    marginBottom: 2,
-  },
-  itemRate: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-  },
-  itemRight: {
-    alignItems: 'flex-end',
-  },
-  itemQuantity: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    marginBottom: 2,
-  },
-  itemTotal: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
-  },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 16,
-    borderTopWidth: 1,
-  },
-  totalLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    fontFamily: 'Inter-Medium',
-  },
-  totalAmount: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  totalValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
-    marginLeft: 4,
-  },
-  bonusRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 12,
-  },
-  bonusLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    fontFamily: 'Inter-Medium',
-  },
-  bonusAmount: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  bonusPrefix: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
-    marginRight: 2,
-  },
-  bonusValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
-    marginLeft: 4,
-  },
-  finalTotalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 16,
-    marginTop: 12,
-    borderTopWidth: 2,
-  },
-  finalTotalLabel: {
-    fontSize: 18,
-    fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
-  },
-  finalTotalAmount: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  finalTotalValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    fontFamily: 'Inter-Bold',
-    marginLeft: 4,
-  },
-  detailsCard: {
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  detailInfo: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  detailLabel: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    marginBottom: 2,
-  },
-  detailValue: {
-    fontSize: 16,
-    fontWeight: '500',
-    fontFamily: 'Inter-Medium',
-  },
-  addressCard: {
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  addressHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  addressTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
-    marginLeft: 8,
-  },
-  addressText: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  addressContactRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-  },
-  addressContact: {
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    marginLeft: 8,
-  },
-  notesCard: {
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-  },
-  notesText: {
+  ratedSubtext: {
     fontSize: 13,
     fontFamily: 'Inter-Regular',
-    lineHeight: 18,
-    fontStyle: 'italic',
+    textAlign: 'center',
   },
-  timelineCard: {
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  timelineItem: {
-    flexDirection: 'row',
+  unratedContainer: {
     alignItems: 'center',
-    marginBottom: 16,
+    paddingVertical: 8,
   },
-  timelineDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 16,
-  },
-  timelineContent: {
-    flex: 1,
-  },
-  timelineTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    fontFamily: 'Inter-Medium',
-    marginBottom: 2,
-  },
-  timelineDate: {
-    fontSize: 14,
+  agentNameText: {
+    fontSize: 13,
     fontFamily: 'Inter-Regular',
-  },
-  actionsSection: {
-    marginTop: 20,
-    marginBottom: 40,
-  },
-  cancelButton: {
-    borderRadius: 16,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
-    marginLeft: 8,
+    marginTop: 4,
   },
   errorContainer: {
     flex: 1,

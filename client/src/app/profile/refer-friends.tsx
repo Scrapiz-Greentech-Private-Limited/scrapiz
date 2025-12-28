@@ -343,7 +343,7 @@ export default function ReferFriendsScreen() {
               <View style={styles.stepContent}>
                 <Text style={[styles.stepTitle, { color: colors.text }]}>Friend Books Service</Text>
                 <Text style={[styles.stepDesc, { color: colors.textSecondary }]}>
-                  Your friend signs up using your code & books a scrap pickup worth minimum ₹500
+                  Your friend signs up using your code & books a scrap pickup worth minimum ₹300
                 </Text>
               </View>
             </View>
@@ -357,7 +357,7 @@ export default function ReferFriendsScreen() {
               <View style={styles.stepContent}>
                 <Text style={[styles.stepTitle, { color: colors.text }]}>Both Earn Rewards!</Text>
                 <Text style={[styles.stepDesc, { color: colors.textSecondary }]}>
-                  You get ₹20 in wallet • Your friend gets ₹5 on their first Pickup
+                  You get ₹20 in wallet • Your friend gets ₹10 on their first Pickup
                 </Text>
               </View>
             </View>

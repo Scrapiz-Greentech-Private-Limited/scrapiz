@@ -4,18 +4,37 @@ import { OrderSummary } from '../api/apiService';
 export const useEnvironmentalImpact = (orders: OrderSummary[]) => {
   const impact = useMemo(() => {
     const safeOrders = orders || [];
-    const totalWeight = safeOrders.reduce((sum, order) => {
+    
+    let totalWeight = 0;
+    let treesSaved = 0;
+    let co2Reduced = 0;
+
+    safeOrders.forEach((order) => {
       const items = Array.isArray(order?.orders) ? order.orders : [];
-      const orderWeight = items.reduce((orderSum, item) => {
-        return orderSum + (parseFloat(item.quantity) || 0);
-      }, 0);
-      return sum + orderWeight;
-    }, 0);
+      items.forEach((item) => {
+        const quantity = parseFloat(item.quantity) || 0;
+        totalWeight += quantity;
+        
+        // Use product-specific impact values if available
+        const product = item.product;
+        if (product) {
+          const treesPerUnit = product.trees_saved_per_unit ?? 0.12;
+          const co2PerUnit = product.co2_reduced_per_unit ?? 2.3;
+          treesSaved += quantity * treesPerUnit;
+          co2Reduced += quantity * co2PerUnit;
+        } else {
+          // Fallback to default estimates
+          treesSaved += quantity * 0.12;
+          co2Reduced += quantity * 2.3;
+        }
+      });
+    });
 
-    const treesSaved = Math.round(totalWeight * 0.12); // Rough estimate
-    const co2Reduced = Math.round(totalWeight * 2.3); // Rough estimate
-
-    return { treesSaved, co2Reduced, totalWeight };
+    return {
+      treesSaved: Math.round(treesSaved * 100) / 100,
+      co2Reduced: Math.round(co2Reduced * 100) / 100,
+      totalWeight: Math.round(totalWeight * 100) / 100,
+    };
   }, [orders]);
 
   return impact;

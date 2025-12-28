@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect , useRef} from 'react';
 import { View, Text,StyleSheet,ScrollView,TouchableOpacity,Dimensions,Image,Platform,ActivityIndicator,RefreshControl,} from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
@@ -27,14 +28,20 @@ import LocationSelector from '@/src/components/LocationSelector';
 import SearchBar from '@/src/components/SearchBar';
 import { RemoteImage } from '../../components/RemoteImage';
 import TutorialOverlay from '@/src/components/TutorialOverlay';
+import RateAppBottomSheet from '@/src/components/RateAppBottomSheet';
+import RatingToast from '@/src/components/RatingToast';
+import NetworkRetryOverlay from '../../components/NetworkRetryOverlay';
 //Hooks
-import { useHomeData } from '../../hooks/useHomeData';
+import { useHomeDataWithRetry } from '../../hooks/useHomeDataWithRetry';
 import { useScrapCategories } from '../../hooks/useScrapCategories';
 import { useRecentActivity } from '../../hooks/useRecentActivity';
 import { useLocalization } from '../../context/LocalizationContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useEnvironmentalImpact } from '../../hooks/useImpact';
+import { useAppRating } from '../../hooks/useAppRating';
+import { useOrderRatingToast } from '../../hooks/useOrderRatingToast';
 import { wp, hp, fs } from '../../utils/responsive';
+import { getAvatarSource } from '../../utils/avatarUtils';
 //Tutorial
 import { homeTutorialConfig } from '@/src/config/tutorials/homeTutorial';
 import { useTutorialStore } from '@/src/store/tutorialStore';
@@ -82,7 +89,22 @@ const ServiceIcon = ({ iconName, color }: { iconName: string, color: string }) =
 export default function HomeScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
-  const { user, products, categories, orders, loading, error, refetch } = useHomeData();
+  const { 
+    user, 
+    products, 
+    categories, 
+    orders, 
+    loading, 
+    error, 
+    refetch,
+    // Network retry state
+    showRetryOverlay,
+    countdown,
+    isRetrying,
+    hasFailedPermanently,
+    errorMessage,
+    retryNow,
+  } = useHomeDataWithRetry();
   const scrapCategories = useScrapCategories(products || [], categories || []);
   const { treesSaved = 0, co2Reduced = 0 } = useEnvironmentalImpact(orders || []);
   const [refreshing, setRefreshing] = useState(false);
@@ -91,6 +113,26 @@ export default function HomeScreen() {
   const { t } = useLocalization();
   const adScrollRef = useRef<ScrollView | null>(null);
   const [adIndex, setAdIndex] = useState(0);
+
+  // App Rating System Integration (Requirements: 1.3, 1.4, 7.1)
+  const {
+    state: appRatingState,
+    checkEligibility,
+    showRatingPrompt,
+    handleRateNow,
+    handleRemindLater,
+    handleNeverAskAgain,
+    dismissBottomSheet,
+  } = useAppRating();
+
+  // Order Rating Toast Integration (Requirements: 3.1, 3.2, 3.3, 3.4, 3.5)
+  const {
+    state: orderRatingState,
+    checkPendingRatings,
+    handleRateNow: handleOrderRateNow,
+    handleLater: handleOrderLater,
+    dismissToast: dismissOrderRatingToast,
+  } = useOrderRatingToast();
 
   // Tutorial system integration
   const { setStepTarget, currentScreen } = useTutorialStore();
@@ -158,15 +200,94 @@ const services = useMemo(() => [
       .slice(0, 2);
   };
 
+  // Error handling is now done by NetworkRetryOverlay - no toast needed
+  // The overlay shows a professional retry UI instead of disruptive toasts
+
+  // App Rating Eligibility Check (Requirements: 7.1)
+  // Check eligibility when home screen loads and show prompt after 2-second delay
   useEffect(() => {
-    if(error){
-      Toast.show({
-        type: 'error',
-        text1: t('home.error'),
-        text2: error,
-      });
+    let timeoutId: NodeJS.Timeout | null = null;
+    let isMounted = true;
+
+    const checkAndShowRatingPrompt = async () => {
+      // Wait for home data to finish loading before checking eligibility
+      if (loading) return;
+
+      try {
+        const isEligible = await checkEligibility();
+        
+        // If eligible and component is still mounted, show prompt after 2-second delay
+        // Requirement 7.1: Display after 2-second delay when eligible
+        if (isEligible && isMounted) {
+          timeoutId = setTimeout(() => {
+            if (isMounted) {
+              showRatingPrompt();
+            }
+          }, 2000);
+        }
+      } catch (err) {
+        // Fail silently - don't disrupt user experience
+        console.error('App rating eligibility check failed:', err);
+      }
+    };
+
+    checkAndShowRatingPrompt();
+
+    return () => {
+      isMounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [loading, checkEligibility, showRatingPrompt]);
+
+  // Order Rating Toast Check (Requirements: 3.1, 3.3)
+  // Check for pending ratings when home screen loads
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkOrderRatings = async () => {
+      // Wait for home data to finish loading before checking
+      if (loading) return;
+
+      try {
+        if (isMounted) {
+          await checkPendingRatings();
+        }
+      } catch (err) {
+        // Fail silently - don't disrupt user experience
+        console.error('Order rating check failed:', err);
+      }
+    };
+
+    checkOrderRatings();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [loading, checkPendingRatings]);
+
+  /**
+   * Handle "Rate Now" button press on order rating toast
+   * Navigates to the order details page
+   * Requirements: 3.4
+   */
+  const onOrderRateNow = () => {
+    const pendingOrder = handleOrderRateNow();
+    if (pendingOrder) {
+      // Navigate to order details page
+      router.push(`/profile/orders/${pendingOrder.order_id}` as any);
     }
-  }, [error]);
+  };
+
+  /**
+   * Handle "Later" button press on order rating toast
+   * Stores cooldown timestamp (72 hours)
+   * Requirements: 3.3, 3.5
+   */
+  const onOrderLater = async () => {
+    await handleOrderLater();
+  };
 
   // Measure element positions when tutorial is active
   useEffect(() => {
@@ -285,27 +406,62 @@ v          <View style={[styles.decorativeCircle1, { opacity: isDark ? 0.05 : 0.
                 onPress={() => router.push('/(tabs)/profile')}
                 activeOpacity={0.7}
               >
-                {user?.profile_image && !imageError ? (
-                  <Image
-                    source={{ uri: user.profile_image }}
-                    style={styles.profileImage}
-                    onError={() => setImageError(true)}
-                  />
-                ) : user?.name ? (
-                  <View style={styles.profileInitials}>
-                    <Text style={{ 
-                        fontSize: fs(14), 
-                        fontWeight: 'bold', 
-                        color: isDark ? '#ecfccb' : '#15803d' // Lighter text in dark mode
-                    }}>
-                      {getInitials(user.name) || 'U'}
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={styles.profileIconWrapper}>
-                  <User size={fs(20)} color={isDark ? '#6ee7b7' : '#16a34a'} strokeWidth={2.8} />
-                </View>
-                )}
+                {(() => {
+                  // Use getAvatarSource to determine avatar display
+                  // Priority: profile_image > DiceBear avatar > initials
+                  const avatarSource = getAvatarSource({
+                    profile_image: imageError ? null : user?.profile_image,
+                    avatar_provider: user?.avatar_provider,
+                    avatar_style: user?.avatar_style,
+                    avatar_seed: user?.avatar_seed,
+                  }, 80);
+
+                  if (avatarSource) {
+                    // Check if it's a DiceBear URL (for using ExpoImage with better caching)
+                    const isDiceBearUrl = avatarSource.uri.includes('api.dicebear.com');
+                    
+                    if (isDiceBearUrl) {
+                      return (
+                        <ExpoImage
+                          source={{ uri: avatarSource.uri }}
+                          style={styles.profileImage}
+                          contentFit="cover"
+                          transition={200}
+                          onError={() => setImageError(true)}
+                        />
+                      );
+                    }
+                    
+                    return (
+                      <Image
+                        source={{ uri: avatarSource.uri }}
+                        style={styles.profileImage}
+                        onError={() => setImageError(true)}
+                      />
+                    );
+                  }
+                  
+                  // Fallback to initials or user icon
+                  if (user?.name) {
+                    return (
+                      <View style={styles.profileInitials}>
+                        <Text style={{ 
+                            fontSize: fs(14), 
+                            fontWeight: 'bold', 
+                            color: isDark ? '#ecfccb' : '#15803d'
+                        }}>
+                          {getInitials(user.name) || 'U'}
+                        </Text>
+                      </View>
+                    );
+                  }
+                  
+                  return (
+                    <View style={styles.profileIconWrapper}>
+                      <User size={fs(20)} color={isDark ? '#6ee7b7' : '#16a34a'} strokeWidth={2.8} />
+                    </View>
+                  );
+                })()}
               </TouchableOpacity>
             </View>
           </View>
@@ -603,6 +759,34 @@ v          <View style={[styles.decorativeCircle1, { opacity: isDark ? 0.05 : 0.
       </ScrollView>
       <Toast />
       <TutorialOverlay />
+      
+      {/* Order Rating Toast (Requirements: 3.1, 3.2, 3.3, 3.4, 3.5) */}
+      <RatingToast
+        visible={orderRatingState.showToast}
+        agentName={orderRatingState.pendingOrder?.agent_name || ''}
+        onRateNow={onOrderRateNow}
+        onLater={onOrderLater}
+        onDismiss={dismissOrderRatingToast}
+      />
+      
+      {/* App Rating Bottom Sheet (Requirements: 1.2, 1.3, 1.4, 7.1) */}
+      <RateAppBottomSheet
+        visible={appRatingState.showBottomSheet}
+        onRateNow={handleRateNow}
+        onRemindLater={handleRemindLater}
+        onNeverAskAgain={handleNeverAskAgain}
+        onDismiss={dismissBottomSheet}
+      />
+
+      {/* Network Retry Overlay - Shows when network issues occur */}
+      <NetworkRetryOverlay
+        visible={showRetryOverlay}
+        countdown={countdown}
+        isRetrying={isRetrying}
+        hasFailedPermanently={hasFailedPermanently}
+        errorMessage={errorMessage || undefined}
+        onRetryNow={retryNow}
+      />
     </View>
   );
 }

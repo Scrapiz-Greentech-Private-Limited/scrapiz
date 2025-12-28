@@ -397,6 +397,35 @@
       "orderCreated": "ऑर्डर सफलतापूर्वक बनाया गया"
     }
   },
+  "appRating": {
+    "title": "Scrapiz पसंद आ रहा है?",
+    "message": "क्या आप Play Store पर हमें रेट करना चाहेंगे?",
+    "rateNow": "अभी रेट करें",
+    "remindLater": "बाद में याद दिलाएं",
+    "neverAskAgain": "फिर कभी न पूछें",
+    "thankYou": "आपकी प्रतिक्रिया के लिए धन्यवाद!",
+    "openingStore": "Play Store खोल रहे हैं...",
+    "errorOpeningStore": "Play Store नहीं खोल सके। कृपया बाद में पुनः प्रयास करें।"
+  },
+  "avatar": {
+    "title": "अवतार चुनें",
+    "subtitle": "एक शैली चुनें और अपना अवतार अनुकूलित करें",
+    "useCustomAvatar": "कस्टम अवतार का उपयोग करें",
+    "randomize": "यादृच्छिक बनाएं",
+    "preview": "पूर्वावलोकन",
+    "selectStyle": "शैली चुनें",
+    "saving": "सहेज रहे हैं...",
+    "saveSuccess": "अवतार सफलतापूर्वक सहेजा गया",
+    "saveError": "अवतार सहेजने में विफल",
+    "styles": {
+      "avataaars": "अवतार्स",
+      "pixelArt": "पिक्सेल आर्ट",
+      "bottts": "बॉट्स",
+      "lorelei": "लोरेलाई",
+      "adventurer": "साहसी",
+      "funEmoji": "मज़ेदार इमोजी"
+    }
+  },
   "alerts": {
     "validation": {
       "missingName": "कृपया अपना पूरा नाम दर्ज करें",
@@ -477,5 +506,19 @@
       "yes": "हां",
       "no": "नहीं"
     }
+  },
+  "networkRetry": {
+    "noConnection": "इंटरनेट कनेक्शन नहीं है",
+    "connectionFailed": "कनेक्शन विफल",
+    "connecting": "कनेक्ट हो रहा है...",
+    "checkConnection": "कृपया अपना इंटरनेट कनेक्शन जांचें",
+    "unableToConnect": "सर्वर से कनेक्ट करने में असमर्थ। कृपया पुनः प्रयास करें।",
+    "pleaseWait": "कृपया प्रतीक्षा करें जब तक हम पुनः कनेक्ट करते हैं...",
+    "retryingIn": "पुनः प्रयास",
+    "second": "सेकंड में",
+    "seconds": "सेकंड में",
+    "retryNow": "अभी पुनः प्रयास करें",
+    "tryAgain": "पुनः प्रयास करें",
+    "retrying": "पुनः प्रयास हो रहा है..."
   }
 }

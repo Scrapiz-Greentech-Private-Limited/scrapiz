@@ -97,6 +97,12 @@
   },
   "profile": {
     "title": "Profile",
+    "changeProfilePhoto":"Change Profile Photo",
+      "chooseFromGallery":"Choose from Gallery",
+      "uploadFromDevice":"Upload a photo from your device",
+      "pickCustomAvatar":"Pick a Custom Avatar",
+      "createUniqueAvatar":"Create a unique avatar style",
+      "removePhoto":"Remove Photo",
     "loadingProfile": "Loading profile...",
     "failedToLoad": "Failed to load profile",
     "retry": "Retry",
@@ -156,7 +162,7 @@
     "fullName": "Full Name",
     "phoneNumber": "Phone Number",
     "referralCode": "Referral Code (Optional)",
-    "welcomeBack": "Sell scrap, get cash — sign in!",
+    "welcomeBack": "Sell scrap, get cash!",
     "welcomeSubtitle": "Sign in to turn your scrap into instant cash 💰",
     "createAccountSubtitle": "Join thousands of users earning money while helping the environment",
     "enterEmail": "Enter your email",
@@ -200,6 +206,16 @@
     "newPasswordPlaceholder": "New Password (min 6 characters)",
     "confirmNewPassword": "Confirm New Password",
     "otpSentMessage": "A 6-digit code was sent to {{email}}",
+    "signInFailed": "Sign In Failed",
+    "unableToSignIn": "Unable to sign in. Please try again",
+    "appleSignInSuccess": "Signed in with Apple successfully",
+    "linkAccountTitle": "Link Your Account?",
+    "linkAccountMessage": "An account with the email {{email}} already exists. Would you like to link your Apple ID to this existing account?",
+    "linkAccount": "Link Account",
+    "linkingFailed": "Linking Failed",
+    "linkingFailedMessage": "Unable to link accounts. Please try again.",
+    "linkingCancelled": "Linking Cancelled",
+    "linkingCancelledMessage": "You can create a new account instead",
     "errors": {
       "emailRequired": "Email is required",
       "invalidEmail": "Please enter a valid email address",
@@ -421,11 +437,14 @@
       "bookingConfirmed": "Booking confirmed successfully",
       "codeCopied": "Code copied to clipboard",
       "linkCopied": "Link copied to clipboard",
-      "profileImageUpdated":"Profile image updated successfully"
+      "profileImageUpdated":"Profile image updated successfully",
+      "avatarUpdated": "Avatar updated successfully",
+      "profileImageRemoved": "Profile image removed successfully"
     },
     "error": {
       "fetchUserData": "Error fetching user data",
       "updateProfile": "Failed to update profile",
+      "updateAvatar": "Failed to update avatar",
       "deleteAddress": "Failed to delete address",
       "saveAddress": "Failed to save address",
       "cancelOrder": "Failed to cancel order",
@@ -495,6 +514,12 @@
         "title": "Profile Header",
         "description": "View and edit your profile information, including your name, photo, and contact details."
       },
+      "changeProfilePhoto":"Change Profile Photo",
+      "chooseFromGallery":"Choose from Gallery",
+      "uploadFromDevice":"Upload a photo from your device",
+      "pickCustomAvatar":"Pick a Custom Avatar",
+      "createUniqueAvatar":"Create a unique avatar style",
+      "removePhoto":"Remove Photo",
       "settings": {
         "title": "Account Settings",
         "description": "Manage your account preferences, notifications, language, and privacy settings."
@@ -579,6 +604,61 @@
       }
     }
   },
+  "appRating": {
+    "title": "Enjoying Scrapiz?",
+    "message": "Would you like to rate us on the Play Store?",
+    "rateNow": "Rate Now",
+    "remindLater": "Remind Me Later",
+    "neverAskAgain": "Never Ask Again",
+    "thankYou": "Thank you for your feedback!",
+    "openingStore": "Opening Play Store...",
+    "errorOpeningStore": "Could not open Play Store. Please try again later."
+  },
+  "avatar": {
+    "title": "Choose Avatar",
+    "subtitle": "Select a style and customize your avatar",
+    "useCustomAvatar": "Use Custom Avatar",
+    "randomize": "Randomize",
+    "preview": "Preview",
+    "selectStyle": "Select Style",
+    "saving": "Saving...",
+    "saveSuccess": "Avatar saved successfully",
+    "saveError": "Failed to save avatar",
+    "styles": {
+      "avataaars": "Avataaars",
+      "pixelArt": "Pixel Art",
+      "bottts": "Bottts",
+      "lorelei": "Lorelei",
+      "adventurer": "Adventurer",
+      "funEmoji": "Fun Emoji"
+    }
+  },
+  "orderRating": {
+    "toastMessage": "How was your Scrapiz pickup experience with {{agentName}}?",
+    "rateNow": "Rate Now",
+    "later": "Later",
+    "modalTitle": "How was your experience with {{agentName}}?",
+    "selectTags": "Select all that apply",
+    "yourRating": "Your rating",
+    "whatWentWell": "What went well?",
+    "additionalFeedback": "Additional feedback (optional)",
+    "feedbackPlaceholder": "Tell us more about your experience...",
+    "thankYou": "Thank You! 🎉",
+    "feedbackReceived": "Your feedback helps us improve",
+    "submitError": "Failed to submit rating",
+    "rateYourExperience": "Rate your experience",
+    "feedbackTitle": "Your Feedback",
+    "thanksForFeedback": "Thanks for your feedback!",
+    "feedbackHelps": "Your feedback helps us improve our service",
+    "withAgent": "with {{agentName}}",
+    "tags": {
+      "polite": "Agent was polite",
+      "accurateWeight": "Accurate weight",
+      "onTime": "On time",
+      "goodPrice": "Good Price",
+      "smoothExperience": "Smooth experience"
+    }
+  },
   "alerts": {
     "validation": {
       "missingName": "Please enter your full name",
@@ -660,5 +740,19 @@
       "yes": "Yes",
       "no": "No"
     }
+  },
+  "networkRetry": {
+    "noConnection": "No Internet Connection",
+    "connectionFailed": "Connection Failed",
+    "connecting": "Connecting...",
+    "checkConnection": "Please check your internet connection",
+    "unableToConnect": "Unable to connect to the server. Please try again.",
+    "pleaseWait": "Please wait while we reconnect...",
+    "retryingIn": "Retrying in",
+    "second": "second",
+    "seconds": "seconds",
+    "retryNow": "Retry Now",
+    "tryAgain": "Try Again",
+    "retrying": "Retrying..."
   }
 }
