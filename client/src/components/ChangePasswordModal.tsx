@@ -15,8 +15,10 @@ import {
 import { X, Lock, Mail, Eye, EyeOff, CheckCircle, ArrowLeft } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
+import { useAuth } from '../context/AuthContext';
 import { AuthService } from '../api/apiService';
 import Toast from 'react-native-toast-message';
+import { useRouter } from 'expo-router';
 
 type Step = 'request' | 'verify' | 'newPassword' | 'success';
 
@@ -29,6 +31,8 @@ interface ChangePasswordModalProps {
 export default function ChangePasswordModal({ visible, onClose, userEmail }: ChangePasswordModalProps) {
   const { colors, isDark } = useTheme();
   const { t } = useLocalization();
+  const { clearAuthState } = useAuth();
+  const router = useRouter();
   
   const [step, setStep] = useState<Step>('request');
   const [isLoading, setIsLoading] = useState(false);
@@ -359,17 +363,42 @@ export default function ChangePasswordModal({ visible, onClose, userEmail }: Cha
       </View>
       <Text style={[styles.stepTitle, { color: colors.text }]}>Password Updated!</Text>
       <Text style={[styles.stepDescription, { color: colors.textSecondary }]}>
-        Your password has been changed successfully. You can now use your new password to log in.
+        Your password has been changed successfully. You will be redirected to login with your new password.
       </Text>
 
       <TouchableOpacity
         style={[styles.primaryButton, { backgroundColor: colors.primary }]}
-        onPress={handleClose}
+        onPress={handleSuccessClose}
       >
-        <Text style={styles.primaryButtonText}>Done</Text>
+        <Text style={styles.primaryButtonText}>Sign In Now</Text>
       </TouchableOpacity>
     </View>
   );
+
+  // Handle success close - clear auth and redirect to login
+  const handleSuccessClose = async () => {
+    try {
+      // Clear auth state (removes token and updates context)
+      await clearAuthState();
+      
+      // Close modal
+      Animated.parallel([
+        Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+        Animated.timing(slideAnim, { toValue: 300, duration: 200, useNativeDriver: true }),
+      ]).start(() => {
+        resetState();
+        onClose();
+        // Navigate to login screen
+        router.replace('/(auth)/login');
+      });
+    } catch (error) {
+      console.error('Error during password change cleanup:', error);
+      // Even if cleanup fails, still redirect to login
+      resetState();
+      onClose();
+      router.replace('/(auth)/login');
+    }
+  };
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
