@@ -1,0 +1,27 @@
+# ---- Android build junk ----
+android/.gradle
+android/build
+android/app/build
+android/.cxx
+android/local.properties
+
+# ---- iOS build junk (future-proof) ----
+ios/build
+ios/Pods
+ios/.xcode.env.local
+
+# ---- Expo / Metro ----
+.expo
+.expo-shared
+
+# ---- Node / tooling ----
+node_modules
+npm-debug.log
+yarn-error.log
+.pnpm-debug.log
+.turbo
+.cache
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
