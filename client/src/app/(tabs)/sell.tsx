@@ -227,7 +227,8 @@ export default function SellScreen() {
         onGoHome={handleGoHome} 
         onRetryPincode={handleRetryPincode}
       />
-  )
+    );
+  }
 
   // Continue with normal sell screen (serviceable)
   return <SellScreenContent />;
