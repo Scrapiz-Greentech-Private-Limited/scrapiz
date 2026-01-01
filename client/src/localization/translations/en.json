@@ -98,7 +98,7 @@
   "profile": {
     "title": "Profile",
     "changeProfilePhoto":"Change Profile Photo",
-      "chooseFromGallery":"Choose from Gallery",
+      "chooseFromGallery":"Choose from Gaqllery",
       "uploadFromDevice":"Upload a photo from your device",
       "pickCustomAvatar":"Pick a Custom Avatar",
       "createUniqueAvatar":"Create a unique avatar style",
@@ -278,7 +278,7 @@
     "loading": "Loading...",
     "selectLocation": "Select location",
     "chooseDeliveryLocation": "Choose your delivery location",
-    "quickActions": "Quick Actions",
+    "quickActions": "Quick Actions to be Done",
     "popular": "Popular",
     "sellScrap": "Sell Scrap",
     "schedulePickup": "Schedule pickup",
