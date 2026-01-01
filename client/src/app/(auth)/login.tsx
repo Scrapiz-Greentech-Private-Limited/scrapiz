@@ -27,6 +27,7 @@ import {
   Chrome,
   X,
   Link as LinkIcon,
+  Phone,
 } from 'lucide-react-native';
 import { Link, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -551,6 +552,24 @@ export default function LoginScreen() {
                 )}
               </TouchableOpacity>
 
+              {/* Continue with Phone Button - Task 16.1 */}
+              {/* Requirements: 10.1 */}
+              {/* TEMPORARILY HIDDEN: Phone authentication postponed - uncomment when ready to enable */}
+              {/* <TouchableOpacity
+                style={[
+                  styles.phoneButton,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                  isAnyLoading && styles.phoneButtonDisabled
+                ]}
+                onPress={() => router.push('/(auth)/phone-login')}
+                disabled={isAnyLoading}
+              >
+                <View style={[styles.phoneIconCircle, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
+                  <Phone size={20} color={colors.primary} />
+                </View>
+                <Text style={[styles.phoneButtonText, { color: colors.text }]}>{t('auth.continueWithPhone') || 'Continue with Phone'}</Text>
+              </TouchableOpacity> */}
+
               {/* Apple Sign-In Button (iOS only) - Task 8.1 */}
               {/* Requirements: 6.1, 6.2, 6.3 */}
               {Platform.OS === 'ios' && isAppleAvailable && (
@@ -956,6 +975,43 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   googleButtonText: {
+    fontSize: fs(15),
+    fontWeight: '700',
+    fontFamily: 'Inter-Bold',
+  },
+  // Phone Sign-In Button Styles (Task 16.1)
+  phoneButton: {
+    borderRadius: spacing(16),
+    height: hp(6.9),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing(12),
+    borderWidth: 1.5,
+    marginBottom: spacing(16),
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  phoneButtonDisabled: {
+    opacity: 0.6,
+  },
+  phoneIconCircle: {
+    width: wp(8),
+    height: wp(8),
+    borderRadius: wp(4),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  phoneButtonText: {
     fontSize: fs(15),
     fontWeight: '700',
     fontFamily: 'Inter-Bold',

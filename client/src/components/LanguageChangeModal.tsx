@@ -221,8 +221,8 @@ const styles = StyleSheet.create({
   modalContent: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '70%',
-    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    maxHeight: '80%',
+    paddingBottom: Platform.OS === 'ios' ? 20 : 10,
   },
   header: {
     flexDirection: 'row',
@@ -303,6 +303,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 20,
     paddingTop: 20,
+    paddingBottom: Platform.OS === 'ios' ? 10 : 20,
     borderTopWidth: 1,
   },
   button: {

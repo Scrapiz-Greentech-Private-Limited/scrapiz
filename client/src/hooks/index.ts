@@ -3,6 +3,10 @@ export { useNetworkRetry } from './useNetworkRetry';
 export { useDataWithRetry } from './useDataWithRetry';
 export { useHomeDataWithRetry } from './useHomeDataWithRetry';
 
+// Authentication hooks
+export { usePhoneAuth, PhoneAuthError, phoneAuthErrorMessages } from './usePhoneAuth';
+export type { UsePhoneAuthReturn } from './usePhoneAuth';
+
 // Existing hooks
 export { useHomeData } from './useHomeData';
 export { useScrapCategories } from './useScrapCategories';

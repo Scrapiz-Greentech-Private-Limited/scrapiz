@@ -465,6 +465,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 20,
+    paddingBottom: 40,
   },
   avatarSection: {
     alignItems: 'center',
@@ -561,7 +562,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 60,
+    marginHorizontal: 0,
   },
   updateButtonDisabled: {
     opacity: 0.7,

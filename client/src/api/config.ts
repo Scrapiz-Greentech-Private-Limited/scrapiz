@@ -23,6 +23,10 @@ export const API_CONFIG = {
     GOOGLE_LOGIN: '/authentication/google-login/',
     APPLE_LOGIN: '/authentication/apple-login/',
     APPLE_LOGIN_CONFIRM: '/authentication/apple-login/confirm-link/',
+    // Phone OTP Authentication endpoints
+    PHONE_VERIFY: '/authentication/phone/verify/',
+    PHONE_COMPLETE_PROFILE: '/authentication/phone/complete-profile/',
+    PHONE_CONFIRM_LINK: '/authentication/phone/confirm-link/',
     USER_ADDRESSES: '/user/address/',
     USER_NOTIFICATION_SETTINGS: '/user/notification-settings/',
     SERVICE_BOOKINGS: '/services/bookings/',
@@ -189,3 +193,106 @@ export interface AppleLoginConfirmRequest {
   nonce: string;
   confirmed: boolean;
 }
+
+
+// Phone OTP Authentication types
+
+/**
+ * Request for /phone/verify/ endpoint
+ */
+export interface PhoneVerifyRequest {
+  firebase_token: string;
+}
+
+/**
+ * User data returned on successful phone authentication
+ */
+export interface PhoneAuthUser {
+  id: number;
+  email: string;
+  name: string;
+}
+
+/**
+ * Response from /phone/verify/ for existing users (successful auth)
+ */
+export interface PhoneVerifySuccessResponse extends ApiResponse {
+  jwt: string;
+  user: PhoneAuthUser;
+}
+
+/**
+ * Response from /phone/verify/ for new users (profile required)
+ */
+export interface PhoneVerifyProfileRequiredResponse extends ApiResponse {
+  profile_required: true;
+  phone_number: string;
+  firebase_uid: string;
+}
+
+/**
+ * Union type for /phone/verify/ responses
+ */
+export type PhoneVerifyResponse = PhoneVerifySuccessResponse | PhoneVerifyProfileRequiredResponse;
+
+/**
+ * Request for /phone/complete-profile/ endpoint
+ */
+export interface PhoneCompleteProfileRequest {
+  name: string;
+  email: string;
+  phone_number: string;
+  firebase_uid: string;
+}
+
+/**
+ * Response from /phone/complete-profile/ on success (new user created)
+ */
+export interface PhoneCompleteProfileSuccessResponse extends ApiResponse {
+  jwt: string;
+  user: PhoneAuthUser;
+}
+
+/**
+ * Response from /phone/complete-profile/ when email collision detected
+ */
+export interface PhoneCompleteProfileLinkRequiredResponse extends ApiResponse {
+  requires_link_confirmation: true;
+  existing_email: string;
+  auth_provider: string;
+}
+
+/**
+ * Union type for /phone/complete-profile/ responses
+ */
+export type PhoneCompleteProfileResponse = PhoneCompleteProfileSuccessResponse | PhoneCompleteProfileLinkRequiredResponse;
+
+/**
+ * Request for /phone/confirm-link/ endpoint
+ */
+export interface PhoneConfirmLinkRequest {
+  confirmed: boolean;
+  email: string;
+  phone_number: string;
+  firebase_uid: string;
+}
+
+/**
+ * Response from /phone/confirm-link/ on successful linking
+ */
+export interface PhoneConfirmLinkSuccessResponse extends ApiResponse {
+  jwt: string;
+  user: PhoneAuthUser;
+}
+
+/**
+ * Response from /phone/confirm-link/ when cancelled
+ */
+export interface PhoneConfirmLinkCancelledResponse extends ApiResponse {
+  message: string;
+}
+
+/**
+ * Union type for /phone/confirm-link/ responses
+ */
+export type PhoneConfirmLinkResponse = PhoneConfirmLinkSuccessResponse | PhoneConfirmLinkCancelledResponse;

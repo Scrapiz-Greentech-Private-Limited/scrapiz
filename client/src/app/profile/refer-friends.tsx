@@ -16,7 +16,7 @@ import {
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, Gift, Users, IndianRupee, Share2, Copy, MessageCircle, Wallet, CheckCircle, Info, AlertCircle } from 'lucide-react-native';
+import { ArrowLeft, Gift, Users, IndianRupee, Share2, Copy, Wallet, CheckCircle, Info, AlertCircle } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useReferral } from '../../context/ReferralContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -323,8 +323,11 @@ export default function ReferFriendsScreen() {
 
           <View style={styles.stepsContainer}>
             <View style={styles.stepItem}>
-              <View style={[styles.stepNumberBox, { backgroundColor: colors.primaryLight + '30' }]}>
-                <Text style={[styles.stepNumber, { color: colors.primary }]}>1</Text>
+              <View style={styles.stepNumberWrapper}>
+                <View style={[styles.stepNumberBox, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.stepNumber}>1</Text>
+                </View>
+                <View style={[styles.stepLine, { backgroundColor: colors.border }]} />
               </View>
               <View style={styles.stepContent}>
                 <Text style={[styles.stepTitle, { color: colors.text }]}>Share Your Code</Text>
@@ -334,11 +337,12 @@ export default function ReferFriendsScreen() {
               </View>
             </View>
 
-            <View style={[styles.stepConnector, { backgroundColor: colors.border }]} />
-
             <View style={styles.stepItem}>
-              <View style={[styles.stepNumberBox, { backgroundColor: colors.primaryLight + '30' }]}>
-                <Text style={[styles.stepNumber, { color: colors.primary }]}>2</Text>
+              <View style={styles.stepNumberWrapper}>
+                <View style={[styles.stepNumberBox, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.stepNumber}>2</Text>
+                </View>
+                <View style={[styles.stepLine, { backgroundColor: colors.border }]} />
               </View>
               <View style={styles.stepContent}>
                 <Text style={[styles.stepTitle, { color: colors.text }]}>Friend Books Service</Text>
@@ -348,11 +352,11 @@ export default function ReferFriendsScreen() {
               </View>
             </View>
 
-            <View style={[styles.stepConnector, { backgroundColor: colors.border }]} />
-
             <View style={styles.stepItem}>
-              <View style={[styles.stepNumberBox, { backgroundColor: colors.primaryLight + '30' }]}>
-                <Text style={[styles.stepNumber, { color: colors.primary }]}>3</Text>
+              <View style={styles.stepNumberWrapper}>
+                <View style={[styles.stepNumberBox, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.stepNumber}>3</Text>
+                </View>
               </View>
               <View style={styles.stepContent}>
                 <Text style={[styles.stepTitle, { color: colors.text }]}>Both Earn Rewards!</Text>
@@ -386,23 +390,18 @@ export default function ReferFriendsScreen() {
           )}
         </View>
 
-        {/* Share Buttons */}
+        {/* Share Button */}
         <View style={styles.shareSection}>
-          <TouchableOpacity style={styles.shareButton} onPress={handleShare} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.shareButtonFull} onPress={handleShare} activeOpacity={0.8}>
             <LinearGradient
               colors={['#16a34a', '#15803d']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              style={styles.shareGradient}
+              style={styles.shareGradientFull}
             >
               <Share2 size={20} color="white" />
               <Text style={styles.shareButtonText}>Share Now</Text>
             </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.whatsappButton, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={handleWhatsAppShare} activeOpacity={0.8}>
-            <MessageCircle size={20} color="#25D366" />
-            <Text style={[styles.whatsappText, { color: colors.text }]}>WhatsApp</Text>
           </TouchableOpacity>
         </View>
 
@@ -674,25 +673,22 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   stepsContainer: {
-    gap: 0,
+    paddingLeft: 4,
   },
   stepItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
+  stepNumberWrapper: {
+    alignItems: 'center',
+    marginRight: 16,
+  },
   stepNumberBox: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#16a34a',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
-    shadowColor: '#16a34a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
   },
   stepNumber: {
     fontSize: 16,
@@ -700,9 +696,16 @@ const styles = StyleSheet.create({
     color: 'white',
     fontFamily: 'Inter-Bold',
   },
+  stepLine: {
+    width: 2,
+    flex: 1,
+    minHeight: 40,
+    marginTop: 8,
+    marginBottom: 8,
+  },
   stepContent: {
     flex: 1,
-    paddingBottom: 20,
+    paddingBottom: 24,
   },
   stepTitle: {
     fontSize: 15,
@@ -716,13 +719,6 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     fontFamily: 'Inter-Regular',
     lineHeight: 20,
-  },
-  stepConnector: {
-    width: 2,
-    height: 24,
-    backgroundColor: '#d1d5db',
-    marginLeft: 17,
-    marginVertical: -6,
   },
 
   // Code Section
@@ -804,12 +800,10 @@ const styles = StyleSheet.create({
 
   // Share Section
   shareSection: {
-    flexDirection: 'row',
-    gap: 12,
     marginBottom: 24,
   },
-  shareButton: {
-    flex: 1,
+  shareButtonFull: {
+    width: '100%',
     borderRadius: 14,
     overflow: 'hidden',
     shadowColor: '#16a34a',
@@ -819,7 +813,7 @@ const styles = StyleSheet.create({
     elevation: 6,
     height: 52,
   },
-  shareGradient: {
+  shareGradientFull: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -831,30 +825,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: 'white',
-    fontFamily: 'Inter-Bold',
-  },
-  whatsappButton: {
-    flex: 1,
-    backgroundColor: 'white',
-    borderRadius: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    gap: 10,
-    borderWidth: 2,
-    borderColor: '#25D366',
-    shadowColor: '#25D366',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 3,
-    height: 52,
-  },
-  whatsappText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#25D366',
     fontFamily: 'Inter-Bold',
   },
 

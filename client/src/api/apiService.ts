@@ -1,11 +1,13 @@
 import axios from 'axios';
-import { API_CONFIG, ApiResponse, RegisterRequest, LoginRequest, VerifyOtpRequest, PasswordResetRequest, NotificationSettings, ServiceBookingPayload, ServiceBooking, PushNotificationPreferences, AppleUserInfo, PlatformInfo, AppleLoginResponse } from './config';
+import { API_CONFIG, ApiResponse, RegisterRequest, LoginRequest, VerifyOtpRequest, PasswordResetRequest, NotificationSettings, ServiceBookingPayload, ServiceBooking, PushNotificationPreferences, AppleUserInfo, PlatformInfo, AppleLoginResponse, PhoneVerifyRequest, PhoneVerifyResponse, PhoneCompleteProfileRequest, PhoneCompleteProfileResponse, PhoneConfirmLinkRequest, PhoneConfirmLinkResponse } from './config';
 import { ReferredUser, ReferralTransaction } from '../types/referral';
 import { DeletionFeedback } from '../types/account';
 import { SecureStorageService } from '../services/secureStorage';
 
 export type { NotificationSettings, ServiceBookingPayload, ServiceBooking, PushNotificationPreferences } from './config';
 export type { DeletionFeedback } from '../types/account';
+// Re-export phone auth types for consumers
+export type { PhoneVerifyRequest, PhoneVerifyResponse, PhoneCompleteProfileRequest, PhoneCompleteProfileResponse, PhoneConfirmLinkRequest, PhoneConfirmLinkResponse, PhoneAuthUser, PhoneVerifySuccessResponse, PhoneVerifyProfileRequiredResponse, PhoneCompleteProfileSuccessResponse, PhoneCompleteProfileLinkRequiredResponse, PhoneConfirmLinkSuccessResponse, PhoneConfirmLinkCancelledResponse } from './config';
 
 // User types
 export interface ProductSummary {
@@ -351,6 +353,96 @@ export class AuthService {
         identity_token: identityToken,
         nonce: nonce,
         confirmed: confirmed,
+      });
+
+      // Store JWT in SecureStore on successful link confirmation
+      if (response.data.jwt) {
+        await SecureStorageService.setAuthToken(response.data.jwt);
+      }
+
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Account linking failed');
+    }
+  }
+
+  /**
+   * Verify Firebase phone auth token with backend.
+   * 
+   * For existing users: Returns JWT and user data for immediate authentication.
+   * For new users: Returns profile_required flag indicating profile completion is needed.
+   * 
+   * @param firebaseToken - Firebase ID token from successful OTP verification
+   * @returns PhoneVerifyResponse - Either success with JWT or profile_required response
+   * 
+   * @see Requirements 6.1 - POST /api/authentication/phone/verify/
+   */
+  static async phoneVerify(firebaseToken: string): Promise<PhoneVerifyResponse> {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.PHONE_VERIFY, {
+        firebase_token: firebaseToken,
+      });
+
+      // Store JWT in SecureStore on success (existing user)
+      if (response.data.jwt) {
+        await SecureStorageService.setAuthToken(response.data.jwt);
+      }
+
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Phone verification failed');
+    }
+  }
+
+  /**
+   * Complete profile for new phone auth user.
+   * 
+   * For new email: Creates user account and returns JWT.
+   * For existing email: Returns requires_link_confirmation flag for account linking flow.
+   * 
+   * @param data - Profile data including name, email, phone_number, and firebase_uid
+   * @returns PhoneCompleteProfileResponse - Either success with JWT or link confirmation required
+   * 
+   * @see Requirements 6.2 - POST /api/authentication/phone/complete-profile/
+   */
+  static async phoneCompleteProfile(data: PhoneCompleteProfileRequest): Promise<PhoneCompleteProfileResponse> {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.PHONE_COMPLETE_PROFILE, {
+        name: data.name,
+        email: data.email,
+        phone_number: data.phone_number,
+        firebase_uid: data.firebase_uid,
+      });
+
+      // Store JWT in SecureStore on success (new user created)
+      if (response.data.jwt) {
+        await SecureStorageService.setAuthToken(response.data.jwt);
+      }
+
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Profile completion failed');
+    }
+  }
+
+  /**
+   * Confirm or cancel account linking for phone auth.
+   * 
+   * When confirmed=true: Links phone number to existing account and returns JWT.
+   * When confirmed=false: Cancels linking and returns cancellation message.
+   * 
+   * @param data - Link confirmation data including confirmed flag, email, phone_number, and firebase_uid
+   * @returns PhoneConfirmLinkResponse - Either success with JWT or cancellation message
+   * 
+   * @see Requirements 6.3 - POST /api/authentication/phone/confirm-link/
+   */
+  static async phoneConfirmLink(data: PhoneConfirmLinkRequest): Promise<PhoneConfirmLinkResponse> {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.PHONE_CONFIRM_LINK, {
+        confirmed: data.confirmed,
+        email: data.email,
+        phone_number: data.phone_number,
+        firebase_uid: data.firebase_uid,
       });
 
       // Store JWT in SecureStore on successful link confirmation

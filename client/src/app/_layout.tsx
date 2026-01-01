@@ -4,8 +4,8 @@ import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 
-import { useEffect, useRef } from "react";
-import { ActivityIndicator, StyleSheet, View, Platform } from 'react-native';
+import { useEffect, useRef, useCallback } from "react";
+import { ActivityIndicator, StyleSheet, View, Platform, Alert } from 'react-native';
 import '@/global.css';
 import React from "react";
 import Toast from 'react-native-toast-message';
@@ -16,6 +16,7 @@ import { ReferralProvider } from "../context/ReferralContext";
 import { LocalizationProvider, useLocalization } from "../context/LocalizationContext";
 import { ThemeProvider } from "../context/ThemeContext";
 import * as Notifications from 'expo-notifications';
+import * as Updates from 'expo-updates';
 import { useRouter } from 'expo-router';
 import { setupNotificationListener } from '../utils/notifications';
 import { initializeNotificationChannels, setupNotifeeEventHandler } from '../services/notifeeService';
@@ -55,6 +56,50 @@ function AppContent() {
   const { isLoading: isLocalizationLoading } = useLocalization();
   const router = useRouter();
   const notificationListener = useRef<Notifications.Subscription>();
+
+  // OTA Updates check
+  const checkForOTAUpdate = useCallback(async () => {
+    // Only check in production builds (not in development/Expo Go)
+    if (__DEV__) {
+      console.log('Skipping OTA update check in development mode');
+      return;
+    }
+
+    try {
+      const update = await Updates.checkForUpdateAsync();
+      
+      if (update.isAvailable) {
+        // Fetch the update
+        await Updates.fetchUpdateAsync();
+        
+        // Option 1: Silent reload (uncomment if you want instant update)
+        await Updates.reloadAsync();
+        
+        // Option 2: Ask user before reloading (better UX)
+        // Alert.alert(
+        //   'Update Available',
+        //   'A new version has been downloaded. Restart now to apply the update?',
+        //   [
+        //     { text: 'Later', style: 'cancel' },
+        //     { 
+        //       text: 'Restart', 
+        //       onPress: async () => {
+        //         await Updates.reloadAsync();
+        //       }
+        //     },
+        //   ]
+        // );
+      }
+    } catch (error) {
+      // Fail silently - don't disrupt user experience
+      console.log('OTA update check failed:', error);
+    }
+  }, []);
+
+  // Check for OTA updates on app start
+  useEffect(() => {
+    checkForOTAUpdate();
+  }, [checkForOTAUpdate]);
 
   useEffect(() => {
     // Hide splash screen only when both fonts and i18n are ready

@@ -979,7 +979,7 @@ const styles = StyleSheet.create({
   menuItemIcon: {
     width: wp(10.6),
     height: wp(10.6),
-    borderRadius: wp(5.3),
+    borderRadius: wp(2.5),  // Changed from wp(5.3) to rounded square instead of circle/hexagon
     backgroundColor: '#f8fafc',
     justifyContent: 'center',
     alignItems: 'center',

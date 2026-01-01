@@ -216,6 +216,36 @@
     "linkingFailedMessage": "Unable to link accounts. Please try again.",
     "linkingCancelled": "Linking Cancelled",
     "linkingCancelledMessage": "You can create a new account instead",
+    "continueWithPhone": "Continue with Phone",
+    "phoneLogin": {
+      "title": "Login with Phone",
+      "instruction": "Enter your phone number to receive a verification code",
+      "placeholder": "Enter phone number",
+      "sendOtp": "Send OTP",
+      "smsInfo": "You will receive an SMS with a verification code"
+    },
+    "phoneOtp": {
+      "title": "Verify Phone",
+      "instruction": "Enter the 6-digit code sent to",
+      "resendOtp": "Resend OTP",
+      "resendIn": "Resend in {{seconds}}s",
+      "verify": "Verify",
+      "verifying": "Verifying...",
+      "otpResent": "OTP sent successfully"
+    },
+    "phoneProfile": {
+      "title": "Complete Your Profile",
+      "instruction": "Please provide your details to create your account",
+      "verifiedPhone": "Verified Phone",
+      "submit": "Create Account"
+    },
+    "phoneLinkConfirm": {
+      "title": "Link Your Account?",
+      "message": "An account with the email {{email}} already exists. Would you like to link your phone number to this existing account?",
+      "authProvider": "Current sign-in method: {{provider}}",
+      "linkButton": "Link Account",
+      "cancelButton": "Cancel"
+    },
     "errors": {
       "emailRequired": "Email is required",
       "invalidEmail": "Please enter a valid email address",

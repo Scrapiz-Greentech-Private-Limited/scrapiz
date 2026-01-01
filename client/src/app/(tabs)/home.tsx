@@ -3,6 +3,7 @@ import { View, Text,StyleSheet,ScrollView,TouchableOpacity,Dimensions,Image,Plat
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import * as Updates from 'expo-updates';
 import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -350,6 +351,9 @@ const services = useMemo(() => [
       </View>
     );
   }
+  console.log('Update ID:', Updates.updateId);
+  console.log('Runtime version:', Updates.runtimeVersion);
+  console.log('Channel:', Updates.channel);
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar 
@@ -375,7 +379,7 @@ const services = useMemo(() => [
           end={{ x: 1, y: 1 }}
         >
           {/* Decorative circles */}
-v          <View style={[styles.decorativeCircle1, { opacity: isDark ? 0.05 : 0.1 }]} />
+          <View style={[styles.decorativeCircle1, { opacity: isDark ? 0.05 : 0.1 }]} />
           <View style={[styles.decorativeCircle2, { opacity: isDark ? 0.05 : 0.08 }]} />
           <View style={[styles.decorativeCircle3, { opacity: isDark ? 0.03 : 0.06 }]} />
           
@@ -444,11 +448,14 @@ v          <View style={[styles.decorativeCircle1, { opacity: isDark ? 0.05 : 0.
                   // Fallback to initials or user icon
                   if (user?.name) {
                     return (
-                      <View style={styles.profileInitials}>
+                      <View style={[
+                        styles.profileInitials,
+                        { backgroundColor: isDark ? '#166534' : '#16a34a' }
+                      ]}>
                         <Text style={{ 
                             fontSize: fs(14), 
                             fontWeight: 'bold', 
-                            color: isDark ? '#ecfccb' : '#15803d'
+                            color: '#ffffff'
                         }}>
                           {getInitials(user.name) || 'U'}
                         </Text>
@@ -457,8 +464,11 @@ v          <View style={[styles.decorativeCircle1, { opacity: isDark ? 0.05 : 0.
                   }
                   
                   return (
-                    <View style={styles.profileIconWrapper}>
-                      <User size={fs(20)} color={isDark ? '#6ee7b7' : '#16a34a'} strokeWidth={2.8} />
+                    <View style={[
+                      styles.profileIconWrapper,
+                      { backgroundColor: isDark ? '#166534' : '#16a34a' }
+                    ]}>
+                      <User size={fs(20)} color="#ffffff" strokeWidth={2.8} />
                     </View>
                   );
                 })()}
@@ -499,8 +509,8 @@ v          <View style={[styles.decorativeCircle1, { opacity: isDark ? 0.05 : 0.
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
             >
-                <View style={[styles.actionIcon, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
-                  <PackagePlus size={28} color="#ffffff" strokeWidth={2.5} />
+                <View style={styles.actionIcon}>
+                  <PackagePlus size={32} color="#ffffff" strokeWidth={2} />
                 </View>
                 <Text style={[styles.actionTitle, { color: 'white' }]}>{t('home.sellScrap')}</Text>
                 <Text style={[styles.actionSubtitle, { color: 'rgba(255,255,255,0.7)' }]}>{t('home.schedulePickup')}</Text>
@@ -517,8 +527,8 @@ v          <View style={[styles.decorativeCircle1, { opacity: isDark ? 0.05 : 0.
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
              >
-                <View style={[styles.actionIcon, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
-                  <AreaChart size={28} color="#ffff" strokeWidth={2.5} />
+                <View style={styles.actionIcon}>
+                  <AreaChart size={32} color="#ffffff" strokeWidth={2} />
                 </View>
                 <Text style={[styles.actionTitle, { color: 'white' }]}>{t('home.viewRates')}</Text>
                 <Text style={[styles.actionSubtitle, { color: 'rgba(255,255,255,0.7)' }]}>{t('home.todaysPrices')}</Text>
@@ -917,7 +927,6 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#dcfce7',
     borderRadius: wp(5),
   },
   profileIconWrapper: {
@@ -925,6 +934,7 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: wp(5),
   },
   searchBarContainer: {
     marginBottom: hp(1), // 8
@@ -1110,17 +1120,7 @@ rateCard: {
     justifyContent: 'center',
   },
   actionIcon: {
-    width: wp(13),          // CHANGED: Increased from 10 to 13
-    height: wp(13),         // CHANGED: Increased from 10 to 13
-    borderRadius: wp(6.5),  // Adjusted to half of width
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: hp(1.2),  // Give space between icon and text
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    marginBottom: hp(1.2),
   },
   actionTitle: {
     fontSize: fs(16),       // CHANGED: Increased from 14 to 16 for better readability

@@ -698,15 +698,16 @@ const styles = StyleSheet.create({
   timeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    justifyContent: 'space-between',
   },
   timeChip: {
-    width: (width - 52) / 3, // Calculate width: (screen width - padding - gaps) / 3
+    width: '31%',  // 3 items per row with space between
     paddingVertical: 14,
     borderRadius: 12,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 10,
   },
   timeText: {
     fontSize: 14,
