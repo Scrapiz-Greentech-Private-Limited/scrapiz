@@ -267,12 +267,12 @@ export default function SellServiceUnavailable({ onGoHome, onRetryPincode }: Sel
           {/* Retry Pincode Button */}
           {onRetryPincode && (
             <TouchableOpacity
-              style={[styles.retryButton, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : '#fef9f0', borderColor: '#f59e0b' }]}
+              style={[styles.retryButton, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#f0fdf4', borderColor: colors.primary }]}
               onPress={onRetryPincode}
               activeOpacity={0.8}
             >
-              <MapPin size={20} color="#f59e0b" />
-              <Text style={[styles.retryButtonText, { color: '#f59e0b' }]}>Entered Wrong Pincode?</Text>
+              <MapPin size={20} color={colors.primary} />
+              <Text style={[styles.retryButtonText, { color: colors.primary }]}>Entered Wrong Pincode?</Text>
             </TouchableOpacity>
           )}
 
