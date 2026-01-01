@@ -16,6 +16,8 @@ develop-eggs/
 dist/
 downloads/
 eggs/
+android/
+ios/
 android/.gradle
 android/build
 android/app/build
