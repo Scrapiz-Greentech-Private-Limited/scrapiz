@@ -32,6 +32,16 @@
             "CFBundleURLSchemes": [
               "com.googleusercontent.apps.515246444918-9i1en7elr36ogmjimmsu0durj7cr0aai"
             ]
+          },
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.515246444918-9i1en7elr36ogmjimmsu0durj7cr0aai"
+            ]
+          },
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.515246444918-9i1en7elr36ogmjimmsu0durj7cr0aai"
+            ]
           }
         ],
         "ITSAppUsesNonExemptEncryption": false
@@ -58,6 +68,12 @@
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.INTERNET",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.INTERNET",
         "android.permission.RECORD_AUDIO"
       ],
       "package": "com.scrapiz.app",
@@ -69,15 +85,15 @@
       "color": "#16a34a"
     },
     "web": {
-      "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/images/newapp.png"
+      "supportedPlatforms": []
     },
     "plugins": [
       "expo-router",
       "expo-apple-authentication",
       "expo-image-picker",
-       [
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      [
         "expo-secure-store",
         {
           "configureAndroidBackup": true,
@@ -139,9 +155,12 @@
         "projectId": "53993ab9-a554-4468-bbb9-e825c5646e77"
       }
     },
-    "runtimeVersion": "1.0.0",
+    "runtimeVersion": "1.1.4",
     "updates": {
-      "url": "https://u.expo.dev/ecd7e0de-6b00-4bb9-acde-8dda52a2fd22"
+      "url": "https://u.expo.dev/53993ab9-a554-4468-bbb9-e825c5646e77",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
     },
     "owner": "scrapiz"
   }
