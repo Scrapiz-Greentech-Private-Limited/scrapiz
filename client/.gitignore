@@ -16,6 +16,10 @@ develop-eggs/
 dist/
 downloads/
 eggs/
+android/.gradle
+android/build
+android/app/build
+.gradle
 .eggs/
 lib64/
 parts/
