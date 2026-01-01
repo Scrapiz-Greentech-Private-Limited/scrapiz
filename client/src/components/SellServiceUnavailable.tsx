@@ -22,9 +22,10 @@ import { WaitlistService, ServiceabilityAPI, ServiceableCity } from '../api/apiS
 
 interface SellServiceUnavailableProps {
   onGoHome: () => void;
+  onRetryPincode?: () => void;
 }
 
-export default function SellServiceUnavailable({ onGoHome }: SellServiceUnavailableProps) {
+export default function SellServiceUnavailable({ onGoHome, onRetryPincode }: SellServiceUnavailableProps) {
   const router = useRouter();
   const { currentLocation } = useLocation();
   const { colors, isDark } = useTheme();
@@ -263,6 +264,18 @@ export default function SellServiceUnavailable({ onGoHome }: SellServiceUnavaila
             </View>
           )}
 
+          {/* Retry Pincode Button */}
+          {onRetryPincode && (
+            <TouchableOpacity
+              style={[styles.retryButton, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : '#fef9f0', borderColor: '#f59e0b' }]}
+              onPress={onRetryPincode}
+              activeOpacity={0.8}
+            >
+              <MapPin size={20} color="#f59e0b" />
+              <Text style={[styles.retryButtonText, { color: '#f59e0b' }]}>Entered Wrong Pincode?</Text>
+            </TouchableOpacity>
+          )}
+
           {/* Go to Home Button */}
           <TouchableOpacity
             style={[styles.homeButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
@@ -431,6 +444,22 @@ const styles = StyleSheet.create({
   homeButtonText: {
     fontSize: 16,
     fontWeight: '700',
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 14,
+    borderWidth: 2,
+    marginBottom: 12,
+    width: '100%',
+  },
+  retryButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   footerNote: {
     fontSize: 12,

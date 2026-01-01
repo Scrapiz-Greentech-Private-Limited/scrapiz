@@ -52,7 +52,8 @@ import SellServiceUnavailable from '../../components/SellServiceUnavailable';
 import { 
   hasSellServiceabilityBeenChecked, 
   getSellServiceAvailability,
-  setSellServiceability 
+  setSellServiceability,
+  resetSellServiceability 
 } from '../../utils/sellServiceability';
 import FeedbackModal from '../../components/FeedbackModal';
 import NetworkRetryOverlay from '../../components/NetworkRetryOverlay';
@@ -190,6 +191,13 @@ export default function SellScreen() {
     router.replace('/(tabs)/home');
   };
 
+  const handleRetryPincode = async () => {
+    // Reset the serviceability state so user can re-enter pincode
+    await resetSellServiceability();
+    // Show the location gate again
+    setScreenState('location_gate');
+  };
+
   // Show loading while checking
   if (screenState === 'checking') {
     return (
@@ -214,7 +222,12 @@ export default function SellScreen() {
 
   // Show service unavailable screen
   if (screenState === 'not_serviceable') {
-    return <SellServiceUnavailable onGoHome={handleGoHome} />;
+    return (
+      <SellServiceUnavailable 
+        onGoHome={handleGoHome} 
+        onRetryPincode={handleRetryPincode}
+      />
+    );
   }
 
   // Continue with normal sell screen (serviceable)
