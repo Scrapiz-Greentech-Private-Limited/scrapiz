@@ -227,8 +227,7 @@ export default function SellScreen() {
         onGoHome={handleGoHome} 
         onRetryPincode={handleRetryPincode}
       />
-    );
-  }
+  
 
   // Continue with normal sell screen (serviceable)
   return <SellScreenContent />;
@@ -438,50 +437,40 @@ function SellScreenContent() {
   };
 
   const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'Permission to access media library is required!');
-      return;
+  const MAX_IMAGES = 5;
+
+  if (selectedImages.length >= MAX_IMAGES) {
+    Alert.alert(
+      'Limit Reached',
+      `You can upload a maximum of ${MAX_IMAGES} images per order.`
+    );
+    return;
+  }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    allowsMultipleSelection: true,
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    quality: 0.8,
+    selectionLimit: MAX_IMAGES - selectedImages.length, // Android-safe
+  });
+
+  if (!result.canceled) {
+    const compressedUris: string[] = [];
+
+    for (const asset of result.assets) {
+      const compressedUri = await compressImage(asset.uri);
+      compressedUris.push(compressedUri);
     }
 
-    // Check current image count
-    const MAX_IMAGES = 5;
-    if (selectedImages.length >= MAX_IMAGES) {
-      Alert.alert('Limit Reached', `You can upload a maximum of ${MAX_IMAGES} images per order.`);
-      return;
-    }
+    setSelectedImages(prev => [...prev, ...compressedUris]);
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      allowsMultipleSelection: true,
-      quality: 0.8,
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    Toast.show({
+      type: 'success',
+      text1: 'Images Added',
+      text2: `${compressedUris.length} images ready`,
     });
-
-    if (!result.canceled) {
-      // Check if adding these images would exceed the limit
-      const remainingSlots = MAX_IMAGES - selectedImages.length;
-      const assetsToAdd = result.assets.slice(0, remainingSlots);
-      
-      if (result.assets.length > remainingSlots) {
-        Alert.alert(
-          'Image Limit',
-          `Only ${remainingSlots} more image(s) can be added. Maximum ${MAX_IMAGES} images per order.`
-        );
-      }
-
-      const compressedUris: string[] = [];
-      for (const asset of assetsToAdd) {
-        const compressedUri = await compressImage(asset.uri);
-        compressedUris.push(compressedUri);
-      }
-      setSelectedImages(prev => [...prev, ...compressedUris]);
-      Toast.show({
-        type: 'success',
-        text1: 'Images Added',
-        text2: `${compressedUris.length} images compressed and ready`
-      });
-    }
-  };
+  }
+};
 
   const removeImage = (uri: string) => {
     setSelectedImages(prev => prev.filter(imageUri => imageUri !== uri));

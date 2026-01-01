@@ -65,20 +65,12 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.READ_MEDIA_IMAGES",
-        "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.INTERNET",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.READ_MEDIA_IMAGES",
-        "android.permission.READ_MEDIA_VIDEO",
         "android.permission.INTERNET",
         "android.permission.RECORD_AUDIO"
       ],
       "package": "com.scrapiz.app",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 31
+      "versionCode": 42
     },
     "notification": {
       "icon": "./assets/images/foreground5.png",

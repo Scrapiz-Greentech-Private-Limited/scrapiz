@@ -84,36 +84,30 @@ export default function EditProfileScreen(){
     }
     
     const handlePickImage = async () => {
-        try {
-            // Request permissions
-            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            
-            if (status !== 'granted') {
-                Alert.alert(
-                    t('alerts.titles.permissionRequired'),
-                    t('alerts.permissions.cameraRollRequired'),
-                    [{ text: t('alerts.buttons.ok') }]
-                );
-                return;
-            }
-            
-            // Launch image picker
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: true,
-                aspect: [1, 1],
-                quality: 0.8,
-            });
-            
-            if (!result.canceled && result.assets && result.assets.length > 0) {
-                setFormData(prev => ({ ...prev, profileImage: result.assets[0].uri }));
-                setImageError(false);
-            }
-        } catch (error) {
-            Alert.alert(t('alerts.titles.error'), t('toasts.error.imagePickerFailed'));
-            console.error('Image picker error:', error);
-        }
-    };
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets?.length) {
+      setFormData(prev => ({
+        ...prev,
+        profileImage: result.assets[0].uri,
+      }));
+      setImageError(false);
+    }
+  } catch (error) {
+    Alert.alert(
+      t('alerts.titles.error'),
+      t('toasts.error.imagePickerFailed')
+    );
+    console.error(error);
+  }
+};
+
     
     const handleRemoveImage = () => {
         Alert.alert(

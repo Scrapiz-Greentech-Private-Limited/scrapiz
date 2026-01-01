@@ -156,35 +156,25 @@ export default function Profile() {
   };
 
   const handlePickImage = async () => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
-      if (status !== 'granted') {
-        Alert.alert(
-          t('alerts.titles.permissionRequired'),
-          t('alerts.permissions.cameraRollRequired'),
-          [{ text: t('alerts.buttons.ok') }]
-        );
-        return;
-      }
-      
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-      
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const newImageUri = result.assets[0].uri;
-        await updateProfileImage(newImageUri);
-      }
-    } catch (error) {
-      Alert.alert(t('alerts.titles.error'), t('toasts.error.imagePickerFailed'));
-      console.error('Image picker error:', error);
-    }
-  };
+  try {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
 
+    if (!result.canceled && result.assets?.length) {
+      await updateProfileImage(result.assets[0].uri);
+    }
+  } catch (error) {
+    Alert.alert(
+      t('alerts.titles.error'),
+      t('toasts.error.imagePickerFailed')
+    );
+    console.error(error);
+  }
+};
   const updateProfileImage = async (imageUri: string) => {
     try {
       setUpdatingImage(true);
