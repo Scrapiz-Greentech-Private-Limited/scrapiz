@@ -7,6 +7,7 @@
     "icon": "./assets/images/newapp.png",
     "scheme": "com.scrapiz.app",
     "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/images/newapp.png",
       "resizeMode": "contain",
@@ -86,6 +87,16 @@
       "@react-native-firebase/app",
       "@react-native-firebase/auth",
       [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "ndkVersion": "26.1.10909125"
+          }
+        }
+      ],
+      [
         "expo-secure-store",
         {
           "configureAndroidBackup": true,
@@ -127,7 +138,8 @@
           "MBXAccessToken": "pk.eyJ1IjoiYXlhYW5hbWphZCIsImEiOiJjbWhxbW1veHcwdnB2MmpzNDA2emo1aWp3In0.Mc5kN89_lqGeagn5jWvvzA"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-build-properties"
     ],
     "experiments": {
       "typedRoutes": true
