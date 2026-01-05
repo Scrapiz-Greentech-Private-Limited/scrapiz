@@ -1607,7 +1607,7 @@ function SellScreenContent() {
       {/* Keep in Mind Section */}
       <View style={[styles.keepInMindCard, { backgroundColor: colors.surface }]}>
   <Text style={[styles.keepInMindTitle, { color: colors.text }]}>
-    Please keep in mind
+    Please keep in mind that we do not accept{'\n'}the following items:
   </Text>
 
   <View style={styles.keepInMindGrid}>
