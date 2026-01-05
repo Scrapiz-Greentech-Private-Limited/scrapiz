@@ -3254,7 +3254,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-  }
+  },
   keepInMindItem: {
     width: '48%', 
     backgroundColor: '#fef9f0',
