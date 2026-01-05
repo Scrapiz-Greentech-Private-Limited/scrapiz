@@ -20,13 +20,26 @@ class Product(models.Model):
     max_rate = models.IntegerField(null=True, blank=True)
     min_rate = models.IntegerField(null=True, blank=True)
     unit = models.CharField(max_length=50, null=True, blank=True)
-    description = models.CharField(max_length=50, null=True, blank=True) 
+    description = models.TextField(null=True, blank=True)
     category = models.ForeignKey(Category, related_name="products", on_delete=models.CASCADE)
     image_url = models.URLField(
         max_length=500,
         null=True,
         blank=True,
         help_text="URL to product image stored in S3"
+    )
+    # Environmental impact fields (per unit recycled)
+    trees_saved_per_unit = models.DecimalField(
+        max_digits=6,
+        decimal_places=3,
+        default=0.0,
+        help_text="Trees saved per unit recycled (e.g., 0.17 for newspaper)"
+    )
+    co2_reduced_per_unit = models.DecimalField(
+        max_digits=6,
+        decimal_places=3,
+        default=0.0,
+        help_text="CO2 reduced in kg per unit recycled (e.g., 2.5 for newspaper)"
     )
     
     def __str__(self):
@@ -48,7 +61,17 @@ class OrderNo(models.Model):
     address = models.ForeignKey(AddressModel, related_name="address", on_delete=models.CASCADE, null=True, blank=True)
     images = models.JSONField(null=True, blank=True, default=list)
     redeemed_referral_bonus = models.DecimalField(max_digits=10,decimal_places=2,default=0.00)
-    estimated_order_value = models.DecimalField(max_digits=10,decimal_places=2,default=0.00)  
+    estimated_order_value = models.DecimalField(max_digits=10,decimal_places=2,default=0.00)
+    # Agent assignment
+    assigned_agent = models.ForeignKey(
+        'agents.Agent',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_orders',
+        help_text="Agent assigned to this order"
+    )
+    assigned_at = models.DateTimeField(null=True, blank=True, help_text="When the agent was assigned")
 
     def __str__(self):
         return f"OrderNo {self.order_number} by {self.user}"

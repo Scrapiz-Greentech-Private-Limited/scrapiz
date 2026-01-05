@@ -1,9 +1,3 @@
-"""
-Business logic service for serviceability checks.
-
-This module provides the core business logic for determining whether
-a location (by pincode or coordinates) is serviceable by Scrapiz.
-"""
 
 from typing import Dict, Optional, Tuple
 from decimal import Decimal

@@ -12,6 +12,14 @@ class UserSerializer(serializers.ModelSerializer):
     orders = OrderNoSerializer(many=True, read_only=True)
     addresses = AddressSerializer(many=True, read_only=True)
     
+    # Avatar fields
+    avatar_provider = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=50)
+    avatar_style = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=50)
+    avatar_seed = serializers.CharField(required=False, allow_null=True, allow_blank=True, max_length=100)
+    
+    # Valid avatar styles for DiceBear
+    VALID_AVATAR_STYLES = ['avataaars', 'pixel-art', 'bottts', 'lorelei', 'adventurer', 'fun-emoji']
+    
     class Meta:
         model = User
         fields = [
@@ -28,7 +36,13 @@ class UserSerializer(serializers.ModelSerializer):
             'referred_balance',
             'has_completed_first_order',
             'profile_image',
+            'avatar_provider',
+            'avatar_style',
+            'avatar_seed',
             'is_staff',
+            'is_superuser',
+            'is_active',
+            'date_joined',
             'orders',
             'addresses',
             ]
@@ -37,7 +51,18 @@ class UserSerializer(serializers.ModelSerializer):
             'referral_code': {'read_only': True},
             'referred_balance': {'read_only': True},
             'has_completed_first_order': {'read_only': True},
+            'is_superuser': {'read_only': True},
+            'is_active': {'read_only': True},
+            'date_joined': {'read_only': True},
         }
+    
+    def validate_avatar_style(self, value):
+        """Validate that avatar_style is one of the supported DiceBear styles."""
+        if value and value not in self.VALID_AVATAR_STYLES:
+            raise serializers.ValidationError(
+                f"Invalid avatar style. Must be one of: {', '.join(self.VALID_AVATAR_STYLES)}"
+            )
+        return value
 class PasswordResetRequestSerializer(serializers.Serializer):
     email = serializers.EmailField()
 

@@ -21,6 +21,7 @@ ALLOWED_HOSTS = [
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
+    "http://localhost:9002",
     'http://192.168.0.107:8081',
     "https://scrapiz.in",
     "https://api.scrapiz.in"
@@ -28,12 +29,26 @@ CORS_ALLOWED_ORIGINS = [
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
+    "http://localhost:9002",
     'http://192.168.0.107:8081',
     "https://scrapiz.in",
     "https://api.scrapiz.in"
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+    "x-auth-app",  # Custom header for frontend authentication
+]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -52,6 +67,9 @@ INSTALLED_APPS = [
     'notifications',
     'waitlist',
     'serviceability',
+    'agents',
+    'dashboard',
+    'feedback',
     'django_celery_beat'
 ]
 

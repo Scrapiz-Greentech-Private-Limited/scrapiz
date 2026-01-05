@@ -1,5 +1,6 @@
 import os
 import jwt
+from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -7,6 +8,10 @@ from rest_framework.exceptions import AuthenticationFailed
 from .serializers import AddressSerializer, NotificationPreferenceSerializer
 from .models import AddressModel, NotificationPreference
 from authentication.models import User
+
+# Use the same JWT secret as usercheck.py for consistency
+JWT_SECRET = getattr(settings, "SECRET_KEY", "your-secret-key")
+JWT_ALGORITHM = "HS256"
 
 
 class AuthenticatedAPIView(APIView):
@@ -20,8 +25,12 @@ class AuthenticatedAPIView(APIView):
         if not token:
             raise AuthenticationFailed('Unauthenticated!')
 
+        # Strip 'Bearer ' prefix if present
+        if token.startswith('Bearer '):
+            token = token[7:]
+
         try:
-            payload = jwt.decode(token, 'secret', algorithms=["HS256"])
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         except jwt.ExpiredSignatureError:
             raise AuthenticationFailed('Token expired!')
         except jwt.InvalidTokenError:

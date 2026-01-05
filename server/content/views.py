@@ -4,6 +4,26 @@ from rest_framework.response import Response
 from django.conf import settings
 from .models import CarouselImage
 from .serializers import CarouselImageSerializer
+from authentication.views.admin_auth import get_admin_from_request
+
+
+class IsAdminDashboardUser(permissions.BasePermission):
+    """
+    Custom permission class that checks for AdminUser authentication.
+    Works with the separate AdminUser model used by the admin dashboard.
+    """
+    
+    def has_permission(self, request, view):
+        # Check for AdminUser JWT authentication
+        admin_user = get_admin_from_request(request)
+        if admin_user:
+            # Attach admin_user to request for use in views
+            request.admin_user = admin_user
+            return True
+        
+        # Fallback to Django's built-in staff check
+        return request.user and request.user.is_staff
+
 
 class CarouselImageViewSet(viewsets.ModelViewSet):
     """
@@ -28,18 +48,20 @@ class CarouselImageViewSet(viewsets.ModelViewSet):
         """
         if self.action == 'list':
             return [permissions.AllowAny()]
-        return [permissions.IsAdminUser()]
+        return [IsAdminDashboardUser()]
     
     def get_queryset(self):
         """
         Return only active images for public list view,
         return all images for admin views
         """
-        if self.action == 'list' and not self.request.user.is_staff:
+        # Check for AdminUser authentication
+        admin_user = get_admin_from_request(self.request)
+        if self.action == 'list' and not admin_user and not self.request.user.is_staff:
             return CarouselImage.objects.filter(is_active=True)
         return CarouselImage.objects.all()
     
-    @action(detail=False, methods=['post'], permission_classes=[permissions.IsAdminUser])
+    @action(detail=False, methods=['post'], permission_classes=[IsAdminDashboardUser])
     def reorder(self, request):
         """
         Reorder carousel images.

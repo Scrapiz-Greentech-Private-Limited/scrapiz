@@ -1,5 +1,6 @@
 from rest_framework import viewsets
 from .models import Category, Product, Status, OrderNo, Order
+from .utils import get_status_by_name
 from .serializers import (
     CategorySerializer,
     ProductSerializer,
@@ -24,6 +25,8 @@ from django.db import transaction as db_transaction
 from django.utils import timezone
 import os
 import random
+import sys
+import logging
 from dotenv import load_dotenv
 from user.models import AddressModel
 from authentication.utils import delete_s3_file
@@ -33,6 +36,8 @@ from django.conf import settings
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from utils.validation_check import validate_images
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 def generate_order_number():
   """
@@ -47,112 +52,199 @@ def generate_order_number():
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    
     def perform_create(self, serializer):
-      image_file = self.request.FILES.get('image')
-      if image_file:
-        try:
-          validate_images(image_file)
-          category = serializer.save()
-          file_extension = image_file.name.split('.')[-1].lower()
-          random_string = get_random_string(length=16)
-          
-          file_path = f"images/categories/{category.id}/{random_string}.{file_extension}"
-          saved_path = default_storage.save(file_path, image_file)
-          file_url = default_storage.url(saved_path)
-          category.image_url = file_url
-          category.save(update_fields=['image_url'])
-        except Exception as e:
-          if 'category' in locals():
-            category.delete()
-          if isinstance(e, ValidationError):
-            raise DRFValidationError({"error": str(e)})
-          raise DRFValidationError({"error": f"Failed to upload image: {str(e)}"})
-      else:
-        serializer.save()
+        image_file = self.request.FILES.get('image')
+        image_url = self.request.data.get('image_url')
+        
+        # DEBUG: Log what we're receiving
+        logger.warning("=" * 60)
+        logger.warning("[CategoryViewSet.perform_create] DEBUG:")
+        logger.warning(f"  request.data = {dict(self.request.data)}")
+        logger.warning(f"  image_file = {image_file}")
+        logger.warning(f"  image_url = {repr(image_url)} (type: {type(image_url).__name__})")
+        logger.warning(f"  content_type = {self.request.content_type}")
+        logger.warning("=" * 60)
+        sys.stdout.flush()
+        
+        if image_file:
+            try:
+                validate_images(image_file)
+                category = serializer.save()
+                file_extension = image_file.name.split('.')[-1].lower()
+                random_string = get_random_string(length=16)
+                file_path = f"images/categories/{category.id}/{random_string}.{file_extension}"
+                saved_path = default_storage.save(file_path, image_file)
+                file_url = default_storage.url(saved_path)
+                category.image_url = file_url
+                category.save(update_fields=['image_url'])
+                logger.warning(f"[CategoryViewSet] SUCCESS: Saved with file, image_url={category.image_url}")
+            except Exception as e:
+                if 'category' in locals():
+                    category.delete()
+                if isinstance(e, ValidationError):
+                    raise DRFValidationError({"error": str(e)})
+                raise DRFValidationError({"error": f"Failed to upload image: {str(e)}"})
+        elif image_url and str(image_url).strip() and image_url != 'null':
+            category = serializer.save()
+            category.image_url = str(image_url).strip()
+            category.save(update_fields=['image_url'])
+            logger.warning(f"[CategoryViewSet] SUCCESS: Saved with URL, image_url={category.image_url}")
+        else:
+            serializer.save()
+            logger.warning(f"[CategoryViewSet] INFO: Saved without image")
+            
     def perform_update(self, serializer):
-       image_file = self.request.FILES.get('image')
-       category = self.get_object()
-       if 'image' in self.request.data and not image_file:
-         if category.image_url:
-           delete_s3_file(category.image_url)
-           category.image_url = None
-           category.save(update_fields=['image_url'])
-       elif image_file:
-         try:
-           validate_images(image_file)
-           if category.image_url:
-             delete_s3_file(category.image_url)
-           file_extension = image_file.name.split('.')[-1].lower()
-           random_string = get_random_string(length=16)
-           file_path = f"images/categories/{category.id}/{random_string}.{file_extension}"
-           saved_path = default_storage.save(file_path, image_file)
-           file_url = default_storage.url(saved_path)
-           category.image_url = file_url
-           category.save(update_fields=['image_url'])
-         except Exception as e:
-           if isinstance(e, ValidationError):
-             raise DRFValidationError({"error": str(e)})
-           raise DRFValidationError({"error": f"Failed to upload image: {str(e)}"})
-       serializer.save()
+        image_file = self.request.FILES.get('image')
+        image_url = self.request.data.get('image_url')
+        category = self.get_object()
+        
+        # DEBUG
+        logger.warning("=" * 60)
+        logger.warning("[CategoryViewSet.perform_update] DEBUG:")
+        logger.warning(f"  request.data = {dict(self.request.data)}")
+        logger.warning(f"  image_file = {image_file}")
+        logger.warning(f"  image_url = {repr(image_url)} (type: {type(image_url).__name__})")
+        logger.warning("=" * 60)
+        sys.stdout.flush()
+        
+        if 'image' in self.request.data and not image_file:
+            if category.image_url:
+                delete_s3_file(category.image_url)
+                category.image_url = None
+                category.save(update_fields=['image_url'])
+        elif image_file:
+            try:
+                validate_images(image_file)
+                if category.image_url:
+                    delete_s3_file(category.image_url)
+                file_extension = image_file.name.split('.')[-1].lower()
+                random_string = get_random_string(length=16)
+                file_path = f"images/categories/{category.id}/{random_string}.{file_extension}"
+                saved_path = default_storage.save(file_path, image_file)
+                file_url = default_storage.url(saved_path)
+                category.image_url = file_url
+                category.save(update_fields=['image_url'])
+                logger.warning(f"[CategoryViewSet] SUCCESS: Updated with file")
+            except Exception as e:
+                if isinstance(e, ValidationError):
+                    raise DRFValidationError({"error": str(e)})
+                raise DRFValidationError({"error": f"Failed to upload image: {str(e)}"})
+        elif image_url and str(image_url).strip() and image_url != 'null':
+            if category.image_url and category.image_url != str(image_url).strip():
+                delete_s3_file(category.image_url)
+            category.image_url = str(image_url).strip()
+            category.save(update_fields=['image_url'])
+            logger.warning(f"[CategoryViewSet] SUCCESS: Updated with URL, image_url={category.image_url}")
+        else:
+            logger.warning(f"[CategoryViewSet] INFO: No image update")
+        serializer.save()
+        
     def perform_destroy(self, instance):
-      if instance.image_url:
-        delete_s3_file(instance.image_url)
-      instance.delete()    
+        if instance.image_url:
+            delete_s3_file(instance.image_url)
+        instance.delete()
 
 
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+    
     def perform_create(self, serializer):
-      image_file = self.request.FILES.get('image')
-      if image_file:
-        try:
-          validate_images(image_file)
-          product = serializer.save()
-          file_extension = image_file.name.split('.')[-1].lower()
-          random_string = get_random_string(length=16)
-          file_path = f"images/products/{product.id}/{random_string}.{file_extension}"
-          saved_path = default_storage.save(file_path, image_file)
-          file_url = default_storage.url(saved_path)
-          product.image_url = file_url
-          product.save(update_fields=['image_url'])
-        except Exception as e:
-          if 'product' in locals():
-            product.delete()
-          if isinstance(e, ValidationError):
-            raise DRFValidationError({"error": str(e)})
-          raise DRFValidationError({"error": f"Failed to upload image: {str(e)}"})
-      else:
-        serializer.save()
-    def perform_update(self, serializer):
-      image_file = self.request.FILES.get('image')
-      product = self.get_object()
-      if 'image' in self.request.data and not image_file:
-        if product.image_url:
-          delete_s3_file(product.image_url)
-          product.image_url = None
-          product.save(update_fields=['image_url'])
-        elif image_file:
-          try:
-            validate_images(image_file)
-            if product.image_url:
-              delete_s3_file(product.image_url)
-            file_extension = image_file.name.split('.')[-1].lower()
-            random_string = get_random_string(length=16)
-            file_path = f"images/products/{product.id}/{random_string}.{file_extension}"
-            saved_path = default_storage.save(file_path, image_file)
-            file_url = default_storage.url(saved_path)
-            product.image_url = file_url
+        image_file = self.request.FILES.get('image')
+        image_url = self.request.data.get('image_url')
+        
+        # DEBUG
+        logger.warning("=" * 60)
+        logger.warning("[ProductViewSet.perform_create] DEBUG:")
+        logger.warning(f"  request.data = {dict(self.request.data)}")
+        logger.warning(f"  image_file = {image_file}")
+        logger.warning(f"  image_url = {repr(image_url)} (type: {type(image_url).__name__})")
+        logger.warning(f"  content_type = {self.request.content_type}")
+        logger.warning("=" * 60)
+        sys.stdout.flush()
+        
+        if image_file:
+            try:
+                validate_images(image_file)
+                product = serializer.save()
+                file_extension = image_file.name.split('.')[-1].lower()
+                random_string = get_random_string(length=16)
+                file_path = f"images/products/{product.id}/{random_string}.{file_extension}"
+                saved_path = default_storage.save(file_path, image_file)
+                file_url = default_storage.url(saved_path)
+                product.image_url = file_url
+                product.save(update_fields=['image_url'])
+                logger.warning(f"[ProductViewSet] SUCCESS: Saved with file, image_url={product.image_url}")
+            except Exception as e:
+                if 'product' in locals():
+                    product.delete()
+                if isinstance(e, ValidationError):
+                    raise DRFValidationError({"error": str(e)})
+                raise DRFValidationError({"error": f"Failed to upload image: {str(e)}"})
+        elif image_url and str(image_url).strip() and image_url != 'null':
+            product = serializer.save()
+            product.image_url = str(image_url).strip()
             product.save(update_fields=['image_url'])
-          except Exception as e:
-            if isinstance(e, ValidationError):
-              raise DRFValidationError({"error": str(e)})
-            raise DRFValidationError({"error": f"Failed to upload image: {str(e)}"})
+            logger.warning(f"[ProductViewSet] SUCCESS: Saved with URL, image_url={product.image_url}")
+        else:
+            serializer.save()
+            logger.warning(f"[ProductViewSet] INFO: Saved without image")
+            
+    def perform_update(self, serializer):
+        image_file = self.request.FILES.get('image')
+        image_url = self.request.data.get('image_url')
+        product = self.get_object()
+        
+        # DEBUG
+        logger.warning("=" * 60)
+        logger.warning("[ProductViewSet.perform_update] DEBUG:")
+        logger.warning(f"  request.data = {dict(self.request.data)}")
+        logger.warning(f"  image_file = {image_file}")
+        logger.warning(f"  image_url = {repr(image_url)} (type: {type(image_url).__name__})")
+        logger.warning("=" * 60)
+        sys.stdout.flush()
+        
+        if 'image' in self.request.data and not image_file:
+            if product.image_url:
+                delete_s3_file(product.image_url)
+                product.image_url = None
+                product.save(update_fields=['image_url'])
+        elif image_file:
+            try:
+                validate_images(image_file)
+                if product.image_url:
+                    delete_s3_file(product.image_url)
+                file_extension = image_file.name.split('.')[-1].lower()
+                random_string = get_random_string(length=16)
+                file_path = f"images/products/{product.id}/{random_string}.{file_extension}"
+                saved_path = default_storage.save(file_path, image_file)
+                file_url = default_storage.url(saved_path)
+                product.image_url = file_url
+                product.save(update_fields=['image_url'])
+                logger.warning(f"[ProductViewSet] SUCCESS: Updated with file")
+            except Exception as e:
+                if isinstance(e, ValidationError):
+                    raise DRFValidationError({"error": str(e)})
+                raise DRFValidationError({"error": f"Failed to upload image: {str(e)}"})
+        elif image_url and str(image_url).strip() and image_url != 'null':
+            if product.image_url and product.image_url != str(image_url).strip():
+                delete_s3_file(product.image_url)
+            product.image_url = str(image_url).strip()
+            product.save(update_fields=['image_url'])
+            logger.warning(f"[ProductViewSet] SUCCESS: Updated with URL, image_url={product.image_url}")
+        else:
+            logger.warning(f"[ProductViewSet] INFO: No image update")
+        serializer.save()
+        
     def perform_destroy(self, instance):
-      if instance.image_url:
-        delete_s3_file(instance.image_url)
-      instance.delete()
+        if instance.image_url:
+            delete_s3_file(instance.image_url)
+        instance.delete()
+
+
 class StatusViewSet(viewsets.ModelViewSet):
     queryset = Status.objects.all()
     serializer_class = StatusSerializer
@@ -290,7 +382,8 @@ class CreateOrderAPIView(APIView):
               address=address,
               images=image_urls if image_urls else [],
               redeemed_referral_bonus= redeemed_amount,
-              estimated_order_value=estimated_order_value
+              estimated_order_value=estimated_order_value,
+              status=get_status_by_name("pending")
               )
             
             print(f"? Order created: {order_no.order_number}")
@@ -404,3 +497,500 @@ class CancelOrderAPIView(APIView):
             {"message": "Order cancelled successfully", "order": serialized_order.data},
             status=status.HTTP_200_OK,
         )
+
+
+# ============================================================================
+# ADMIN DASHBOARD API VIEWS
+# ============================================================================
+
+class AdminOrderListAPIView(APIView):
+    """
+    Admin endpoint to get all orders with full details.
+    Requires admin/staff privileges.
+    """
+    def get(self, request):
+        try:
+            user = authenticate_request(request, need_user=True)
+        except AuthenticationFailed as auth_error:
+            raise auth_error
+        
+        # Check admin privileges
+        if not user.is_staff and not user.is_superuser:
+            return Response(
+                {"error": "Admin privileges required"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get all orders with related data
+        orders = OrderNo.objects.all().select_related(
+            "user", "status", "address"
+        ).prefetch_related("orders__product").order_by('-created_at')
+        
+        serializer = OrderNoSerializer(orders, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AdminOrderDetailAPIView(APIView):
+    """
+    Admin endpoint to get a single order with full details.
+    Requires admin/staff privileges.
+    """
+    def get(self, request, order_id):
+        try:
+            user = authenticate_request(request, need_user=True)
+        except AuthenticationFailed as auth_error:
+            raise auth_error
+        
+        # Check admin privileges
+        if not user.is_staff and not user.is_superuser:
+            return Response(
+                {"error": "Admin privileges required"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            order = OrderNo.objects.select_related(
+                "user", "status", "address"
+            ).prefetch_related("orders__product").get(id=order_id)
+        except OrderNo.DoesNotExist:
+            return Response(
+                {"error": "Order not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        serializer = OrderNoSerializer(order)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AdminUpdateOrderStatusAPIView(APIView):
+    """
+    Admin endpoint to update order status.
+    Requires admin/staff privileges.
+    """
+    def patch(self, request, order_id):
+        try:
+            user = authenticate_request(request, need_user=True)
+        except AuthenticationFailed as auth_error:
+            raise auth_error
+        
+        # Check admin privileges
+        if not user.is_staff and not user.is_superuser:
+            return Response(
+                {"error": "Admin privileges required"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            order = OrderNo.objects.get(id=order_id)
+        except OrderNo.DoesNotExist:
+            return Response(
+                {"error": "Order not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        status_id = request.data.get("status_id")
+        status_name = request.data.get("status")
+        
+        if status_id:
+            try:
+                new_status = Status.objects.get(id=status_id)
+            except Status.DoesNotExist:
+                return Response(
+                    {"error": "Status not found"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        elif status_name:
+            # Find or create status by name
+            new_status, _ = Status.objects.get_or_create(
+                name__iexact=status_name,
+                defaults={"name": status_name.capitalize()}
+            )
+        else:
+            return Response(
+                {"error": "status_id or status is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        order.status = new_status
+        order.save(update_fields=["status"])
+        
+        serializer = OrderNoSerializer(order)
+        return Response({
+            "message": "Order status updated successfully",
+            "order": serializer.data
+        }, status=status.HTTP_200_OK)
+
+
+class AdminCancelOrderAPIView(APIView):
+    """
+    Admin endpoint to cancel any order.
+    Requires admin/staff privileges.
+    """
+    def post(self, request):
+        try:
+            user = authenticate_request(request, need_user=True)
+        except AuthenticationFailed as auth_error:
+            raise auth_error
+        
+        # Check admin privileges
+        if not user.is_staff and not user.is_superuser:
+            return Response(
+                {"error": "Admin privileges required"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        order_number = request.data.get("order_number")
+        order_id = request.data.get("order_id")
+        
+        if not order_number and not order_id:
+            return Response(
+                {"error": "order_number or order_id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        order = None
+        if order_number:
+            order = OrderNo.objects.filter(order_number=order_number).first()
+        elif order_id:
+            order = OrderNo.objects.filter(id=order_id).first()
+        
+        if not order:
+            return Response(
+                {"error": "Order not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        if order.status and order.status.name.lower() == "cancelled":
+            serializer = OrderNoSerializer(order)
+            return Response({
+                "message": "Order already cancelled",
+                "order": serializer.data
+            }, status=status.HTTP_200_OK)
+        
+        cancelled_status, _ = Status.objects.get_or_create(
+            name__iexact="cancelled",
+            defaults={"name": "Cancelled"}
+        )
+        
+        order.status = cancelled_status
+        order.save(update_fields=["status"])
+        
+        serializer = OrderNoSerializer(order)
+        return Response({
+            "message": "Order cancelled successfully",
+            "order": serializer.data
+        }, status=status.HTTP_200_OK)
+
+
+class AdminStatusListAPIView(APIView):
+    """
+    Admin endpoint to get all available statuses.
+    """
+    def get(self, request):
+        try:
+            user = authenticate_request(request, need_user=True)
+        except AuthenticationFailed as auth_error:
+            raise auth_error
+        
+        statuses = Status.objects.all()
+        serializer = StatusSerializer(statuses, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AdminAssignAgentAPIView(APIView):
+    """
+    Admin endpoint to assign an agent to an order.
+    Requires admin/staff privileges.
+    
+    POST /api/inventory/admin/orders/{order_id}/assign-agent/
+    Body: { "agent_id": <int> }
+    """
+    def post(self, request, order_id):
+        try:
+            user = authenticate_request(request, need_user=True)
+        except AuthenticationFailed as auth_error:
+            raise auth_error
+        
+        # Check admin privileges
+        if not user.is_staff and not user.is_superuser:
+            return Response(
+                {"error": "Admin privileges required"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            order = OrderNo.objects.select_related("assigned_agent").get(id=order_id)
+        except OrderNo.DoesNotExist:
+            return Response(
+                {"error": "Order not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        agent_id = request.data.get("agent_id")
+        if not agent_id:
+            return Response(
+                {"error": "agent_id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Import Agent model
+        from agents.models import Agent
+        
+        try:
+            agent = Agent.objects.get(id=agent_id)
+        except Agent.DoesNotExist:
+            return Response(
+                {"error": "Agent not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if agent is eligible (active and verified)
+        if agent.status != 'active':
+            return Response(
+                {"error": f"Agent is not active (current status: {agent.status})"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Assign agent to order
+        order.assigned_agent = agent
+        order.assigned_at = timezone.now()
+        
+        # Update order status to scheduled if it's pending
+        if order.status and order.status.name.lower() == 'pending':
+            scheduled_status, _ = Status.objects.get_or_create(
+                name__iexact="scheduled",
+                defaults={"name": "Scheduled"}
+            )
+            order.status = scheduled_status
+            order.save(update_fields=["assigned_agent", "assigned_at", "status"])
+        else:
+            order.save(update_fields=["assigned_agent", "assigned_at"])
+        
+        # Update agent's current day orders count
+        agent.current_day_orders += 1
+        agent.total_orders += 1
+        agent.save(update_fields=["current_day_orders", "total_orders"])
+        
+        serializer = OrderNoSerializer(order)
+        return Response({
+            "message": f"Agent {agent.agent_code} assigned to order {order.order_number}",
+            "order": serializer.data
+        }, status=status.HTTP_200_OK)
+
+
+class AdminUnassignAgentAPIView(APIView):
+    """
+    Admin endpoint to unassign an agent from an order.
+    Requires admin/staff privileges.
+    
+    POST /api/inventory/admin/orders/{order_id}/unassign-agent/
+    """
+    def post(self, request, order_id):
+        try:
+            user = authenticate_request(request, need_user=True)
+        except AuthenticationFailed as auth_error:
+            raise auth_error
+        
+        # Check admin privileges
+        if not user.is_staff and not user.is_superuser:
+            return Response(
+                {"error": "Admin privileges required"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            order = OrderNo.objects.select_related("assigned_agent").get(id=order_id)
+        except OrderNo.DoesNotExist:
+            return Response(
+                {"error": "Order not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        if not order.assigned_agent:
+            return Response(
+                {"error": "No agent is assigned to this order"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Decrement agent's order count
+        agent = order.assigned_agent
+        if agent.current_day_orders > 0:
+            agent.current_day_orders -= 1
+            agent.save(update_fields=["current_day_orders"])
+        
+        # Unassign agent
+        order.assigned_agent = None
+        order.assigned_at = None
+        order.save(update_fields=["assigned_agent", "assigned_at"])
+        
+        serializer = OrderNoSerializer(order)
+        return Response({
+            "message": "Agent unassigned from order",
+            "order": serializer.data
+        }, status=status.HTTP_200_OK)
+
+
+class AdminSendOrderNotificationAPIView(APIView):
+    """
+    Admin endpoint to send a push notification to the order's user.
+    Requires admin/staff privileges.
+    
+    POST /api/inventory/admin/orders/{order_id}/send-notification/
+    Body: { "title": "...", "message": "..." }
+    """
+    def post(self, request, order_id):
+        try:
+            user = authenticate_request(request, need_user=True)
+        except AuthenticationFailed as auth_error:
+            raise auth_error
+        
+        # Check admin privileges
+        if not user.is_staff and not user.is_superuser:
+            return Response(
+                {"error": "Admin privileges required"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            order = OrderNo.objects.select_related("user").get(id=order_id)
+        except OrderNo.DoesNotExist:
+            return Response(
+                {"error": "Order not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        title = request.data.get("title", "").strip()
+        message = request.data.get("message", "").strip()
+        
+        if not title or not message:
+            return Response(
+                {"error": "title and message are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if user has push tokens
+        from user.models import PushToken
+        push_tokens = PushToken.objects.filter(user=order.user, is_active=True)
+        
+        if not push_tokens.exists():
+            return Response(
+                {"error": "User does not have any active push tokens"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Send notification using PushNotificationService directly
+        try:
+            from notifications.services.push import PushNotificationService
+            service = PushNotificationService()
+            result = service.send_push_notification(
+                title=title,
+                message=message,
+                category='order_updates',
+                deep_link_data={
+                    "type": "order_update",
+                    "order_id": str(order.id),
+                    "order_number": order.order_number
+                },
+                user_ids=[order.user.id]
+            )
+            
+            return Response({
+                "message": "Notification sent successfully",
+                "sent_count": result.get("sent_count", 0),
+                "order_number": order.order_number
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to send notification: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class AdminSendOrderEmailAPIView(APIView):
+    """
+    Admin endpoint to send an email to the order's user.
+    Requires admin/staff privileges.
+    
+    POST /api/inventory/admin/orders/{order_id}/send-email/
+    Body: { "title": "...", "subject": "...", "body": "..." }
+    """
+    def post(self, request, order_id):
+        try:
+            user = authenticate_request(request, need_user=True)
+        except AuthenticationFailed as auth_error:
+            raise auth_error
+        
+        # Check admin privileges
+        if not user.is_staff and not user.is_superuser:
+            return Response(
+                {"error": "Admin privileges required"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            order = OrderNo.objects.select_related("user").get(id=order_id)
+        except OrderNo.DoesNotExist:
+            return Response(
+                {"error": "Order not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        title = request.data.get("title", "").strip()
+        subject = request.data.get("subject", "").strip()
+        body = request.data.get("body", "").strip()
+        
+        if not subject or not body:
+            return Response(
+                {"error": "subject and body are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if user has email
+        if not order.user.email:
+            return Response(
+                {"error": "User does not have an email address"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Send email using Django's send_mail
+        try:
+            from django.core.mail import send_mail
+            from django.template.loader import render_to_string
+            from django.conf import settings
+            
+            # Try to render HTML template, fallback to plain text
+            try:
+                html_message = render_to_string('email/admin_custom_email.html', {
+                    'title': title,
+                    'subject': subject,
+                    'body': body,
+                    'order_number': order.order_number,
+                    'user_name': order.user.name or order.user.email,
+                })
+            except Exception:
+                html_message = None
+            
+            send_mail(
+                subject=subject,
+                message=body,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[order.user.email],
+                fail_silently=False,
+                html_message=html_message,
+            )
+            
+            logger.info(f"Email sent to {order.user.email} for order {order.order_number} by admin {user.email}")
+            
+            return Response({
+                "message": "Email sent successfully",
+                "recipient": order.user.email,
+                "order_number": order.order_number
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Failed to send email for order {order.order_number}: {str(e)}")
+            return Response(
+                {"error": f"Failed to send email: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

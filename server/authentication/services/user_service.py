@@ -5,7 +5,13 @@ User Service for handling user creation and JWT token management.
 import uuid
 import datetime
 import jwt
+from django.conf import settings
 from ..models import User
+
+
+# Use the same secret as usercheck.py for consistency
+JWT_SECRET = getattr(settings, "SECRET_KEY", "your-secret-key")
+JWT_ALGORITHM = "HS256"
 
 
 class UserService:
@@ -39,7 +45,7 @@ class UserService:
             'exp': datetime.datetime.utcnow() + datetime.timedelta(days=7),
             'iat': datetime.datetime.utcnow()
         }
-        return jwt.encode(payload, 'secret', algorithm='HS256')
+        return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
     
     @staticmethod
     def get_or_create_oauth_user(email: str, name: str) -> User:

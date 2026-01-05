@@ -9,7 +9,7 @@ import jwt
 import datetime
 from django.utils import timezone
 from ..models import User, AuditLog
-from ..serializers import UserSerializer,PasswordResetRequestSerializer,PasswordResetSerializer,ReferredUserSerializer
+from ..serializers import UserSerializer,PasswordResetRequestSerializer,PasswordResetSerializer,ReferredUserSerializer,AuditLogSerializer
 from django.core.mail import send_mail
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
@@ -208,7 +208,10 @@ class LoginView(APIView):
             'iat': datetime.datetime.utcnow()
         }
 
-        token = jwt.encode(payload, 'secret', algorithm='HS256')
+        # Use settings.SECRET_KEY for consistency with usercheck.py
+        from django.conf import settings
+        jwt_secret = getattr(settings, "SECRET_KEY", "your-secret-key")
+        token = jwt.encode(payload, jwt_secret, algorithm='HS256')
         return Response({'jwt': token})
 
 # ----------------- Logout -----------------
@@ -319,8 +322,15 @@ class UserView(APIView):
     def get(self, request):
 
         user = authenticate_request(request, need_user=True)
+        
+        # If admin/staff user, return all users list
+        if user.is_staff or user.is_superuser:
+            all_users = User.objects.all().order_by('-date_joined')
+            serializer = UserSerializer(all_users, many=True)
+            return Response(serializer.data)
+        
+        # Regular users get their own profile
         serializer = UserSerializer(user)
-
         return Response(serializer.data)
 
     @csrf_exempt
@@ -359,6 +369,39 @@ class UserView(APIView):
             delete_s3_file(user.profile_image)
             user.profile_image = None
             updated_fields.append("profile_image")
+        
+        # Handle avatar fields
+        VALID_AVATAR_STYLES = ['avataaars', 'pixel-art', 'bottts', 'lorelei', 'adventurer', 'fun-emoji']
+        
+        if "avatar_provider" in data:
+          avatar_provider = data["avatar_provider"]
+          if avatar_provider == "":
+            user.avatar_provider = None
+          else:
+            user.avatar_provider = avatar_provider
+          updated_fields.append("avatar_provider")
+        
+        if "avatar_style" in data:
+          avatar_style = data["avatar_style"]
+          if avatar_style == "":
+            user.avatar_style = None
+          elif avatar_style and avatar_style not in VALID_AVATAR_STYLES:
+            return Response(
+              {"error": f"Invalid avatar style. Must be one of: {', '.join(VALID_AVATAR_STYLES)}"},
+              status=status.HTTP_400_BAD_REQUEST
+            )
+          else:
+            user.avatar_style = avatar_style
+          updated_fields.append("avatar_style")
+        
+        if "avatar_seed" in data:
+          avatar_seed = data["avatar_seed"]
+          if avatar_seed == "":
+            user.avatar_seed = None
+          else:
+            user.avatar_seed = avatar_seed
+          updated_fields.append("avatar_seed")
+        
         if updated_fields:
           user.save()
           if "name" in updated_fields:
@@ -590,5 +633,58 @@ class RedeemReferralBalanceView(APIView):
         {"error": f"Failed to redeem balance: {str(e)}"},
         status=status.HTTP_500_INTERNAL_SERVER_ERROR
       )
-  
-  
+
+
+# ----------------- Audit Logs (Admin Only) -----------------
+class AuditLogView(APIView):
+  """
+  Admin endpoint to get audit logs with optional filters.
+  Requires admin/staff privileges.
+  """
+  @csrf_exempt
+  def get(self, request):
+    try:
+      user = authenticate_request(request, need_user=True)
+    except AuthenticationFailed as auth_error:
+      raise auth_error
+    
+    # Check admin privileges
+    if not user.is_staff and not user.is_superuser:
+      return Response(
+        {"error": "Admin privileges required"},
+        status=status.HTTP_403_FORBIDDEN
+      )
+    
+    # Build queryset with optional filters
+    queryset = AuditLog.objects.all().select_related('user').order_by('-timestamp')
+    
+    # Filter by action
+    action = request.query_params.get('action')
+    if action:
+      queryset = queryset.filter(action=action)
+    
+    # Filter by user_id
+    user_id = request.query_params.get('user_id')
+    if user_id:
+      try:
+        queryset = queryset.filter(user_id=int(user_id))
+      except ValueError:
+        pass
+    
+    # Filter by date range
+    start_date = request.query_params.get('start_date')
+    if start_date:
+      try:
+        queryset = queryset.filter(timestamp__gte=start_date)
+      except ValueError:
+        pass
+    
+    end_date = request.query_params.get('end_date')
+    if end_date:
+      try:
+        queryset = queryset.filter(timestamp__lte=end_date)
+      except ValueError:
+        pass
+    
+    serializer = AuditLogSerializer(queryset, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)

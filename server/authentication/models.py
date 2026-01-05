@@ -14,7 +14,22 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)  
     date_joined = models.DateTimeField(default=timezone.now)  # Add this line
     is_superuser = models.BooleanField(default=False)
-    phone_number = models.CharField(max_length=14, default= False, null=True)
+    phone_number = models.CharField(
+        max_length=20,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Phone number in E.164 format (e.g., +919876543210)"
+    )
+    firebase_uid = models.CharField(
+        max_length=128,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Firebase unique user identifier for phone authentication"
+    )
     gender = models.CharField(
         max_length=20,
         choices=[
@@ -40,6 +55,26 @@ class User(AbstractBaseUser, PermissionsMixin):
         blank=True,
         db_index=True,
         help_text="Apple's unique user identifier (sub claim)"
+    )
+    
+    # Avatar configuration fields
+    avatar_provider = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text="Avatar service provider (e.g., 'dicebear')"
+    )
+    avatar_style = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text="DiceBear avatar style (e.g., 'avataaars', 'pixel-art')"
+    )
+    avatar_seed = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        help_text="Seed for deterministic avatar generation"
     )
     
     # Push Notification Preference Fields
@@ -69,7 +104,12 @@ class AuditLog(models.Model):
         ('logout', 'Logout'),
         ('oauth_login', 'OAuth Login'),
         ('apple_oauth_login', 'Apple OAuth Login'),
-        ('account_deleted', 'Account Deleted')
+        ('account_deleted', 'Account Deleted'),
+        # Phone authentication actions
+        ('phone_login', 'Phone Login'),
+        ('phone_registration', 'Phone Registration'),
+        ('phone_account_linked', 'Phone Account Linked'),
+        ('phone_auth_failed', 'Phone Auth Failed'),
     ]
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     action = models.CharField(max_length=50, choices=ACTION_CHOICES, null=True, blank=True)

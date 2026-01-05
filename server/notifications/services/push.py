@@ -101,9 +101,38 @@ class PushNotificationService:
     except Exception as e:
       logger.error(f"Error getting eligible tokens: {str(e)}", exc_info=True)
       return []
-  def _build_expo_messages(self , tokens: List['PushToken'], title:str, message:str,deep_link_data: Optional[Dict],image_url: Optional[str]) -> List[Dict]:
+  # Default app icon URL for large icon display (appears on right side of notification)
+  # Replace with your actual hosted icon URL
+  DEFAULT_LARGE_ICON_URL = "https://api.scrapiz.in/static/images/scrapiz-icon.png"
+  
+  def _build_expo_messages(
+    self, 
+    tokens: List['PushToken'], 
+    title: str, 
+    message: str,
+    deep_link_data: Optional[Dict],
+    image_url: Optional[str],
+    large_icon_url: Optional[str] = None
+  ) -> List[Dict]:
+    """
+    Build Expo push notification messages with rich notification support.
+    
+    Args:
+        tokens: List of push tokens to send to
+        title: Notification title
+        message: Notification body
+        deep_link_data: Data for deep linking on tap
+        image_url: Big picture image URL (full-width image below text)
+        large_icon_url: Large icon URL (appears on right side like Lenskart)
+    
+    Returns:
+        List of Expo message dictionaries
+    """
     messages = []
     validated_image_url = None
+    validated_large_icon_url = large_icon_url or self.DEFAULT_LARGE_ICON_URL
+    
+    # Validate big picture image URL if provided
     if image_url:
       is_valid, error_message = self.validate_notification_image(image_url)
       if is_valid:
@@ -114,6 +143,7 @@ class PushNotificationService:
           f"Image URL validation failed, sending notifications without image. "
           f"Error: {error_message}"
         )
+    
     for token in tokens:
       expo_message = {
         "to": token.token,
@@ -123,17 +153,29 @@ class PushNotificationService:
         "priority": "high",
         "channelId": "default"
       }
+      
+      # Build data payload
       if deep_link_data:
-        expo_message["data"] = deep_link_data
+        expo_message["data"] = deep_link_data.copy()
       else:
         expo_message["data"] = {}
-        
+      
+      # Add large icon URL to data (for Notifee to display on right side)
+      # This creates the Lenskart-style notification appearance
+      expo_message["data"]["largeIcon"] = validated_large_icon_url
+      
+      # Add big picture image if provided
+      # Use richContent.image for Expo's native image support (works in background)
+      # Also keep data.image for Notifee foreground display
       if validated_image_url:
-        expo_message["image"] = validated_image_url
+        expo_message["richContent"] = {
+          "image": validated_image_url
+        }
         expo_message["data"]["image"] = validated_image_url
         
       messages.append(expo_message)
-    logger.info(f"Built {len(messages)} Expo messages")
+    
+    logger.info(f"Built {len(messages)} Expo messages with largeIcon support")
     return messages
     
   def _send_to_expo(self, messages: List[Dict]) -> Dict:
@@ -238,9 +280,25 @@ class PushNotificationService:
     message:str, 
     category:str, 
     deep_link_data:Optional[Dict]=None, 
-    image_url: Optional[str] = None, 
+    image_url: Optional[str] = None,
+    large_icon_url: Optional[str] = None,
     user_ids: Optional[List[int]] = None
   ) -> Dict[str,any]:
+    """
+    Send push notification to eligible users.
+    
+    Args:
+        title: Notification title
+        message: Notification body/message
+        category: Notification category for filtering (order_updates, promotions, etc.)
+        deep_link_data: Data for deep linking when notification is tapped
+        image_url: Big picture image URL (full-width image below text)
+        large_icon_url: Large icon URL (appears on right side like Lenskart)
+        user_ids: Optional list of specific user IDs to target
+    
+    Returns:
+        Dict with success status and counts
+    """
     try:
       logger.info(
         f"Starting push notification send: title='{title}', "
@@ -270,7 +328,8 @@ class PushNotificationService:
         title=title,
         message=message,
         deep_link_data=deep_link_data,
-        image_url=image_url
+        image_url=image_url,
+        large_icon_url=large_icon_url
       )
       response_data = self._send_to_expo(expo_messages)
       if not response_data.get('success'):

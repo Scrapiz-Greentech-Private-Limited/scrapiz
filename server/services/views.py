@@ -1,6 +1,7 @@
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.exceptions import AuthenticationFailed
 from django.conf import settings
 
 from utils.usercheck import authenticate_request
@@ -93,3 +94,113 @@ class ServiceBookingAPIView(APIView):
             )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ============================================================================
+# ADMIN DASHBOARD API VIEWS
+# ============================================================================
+
+class AdminServiceBookingListAPIView(APIView):
+    """
+    Admin endpoint to get all service bookings.
+    Requires admin/staff privileges.
+    """
+    def get(self, request):
+        try:
+            user = authenticate_request(request, need_user=True)
+        except AuthenticationFailed as auth_error:
+            raise auth_error
+        
+        # Check admin privileges
+        if not user.is_staff and not user.is_superuser:
+            return Response(
+                {"error": "Admin privileges required"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get all service bookings
+        bookings = ServiceBooking.objects.all().select_related("user").order_by('-created_at')
+        serializer = ServiceBookingSerializer(bookings, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AdminServiceBookingDetailAPIView(APIView):
+    """
+    Admin endpoint to get a single service booking.
+    Requires admin/staff privileges.
+    """
+    def get(self, request, booking_id):
+        try:
+            user = authenticate_request(request, need_user=True)
+        except AuthenticationFailed as auth_error:
+            raise auth_error
+        
+        # Check admin privileges
+        if not user.is_staff and not user.is_superuser:
+            return Response(
+                {"error": "Admin privileges required"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            booking = ServiceBooking.objects.select_related("user").get(id=booking_id)
+        except ServiceBooking.DoesNotExist:
+            return Response(
+                {"error": "Service booking not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        serializer = ServiceBookingSerializer(booking)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AdminUpdateServiceBookingStatusAPIView(APIView):
+    """
+    Admin endpoint to update service booking status.
+    Requires admin/staff privileges.
+    """
+    def patch(self, request, booking_id):
+        try:
+            user = authenticate_request(request, need_user=True)
+        except AuthenticationFailed as auth_error:
+            raise auth_error
+        
+        # Check admin privileges
+        if not user.is_staff and not user.is_superuser:
+            return Response(
+                {"error": "Admin privileges required"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            booking = ServiceBooking.objects.get(id=booking_id)
+        except ServiceBooking.DoesNotExist:
+            return Response(
+                {"error": "Service booking not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        new_status = request.data.get("status")
+        
+        if not new_status:
+            return Response(
+                {"error": "status is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate status
+        valid_statuses = [choice[0] for choice in ServiceBooking.STATUS_CHOICES]
+        if new_status.lower() not in valid_statuses:
+            return Response(
+                {"error": f"Invalid status. Valid options: {', '.join(valid_statuses)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        booking.status = new_status.lower()
+        booking.save(update_fields=["status"])
+        
+        serializer = ServiceBookingSerializer(booking)
+        return Response({
+            "message": "Service booking status updated successfully",
+            "booking": serializer.data
+        }, status=status.HTTP_200_OK)
