@@ -1606,52 +1606,109 @@ function SellScreenContent() {
 
       {/* Keep in Mind Section */}
       <View style={[styles.keepInMindCard, { backgroundColor: colors.surface }]}>
-        <Text style={[styles.keepInMindTitle, { color: colors.text }]}>Please keep in mind</Text>
-        
-        <View style={styles.keepInMindGrid}>
-          <View style={styles.keepInMindRow}>
-            <View style={[styles.keepInMindItem, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' }]}>
-              <View style={[styles.keepInMindIconContainer, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
-                <Text style={styles.keepInMindEmoji}>🪵🍾</Text>
-                <View style={styles.keepInMindCross}>
-                  <X size={28} color="#dc2626" strokeWidth={3} />
-                </View>
-              </View>
-              <Text style={[styles.keepInMindText, { color: colors.text }]}>We do not buy{'\n'}Wood & Glass</Text>
-            </View>
+  <Text style={[styles.keepInMindTitle, { color: colors.text }]}>
+    Please keep in mind
+  </Text>
 
-            <View style={[styles.keepInMindItem, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' }]}>
-              <View style={[styles.keepInMindIconContainer, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
-                <Text style={styles.keepInMindEmoji}>👕👖</Text>
-                <View style={styles.keepInMindCross}>
-                  <X size={28} color="#dc2626" strokeWidth={3} />
-                </View>
-              </View>
-              <Text style={[styles.keepInMindText, { color: colors.text }]}>We do not buy{'\n'}Clothes</Text>
-            </View>
-          </View>
-
-          <View style={styles.keepInMindRow}>
-            <View style={[styles.keepInMindItem, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' }]}>
-              <View style={[styles.keepInMindIconContainer, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
-                <Text style={styles.keepInMindEmoji}>🪑💻</Text>
-                <View style={styles.keepInMindCross}>
-                  <X size={28} color="#dc2626" strokeWidth={3} />
-                </View>
-              </View>
-              <Text style={[styles.keepInMindText, { color: colors.text }]}>We buy only in{'\n'}scrap rates</Text>
-            </View>
-
-            <View style={[styles.keepInMindItem, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' }]}>
-              <View style={[styles.keepInMindIconContainer, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
-                <Text style={styles.keepInMindEmoji}>⚖️📦</Text>
-                <Text style={[styles.keepInMindWeight, { backgroundColor: colors.surface, color: colors.text }]}>20 kg</Text>
-              </View>
-              <Text style={[styles.keepInMindText, { color: colors.text }]}>Free pickup only{'\n'}above 20 kg</Text>
-            </View>
-          </View>
+  <View style={styles.keepInMindGrid}>
+    {/* Wood & Glass */}
+    <View
+      style={[
+        styles.keepInMindItem,
+        { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
+      ]}
+    >
+      <View
+        style={[
+          styles.keepInMindIconContainer,
+          { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
+        ]}
+      >
+        <Text style={styles.keepInMindEmoji}>🪵🍾</Text>
+        <View style={styles.keepInMindCross}>
+          <X size={28} color="#dc2626" strokeWidth={3} />
         </View>
       </View>
+      <Text style={[styles.keepInMindText, { color: colors.text }]}>
+        We do not buy{'\n'}Wood & Glass
+      </Text>
+    </View>
+
+    {/* Clothes */}
+    <View
+      style={[
+        styles.keepInMindItem,
+        { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
+      ]}
+    >
+      <View
+        style={[
+          styles.keepInMindIconContainer,
+          { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
+        ]}
+      >
+        <Text style={styles.keepInMindEmoji}>👕👖</Text>
+        <View style={styles.keepInMindCross}>
+          <X size={28} color="#dc2626" strokeWidth={3} />
+        </View>
+      </View>
+      <Text style={[styles.keepInMindText, { color: colors.text }]}>
+        We do not buy{'\n'}Clothes
+      </Text>
+    </View>
+
+    {/* Scrap Rates */}
+    <View
+      style={[
+        styles.keepInMindItem,
+        { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
+      ]}
+    >
+      <View
+        style={[
+          styles.keepInMindIconContainer,
+          { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
+        ]}
+      >
+        <Text style={styles.keepInMindEmoji}>🪑💻</Text>
+        <View style={styles.keepInMindCross}>
+          <X size={28} color="#dc2626" strokeWidth={3} />
+        </View>
+      </View>
+      <Text style={[styles.keepInMindText, { color: colors.text }]}>
+        We buy only in{'\n'}scrap rates
+      </Text>
+    </View>
+
+    {/* 20kg */}
+    <View
+      style={[
+        styles.keepInMindItem,
+        { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
+      ]}
+    >
+      <View
+        style={[
+          styles.keepInMindIconContainer,
+          { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
+        ]}
+      >
+        <Text style={styles.keepInMindEmoji}>⚖️📦</Text>
+        <Text
+          style={[
+            styles.keepInMindWeight,
+            { backgroundColor: colors.surface, color: colors.text },
+          ]}
+        >
+          20 kg
+        </Text>
+      </View>
+      <Text style={[styles.keepInMindText, { color: colors.text }]}>
+        Free pickup only{'\n'}above 20 kg
+      </Text>
+    </View>
+  </View>
+</View>
 
       {selectedImages.length > 0 && (
         <View style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -3194,15 +3251,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   keepInMindGrid: {
-    gap: 12,
-  },
-  keepInMindRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 12,
-  },
+  }
   keepInMindItem: {
-    flex: 1,
+    width: '48%', 
     backgroundColor: '#fef9f0',
     borderRadius: 12,
     padding: 12,
