@@ -95,7 +95,17 @@ function AppContent() {
       console.log('OTA update check failed:', error);
     }
   }, []);
+  useEffect(() => {
+  if (__DEV__) return;
 
+  console.log('EXPO UPDATES DEBUG', {
+    isEmbeddedLaunch: Updates.isEmbeddedLaunch,
+    updateId: Updates.updateId,
+    channel: Updates.channel,
+    runtimeVersion: Updates.runtimeVersion,
+    isEnabled: Updates.isEnabled,
+  });
+}, []);
   // Check for OTA updates on app start
   useEffect(() => {
     checkForOTAUpdate();
