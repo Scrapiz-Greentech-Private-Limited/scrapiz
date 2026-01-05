@@ -90,9 +90,10 @@
         "expo-build-properties",
         {
           "android": {
-            "compileSdkVersion": 35,
-            "targetSdkVersion": 35,
-            "ndkVersion": "26.1.10909125"
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "ndkVersion": "26.1.10909125",
+            "newArchEnabled": true
           }
         }
       ],
