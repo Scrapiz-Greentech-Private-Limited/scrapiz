@@ -7,7 +7,7 @@
     "icon": "./assets/images/newapp.png",
     "scheme": "com.scrapiz.app",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/newapp.png",
       "resizeMode": "contain",
