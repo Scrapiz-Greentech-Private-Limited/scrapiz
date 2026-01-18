@@ -60,7 +60,7 @@ export default function LocationSelectionModal({
   const [showAddressMenu, setShowAddressMenu] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<SavedLocation | null>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
-
+  const absoluteFill = StyleSheet.absoluteFillObject;
   // Reload addresses when modal becomes visible and cleanup when it closes
   useEffect(() => {
     if (visible) {
@@ -486,49 +486,53 @@ export default function LocationSelectionModal({
       </Modal>
 
       {/* Map Location Picker Modal - Search Mode */}
-      <MapLocationPicker
-        visible={showMapPicker}
+        {showMapPicker && (
+    <View style={absoluteFill} pointerEvents="box-none">
+        <MapLocationPicker
+        visible={true} // always true, DO NOT bind to state
         onClose={() => setShowMapPicker(false)}
         onLocationSelect={(location) => {
-          // Handle location selection from map
-          selectLocation(location);
-          setShowMapPicker(false);
-          onClose();
+            selectLocation(location);
+            setShowMapPicker(false);
+            onClose();
         }}
         onUseCurrentLocation={handleUseCurrentLocation}
-        onAddManualAddress={() => {
-          // Handle manual address entry
-        }}
+        onAddManualAddress={() => {}}
         savedLocations={savedLocations}
         onSelectSavedLocation={handleSelectSavedLocation}
         initialLocation={
-          currentLocation
+            currentLocation
             ? {
                 latitude: currentLocation.latitude,
                 longitude: currentLocation.longitude,
-              }
+                }
             : undefined
         }
-      />
+        />
+    </View>
+    )}
 
       {/* Map Location Picker Modal - GPS Mode */}
-      <MapLocationPicker
-        visible={showMapPickerForGPS}
-        onClose={() => setShowMapPickerForGPS(false)}
-        onLocationSelect={handleMapLocationConfirm}
-        mode="standalone"
-        autoOpenGPS={true}
-        saving={saving}
-        initialLocation={
-          currentLocation
-            ? {
-                latitude: currentLocation.latitude,
-                longitude: currentLocation.longitude,
-              }
-            : undefined
-        }
-      />
-
+            {showMapPickerForGPS && (
+        <View style={absoluteFill} pointerEvents="box-none">
+            <MapLocationPicker
+            visible={true} // 🔴 always true
+            mode="standalone"
+            autoOpenGPS={true}
+            saving={saving}
+            onClose={() => setShowMapPickerForGPS(false)}
+            onLocationSelect={handleMapLocationConfirm}
+            initialLocation={
+                currentLocation
+                ? {
+                    latitude: currentLocation.latitude,
+                    longitude: currentLocation.longitude,
+                    }
+                : undefined
+            }
+            />
+        </View>
+        )}
       {/* Address Menu Modal */}
       {showAddressMenu && selectedAddress && (
         <Modal

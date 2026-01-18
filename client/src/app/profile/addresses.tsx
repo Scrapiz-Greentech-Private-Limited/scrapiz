@@ -961,17 +961,25 @@ export default function AddressesScreen() {
       </Modal>
 
       {/* Map Location Picker */}
+        {showMapPicker && (
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <MapLocationPicker
-        visible={showMapPicker}
+        visible={true}
+        mode="form-populate"
+        autoOpenGPS
+        initialLocation={
+          currentLocation
+            ? {
+                latitude: currentLocation.latitude,
+                longitude: currentLocation.longitude,
+              }
+            : undefined
+        }
         onClose={() => setShowMapPicker(false)}
         onLocationSelect={handleMapLocationSelect}
-        mode="form-populate"
-        autoOpenGPS={true}
-        initialLocation={currentLocation ? {
-          latitude: currentLocation.latitude,
-          longitude: currentLocation.longitude
-        } : undefined}
       />
+  </View>
+)}
 
       <Toast />
     </View>

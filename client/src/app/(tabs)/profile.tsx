@@ -70,6 +70,14 @@ export default function Profile() {
 
   // Data loading function
   const loadUserProfile = useCallback(async () => {
+    // Check authentication first before making API calls
+    const isAuthenticated = await AuthService.isAuthenticated();
+    if (!isAuthenticated) {
+      // Not authenticated - redirect to login
+      router.replace('/(auth)/login');
+      return;
+    }
+    
     setLoading(true);
     setErrors(null);
     const [userData, productsData] = await Promise.all([
@@ -79,7 +87,7 @@ export default function Profile() {
     setUser(userData);
     setProducts(productsData);
     setLoading(false);
-  }, []);
+  }, [router]);
 
   // Network retry hook
   const {
@@ -110,6 +118,19 @@ export default function Profile() {
             await loadUserProfile();
           } catch (error: any) {
             const errorMsg = error.message || 'Failed to load profile';
+            
+            // Check if it's an authentication error
+            const isAuthError = 
+              errorMsg.toLowerCase().includes('unauthenticated') ||
+              errorMsg.toLowerCase().includes('unauthorized') ||
+              errorMsg.toLowerCase().includes('authentication');
+            
+            if (isAuthError) {
+              // Auth error - redirect to login (the global handler should also trigger)
+              router.replace('/(auth)/login');
+              return;
+            }
+            
             const isNetworkError = 
               errorMsg.toLowerCase().includes('network') ||
               errorMsg.toLowerCase().includes('internet') ||
@@ -126,7 +147,7 @@ export default function Profile() {
       };
       
       initLoad();
-    }, [loadUserProfile, checkNetworkAndLoad, startRetryFlow])
+    }, [loadUserProfile, checkNetworkAndLoad, startRetryFlow, router])
   );
 
   const environmentalImpact = useEnvironmentalImpact(user?.orders || []);

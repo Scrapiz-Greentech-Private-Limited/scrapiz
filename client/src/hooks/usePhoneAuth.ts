@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
+
 import { usePhoneAuthStore } from '../store/phoneAuthStore';
 
 /**

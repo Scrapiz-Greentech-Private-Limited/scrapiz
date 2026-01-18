@@ -12,20 +12,31 @@ import {
   Platform,
   TouchableWithoutFeedback,
 } from 'react-native';
+import MapboxGL from '@rnmapbox/maps';
 import * as Location from 'expo-location';
 import { X, MapPin, Navigation, Search, Plus } from 'lucide-react-native';
 import Toast from 'react-native-toast-message';
 import {
+  DEFAULT_MAP_STYLE,
+  getIndiaBounds,
+  MAPBOX_API_KEY,
+  buildGeocodingUrl,
+  buildReverseGeocodingUrl,
   MAP_SETTINGS,
   DEFAULT_CENTER,
   KRUTRIM_API_KEY,
+  buildGoogleAutocompletePayload,
+  buildGooglePlaceDetailsPayload,
+  GOOGLE_API_KEY,
   getSessionToken,
   buildKrutrimAutocompleteUrl,
   buildGoogleReverseGeocodeUrl,
   buildKrutrimPlaceDetailsUrl
-} from '../config/mapConfig';
-import { MapViewWrapper } from './maps/MapViewWrapper';
-import { CameraController, Coordinates } from './maps/types';
+} from '../../config/mapConfig';
+
+// Debug: Log Mapbox token (first 20 chars only for security)
+console.log('Mapbox Token:', MAPBOX_API_KEY ? `${MAPBOX_API_KEY.substring(0, 20)}...` : 'MISSING');
+MapboxGL.setAccessToken(MAPBOX_API_KEY);
 
 interface KrutrimAutocompleteResult {
   place_id: string;
@@ -99,24 +110,25 @@ export default function MapLocationPicker({
   const [showResults, setShowResults] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
   const sessionTokenRef = useRef<string>(getSessionToken());
-  const [selectedCoords, setSelectedCoords] = useState<Coordinates>(
+  const [selectedCoords, setSelectedCoords] = useState<[number, number]>(
     initialLocation ? [initialLocation.longitude, initialLocation.latitude] : DEFAULT_CENTER
   );
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
-  const [markerCoords, setMarkerCoords] = useState<Coordinates>(selectedCoords);
+  const [markerCoords, setMarkerCoords] = useState<[number, number]>(selectedCoords);
   const [showActionMenu, setShowActionMenu] = useState(false);
-  const [currentUserLocation, setCurrentUserLocation] = useState<Coordinates | null>(null);
+  const [currentUserLocation, setCurrentUserLocation] = useState<[number, number] | null>(null);
   const [isUserTyping, setIsUserTyping] = useState(false);
 
-  const cameraRef = useRef<CameraController>(null);
+  const cameraRef = useRef<MapboxGL.Camera>(null);
   const mapMountedRef = useRef(false);
+  const mapRef = useRef<MapboxGL.MapView>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const hasTriggeredGPS = useRef(false);
   const isSelectingFromSearch = useRef(false);
   const regionChangeTimeoutRef = useRef<NodeJS.Timeout>();
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
 
-  const previousCenterRef = useRef<Coordinates | null>(null);
+  const previousCenterRef = useRef<[number, number] | null>(null);
   const zoomOnlyTimeoutRef = useRef<NodeJS.Timeout>();
 
     useEffect(() => {
@@ -152,8 +164,7 @@ export default function MapLocationPicker({
         const position = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Highest,
         });
-        const coords: Coordinates = [position.coords.longitude, position.coords.latitude];
-        setCurrentUserLocation(coords);
+        setCurrentUserLocation([position.coords.longitude, position.coords.latitude]);
       }
     } catch (error) {
       console.error('Could not get user location for search bias:', error);
@@ -285,7 +296,7 @@ export default function MapLocationPicker({
     const formattedAddress = data.result?.formatted_address || result.description;
 
     if (locationData) {
-      const coords: Coordinates = [locationData.lng, locationData.lat];
+      const coords: [number, number] = [locationData.lng, locationData.lat];
 
       setSelectedCoords(coords);
       setMarkerCoords(coords);
@@ -346,7 +357,7 @@ export default function MapLocationPicker({
         accuracy: Location.Accuracy.Highest,
       });
 
-      const coords: Coordinates = [
+      const coords: [number, number] = [
         position.coords.longitude,
         position.coords.latitude,
       ];
@@ -394,57 +405,83 @@ export default function MapLocationPicker({
     setIsLoadingLocation(false);
   }
 };
-  const handleMapPress = async (coords: Coordinates) => {
-    isSelectingFromSearch.current = true;
-    
-    setSelectedCoords(coords);
-    setMarkerCoords(coords);
-    previousCenterRef.current = coords; // Track this position
-    if (!mapMountedRef.current) return;
-    cameraRef.current?.setCamera({
-      centerCoordinate: coords,
-      animationDuration: 300,
-    });
-    await reverseGeocode(coords[1], coords[0]);
-    
-    setTimeout(() => {
-      isSelectingFromSearch.current = false;
-    }, 800);
+  const handleMapPress = async (feature: GeoJSON.Feature<GeoJSON.Point>) => {
+    const { geometry } = feature;
+    if (geometry && geometry.coordinates) {
+      const coords = geometry.coordinates as [number, number];
+      
+      isSelectingFromSearch.current = true;
+      
+      setSelectedCoords(coords);
+      setMarkerCoords(coords);
+      previousCenterRef.current = coords; // Track this position
+      if (!mapMountedRef.current) return;
+      cameraRef.current?.setCamera({
+        centerCoordinate: coords,
+        animationDuration: 300,
+      });
+      await reverseGeocode(coords[1], coords[0]);
+      
+      setTimeout(() => {
+        isSelectingFromSearch.current = false;
+      }, 800);
+    }
   };
 
   // IMPROVED: Only update marker position, don't reverse geocode yet
-  const handleCameraChanged = async (coords: Coordinates) => {
+  const handleCameraChanged = async () => {
     if (isSelectingFromSearch.current) {
       return;
     }
     
-    setMarkerCoords(coords);
-    setSelectedCoords(coords);
+    if (!mapRef.current) return;
+    
+    try {
+      const center = await mapRef.current.getCenter();
+      if (center && center.length === 2) {
+        const coords: [number, number] = [center[0], center[1]];
+        setMarkerCoords(coords);
+        setSelectedCoords(coords);
+      }
+    } catch (error) {
+      console.error('Error getting map center:', error);
+    }
   };
 
   // FIX: Detect if this is a zoom-only operation
-  const handleMapIdle = async (coords: Coordinates) => {
+  const handleMapIdle = async () => {
     if (isSelectingFromSearch.current || isUserTyping) return;
     
-    // NEW: Check if center has significantly changed (not just zoom)
-    // Reduced threshold from ~11m to ~2m for more precise location
-    const hasSignificantMove = !previousCenterRef.current || 
-      Math.abs(coords[0] - previousCenterRef.current[0]) > 0.00002 || // ~2 meters
-      Math.abs(coords[1] - previousCenterRef.current[1]) > 0.00002;
+    if (!mapRef.current) return;
     
-    // Only reverse geocode if the map actually moved (pan), not just zoomed
-    if (hasSignificantMove) {
-      // Clear existing timeout
-      if (regionChangeTimeoutRef.current) {
-        clearTimeout(regionChangeTimeoutRef.current);
+    try {
+      const center = await mapRef.current.getCenter();
+      if (center && center.length === 2) {
+        const coords: [number, number] = [center[0], center[1]];
+        
+        // NEW: Check if center has significantly changed (not just zoom)
+        // Reduced threshold from ~11m to ~2m for more precise location
+        const hasSignificantMove = !previousCenterRef.current || 
+          Math.abs(coords[0] - previousCenterRef.current[0]) > 0.00002 || // ~2 meters
+          Math.abs(coords[1] - previousCenterRef.current[1]) > 0.00002;
+        
+        // Only reverse geocode if the map actually moved (pan), not just zoomed
+        if (hasSignificantMove) {
+          // Clear existing timeout
+          if (regionChangeTimeoutRef.current) {
+            clearTimeout(regionChangeTimeoutRef.current);
+          }
+          
+          // Debounce: Wait 600ms after user stops moving map (reduced from 800ms)
+          regionChangeTimeoutRef.current = setTimeout(() => {
+            // Update both selectedAddress and searchQuery when manually dragging
+            reverseGeocode(coords[1], coords[0], true);
+            previousCenterRef.current = coords; // Update tracked position
+          }, 600);
+        }
       }
-      
-      // Debounce: Wait 600ms after user stops moving map (reduced from 800ms)
-      regionChangeTimeoutRef.current = setTimeout(() => {
-        // Update both selectedAddress and searchQuery when manually dragging
-        reverseGeocode(coords[1], coords[0], true);
-        previousCenterRef.current = coords; // Update tracked position
-      }, 600);
+    } catch (error) {
+      console.error('Error getting map center:', error);
     }
   };
 
@@ -507,16 +544,37 @@ export default function MapLocationPicker({
 
         {/* Map Container - Full Screen */}
         <View style={styles.mapContainer}>
-              <MapViewWrapper
-                center={selectedCoords}
-                marker={markerCoords}
-                zoom={MAP_SETTINGS.defaultZoom}
-                onMapPress={handleMapPress}
-                onRegionChange={handleCameraChanged}
-                onRegionChangeEnd={handleMapIdle}
-                cameraRef={cameraRef}
+              <MapboxGL.MapView
+                ref={mapRef}
+                surfaceView={Platform.OS === "android"}
                 style={styles.map}
-              />
+                styleURL={DEFAULT_MAP_STYLE}
+                onPress={handleMapPress}
+                onCameraChanged={handleCameraChanged}
+                onMapIdle={handleMapIdle}
+                logoEnabled={false}
+                onDidFinishRenderingMapFully={()=>{
+                    mapMountedRef.current = true;
+                }}
+                attributionEnabled={true}
+                attributionPosition={{ bottom: 8, left: 8 }}
+                onMapLoadingError={(e)=>{
+                   console.error('Mapbox error:', e?.message ?? e);
+                }}
+              >
+                <MapboxGL.Camera
+                  ref={cameraRef}
+                  centerCoordinate={selectedCoords}
+                  zoomLevel={MAP_SETTINGS.defaultZoom}
+                  animationMode="flyTo"
+                  animationDuration={MAP_SETTINGS.animationDuration}
+                />
+                <MapboxGL.PointAnnotation id="selected-marker" coordinate={markerCoords}>
+          <View style={styles.markerOuter}>
+        <View style={styles.markerInner} />
+            </View>
+            </MapboxGL.PointAnnotation>
+              </MapboxGL.MapView>
 
               {/* Search Bar Overlay */}
               <View style={styles.searchOverlay}>
@@ -986,4 +1044,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
   },
+  markerOuter: {
+  width: 36,
+  height: 36,
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: 'transparent',
+},
+markerInner: {
+  width: 14,
+  height: 14,
+  borderRadius: 7,
+  backgroundColor: '#16a34a',
+  borderWidth: 3,
+  borderColor: '#ffffff',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.2,
+  shadowRadius: 4,
+  elevation: 4,
+}
+
 });

@@ -71,7 +71,7 @@
       ],
       "package": "com.scrapiz.app",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 46
+      "versionCode": 50
     },
     "notification": {
       "icon": "./assets/images/foreground5.png",
@@ -81,66 +81,70 @@
       "supportedPlatforms": []
     },
     "plugins": [
-      "expo-router",
-      "expo-apple-authentication",
-      "expo-image-picker",
+  "expo-router",
+  "expo-apple-authentication",
+  "expo-image-picker",
 
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "compileSdkVersion": 36,
-            "targetSdkVersion": 36,
-            "ndkVersion": "26.1.10909125",
-            "newArchEnabled": true
-          }
-        }
-      ],
-      [
-        "expo-secure-store",
-        {
-          "configureAndroidBackup": true,
-          "faceIDPermission": "Allow $(PRODUCT_NAME) to access your Face ID biometric data."
-        }
-      ],
-      [
-        "expo-location",
-        {
-          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location."
-        }
-      ],
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splashScreen.png",
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "image": "./assets/images/splashScreen.png",
-            "backgroundColor": "#121212"
-          }
-        }
-      ],
-      [
-        "expo-font",
-        {
-          "fonts": [
-            "./assets/fonts/Montserrat-Regular.ttf",
-            "./assets/fonts/YoungSerif-Regular.ttf"
-          ]
-        }
-      ],
-      "expo-localization",
-      [
-        "@rnmapbox/maps",
-        {
-          "RNMapboxMapsImpl": "mapbox",
-          "MBXAccessToken": "pk.eyJ1IjoiYXlhYW5hbWphZCIsImEiOiJjbWhxbW1veHcwdnB2MmpzNDA2emo1aWp3In0.Mc5kN89_lqGeagn5jWvvzA"
-        }
-      ],
-      "expo-secure-store",
-      "expo-build-properties"
-    ],
+  [
+    "expo-build-properties",
+    {
+      "android": {
+        "compileSdkVersion": 36,
+        "targetSdkVersion": 36,
+        "ndkVersion": "26.1.10909125",
+        "newArchEnabled": true
+      }
+    }
+  ],
+
+  [
+    "expo-secure-store",
+    {
+      "configureAndroidBackup": true,
+      "faceIDPermission": "Allow $(PRODUCT_NAME) to access your Face ID biometric data."
+    }
+  ],
+
+  [
+    "expo-location",
+    {
+      "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location."
+    }
+  ],
+
+  [
+    "expo-splash-screen",
+    {
+      "image": "./assets/images/splashScreen.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff",
+      "dark": {
+        "image": "./assets/images/splashScreen.png",
+        "backgroundColor": "#121212"
+      }
+    }
+  ],
+
+  [
+    "expo-font",
+    {
+      "fonts": [
+        "./assets/fonts/Montserrat-Regular.ttf",
+        "./assets/fonts/YoungSerif-Regular.ttf"
+      ]
+    }
+  ],
+
+  "expo-localization",
+
+  [
+    "@rnmapbox/maps",
+    {
+      "RNMapboxMapsImpl": "mapbox",
+      "MBXAccessToken": "pk.eyJ1IjoiYXlhYW5hbWphZCIsImEiOiJjbWhxbW1veHcwdnB2MmpzNDA2emo1aWp3In0.Mc5kN89_lqGeagn5jWvvzA"
+    }
+  ]
+],
     "experiments": {
       "typedRoutes": true
     },
