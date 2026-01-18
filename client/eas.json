@@ -33,9 +33,33 @@
       "ios": {
         "credentialsSource": "remote"
       }
+    },
+    "production-ios": {
+      "distribution": "store",
+      "platform": "ios",
+      "channel": "production-ios",
+      "autoIncrement": true,
+      "environment": "production",
+      "ios": {
+        "credentialsSource": "remote"
+      }
+    },"production-android": {
+      "distribution": "store",
+      "platform": "android",
+      "channel": "production-android",
+      "autoIncrement": true,
+      "environment": "production",
+      "android": {
+        "credentialsSource": "local"
+      }
     }
   },
   "submit": {
-    "production": {}
+    "production-ios": {
+      "platform": "ios"
+    },
+    "production-android": {
+      "platform": "android"
+    }
   }
 }
