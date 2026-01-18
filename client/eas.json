@@ -23,29 +23,17 @@
         "credentialsSource": "remote"
       }
     },
-    "production": {
-      "autoIncrement": true,
-      "environment": "production",
-      "channel": "production",
-      "android": {
-        "credentialsSource": "local"
-      },
-      "ios": {
-        "credentialsSource": "remote"
-      }
-    },
     "production-ios": {
       "distribution": "store",
-      "platform": "ios",
       "channel": "production-ios",
       "autoIncrement": true,
       "environment": "production",
       "ios": {
         "credentialsSource": "remote"
       }
-    },"production-android": {
+    },
+    "production-android": {
       "distribution": "store",
-      "platform": "android",
       "channel": "production-android",
       "autoIncrement": true,
       "environment": "production",
@@ -55,11 +43,7 @@
     }
   },
   "submit": {
-    "production-ios": {
-      "platform": "ios"
-    },
-    "production-android": {
-      "platform": "android"
-    }
+    "production-ios": {},
+    "production-android": {}
   }
 }
