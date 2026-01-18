@@ -123,7 +123,7 @@ export default function PhoneLinkConfirmScreen() {
       case 'google':
         return (
           <Image 
-            source={require('../../../assets/images/Gooogle Favicon.png')}
+            source={require('../../../assets/images/GoogleFavicon.png')}
             style={styles.providerIconImage}
           />
         );

@@ -27,6 +27,7 @@ import NetworkRetryOverlay from '../../components/NetworkRetryOverlay';
 import { useNetworkRetry } from '../../hooks/useNetworkRetry';
 import { ratesTutorialConfig } from '@/src/config/tutorials/homeTutorial';
 import { useTutorialStore } from '@/src/store/tutorialStore';
+import { LastUpdatedToast } from '../../components/LastUpdatedToast';
 
 // Helper to get product image - checks S3 URL first, then falls back to local assets
 const getImageForProduct = (product: ProductSummary) => {
@@ -104,6 +105,8 @@ export default function RatesScreen(){
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showLastUpdated, setShowLastUpdated] = useState(false);
+  const [lastUpdatedDate, setLastUpdatedDate] = useState(new Date());
 
   // Tutorial system integration
   const { setStepTarget, currentScreen } = useTutorialStore();
@@ -123,7 +126,13 @@ export default function RatesScreen(){
     ]);
     setCategories(cats);
     setProducts(prods);
+    setLastUpdatedDate(new Date());
     setLoading(false);
+    
+    // Show the last updated toast after data loads
+    setTimeout(() => {
+      setShowLastUpdated(true);
+    }, 500);
   }, []);
 
   // Network retry hook
@@ -217,6 +226,7 @@ export default function RatesScreen(){
   const onRefresh = async () => {
     setRefreshing(true);
     resetRetryState();
+    setShowLastUpdated(false); // Hide toast during refresh
     try {
       await loadData();
     } catch (error: any) {
@@ -377,6 +387,16 @@ if (error && categories.length === 0) {
         </View>
       </LinearGradient>
 
+      {/* Last Updated Toast */}
+      {showLastUpdated && (
+        <LastUpdatedToast
+          lastUpdated={lastUpdatedDate}
+          autoShow={true}
+          duration={4000}
+          countdownFrom={5}
+        />
+      )}
+
       <ScrollView 
         style={styles.content} 
         showsVerticalScrollIndicator={false}
@@ -401,17 +421,6 @@ if (error && categories.length === 0) {
           </View>
           <Text style={[styles.disclaimerFooter, { color: colors.textSecondary }]}>
             Contact us for accurate pricing based on your specific materials.
-          </Text>
-        </View>
-
-        {/* Last Updated */}
-        <View style={[styles.lastUpdated, { backgroundColor: colors.card }]}>
-          <Text style={[styles.lastUpdatedText, { color: colors.textSecondary }]}>
-            Last updated: {new Date().toLocaleDateString('en-IN', { 
-              day: 'numeric', 
-              month: 'long', 
-              year: 'numeric' 
-            })}
           </Text>
         </View>
 
@@ -571,15 +580,6 @@ const styles = StyleSheet.create({
     color: '#166534',
     fontFamily: 'Inter-Medium',
     fontWeight: '500',
-  },
-  lastUpdated: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  lastUpdatedText: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontFamily: 'Inter-Regular',
   },
   categorySection: {
     marginBottom: 32,

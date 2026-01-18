@@ -40,6 +40,8 @@ import { useAppleAuth, AppleAuthError, appleAuthErrorMessages } from '../../hook
 import { useLocalization } from '../../context/LocalizationContext';
 import {wp, hp, fs, spacing} from '../../utils/responsive'
 import {useTheme} from '../../context/ThemeContext.tsx';
+import { ForceUpdateModal } from '../../components/ForceUpdateModal';
+import { checkAppVersion } from '../../utils/versionCheck';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -51,6 +53,11 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?
     : string; password?: string }>({});
+
+  // Force update state
+  const [showForceUpdate, setShowForceUpdate] = useState(false);
+  const [updateUrl, setUpdateUrl] = useState('');
+  const [minVersion, setMinVersion] = useState('1.0.0');
 
   // Google Auth Hook
   const { signInWithGoogle, isLoading: isGoogleLoading, error: googleError, authSuccess } = useGoogleAuth();
@@ -77,6 +84,26 @@ export default function LoginScreen() {
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
+
+  // Check app version on mount
+  useEffect(() => {
+    const checkVersion = async () => {
+      try {
+        const versionCheck = await checkAppVersion();
+        
+        if (versionCheck.force_update) {
+          setShowForceUpdate(true);
+          setUpdateUrl(versionCheck.update_url);
+          setMinVersion(versionCheck.min_app_version);
+        }
+      } catch (error) {
+        console.error('Version check failed:', error);
+        // Fail open - don't block users if check fails
+      }
+    };
+    
+    checkVersion();
+  }, []);
 
   useEffect(() => {
     Animated.parallel([
@@ -344,75 +371,78 @@ export default function LoginScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
-      <View style={styles.backgroundWrapper}>
-        {/* Green Gradient Header */}
-        <LinearGradient
-          colors={isDark ? ['#22c55e', '#16a34a', '#15803d'] : ['#16a34a', '#15803d', '#14532d']}
-          style={styles.greenHeader}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bounces={true}
         >
-          {/* Texture Pattern */}
-          <View 
-          style={styles.texturePattern}>
-            {Array.from({ length: 80 }).map((_, i) => (
-              <View key={i} style={styles.textureDot} />
-            ))}
-          </View>
-          
-          {/* Decorative Circles */}
-          <Animated.View 
-            style={[
-              styles.bgCircle1,
-              {
-                zIndex:1,
-                opacity: fadeAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, 0.15]
-                })
-              }
-            ]}
-          />
-          <Animated.View 
-            style={[
-              styles.bgCircle2,
-              {zIndex:1,
-                opacity: fadeAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, 0.1]
-                })
-              }
-            ]}
-          />
-          
-          {/* Header Content in Green Section */}
-          <Animated.View 
-            style={[
-              styles.headerInGreen,
-              {zIndex:10,
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }],
-              },
-            ]}
+          {/* Green Gradient Header */}
+          <LinearGradient
+            colors={isDark ? ['#22c55e', '#16a34a', '#15803d'] : ['#16a34a', '#15803d', '#14532d']}
+            style={styles.greenHeader}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
           >
-            <View style={styles.logoContainer}>
-              <Image source={require('../../../assets/images/LogowithoutS.png')} style={styles.logoImage} resizeMode='contain'/>
-              <View style={styles.badge}>
-                <Sparkles size={12} color="#ffffff" />
-                <Text style={styles.badgeText}>{t('auth.trustedBy')}</Text>
-              </View>
+            {/* Texture Pattern */}
+            <View 
+            style={styles.texturePattern}>
+              {Array.from({ length: 80 }).map((_, i) => (
+                <View key={i} style={styles.textureDot} />
+              ))}
             </View>
             
-            <Text style={styles.welcomeText}>{t('auth.welcomeBack')}</Text>
+            {/* Decorative Circles */}
+            <Animated.View 
+              style={[
+                styles.bgCircle1,
+                {
+                  zIndex:1,
+                  opacity: fadeAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 0.15]
+                  })
+                }
+              ]}
+            />
+            <Animated.View 
+              style={[
+                styles.bgCircle2,
+                {zIndex:1,
+                  opacity: fadeAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 0.1]
+                  })
+                }
+              ]}
+            />
             
-          </Animated.View>
-        </LinearGradient>
-
-        <KeyboardAvoidingView 
-          style={styles.keyboardView}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <View style={styles.scrollContent}>
+            {/* Header Content in Green Section */}
+            <Animated.View 
+              style={[
+                styles.headerInGreen,
+                {zIndex:10,
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }],
+                },
+              ]}
+            >
+              <View style={styles.logoContainer}>
+                <Image source={require('../../../assets/images/LogowithoutS.png')} style={styles.logoImage} resizeMode='contain'/>
+                <View style={styles.badge}>
+                  <Sparkles size={12} color="#ffffff" />
+                  <Text style={styles.badgeText}>{t('auth.trustedBy')}</Text>
+                </View>
+              </View>
+              
+              <Text style={styles.welcomeText}>{t('auth.welcomeBack')}</Text>
+              
+            </Animated.View>
+          </LinearGradient>
             {/* Login Form */}
             <Animated.View 
               style={[
@@ -533,6 +563,7 @@ export default function LoginScreen() {
               </View>
 
               <TouchableOpacity
+                activeOpacity={0.8}
                 style={[
                   styles.googleButton,
                   { backgroundColor: colors.surface, borderColor: colors.border },
@@ -545,8 +576,11 @@ export default function LoginScreen() {
                   <ActivityIndicator color={colors.textSecondary} size="small" />
                 ) : (
                   <>
-                    <Image source={require('../../../assets/images/Gooogle Favicon.png')}
-                    className='w-6 h-6 object-contain'/>
+                    <Image 
+                      source={require('../../../assets/images/GoogleFavicon.png')}
+                      style={styles.googleIcon}
+                      resizeMode="contain"
+                    />
                     <Text style={[styles.googleButtonText, { color: colors.text }]}>{t('auth.continueWithGoogle')}</Text>
                   </>
                 )}
@@ -585,7 +619,7 @@ export default function LoginScreen() {
                         ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE 
                         : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
                       }
-                      cornerRadius={spacing(16)}
+                      cornerRadius={spacing(14)}
                       style={styles.appleButton}
                       onPress={handleAppleLogin}
                     />
@@ -594,50 +628,52 @@ export default function LoginScreen() {
               )}
             </Animated.View>
 
-            {/* Footer */}
-            <Animated.View 
-              style={[
-                styles.footer,
-                { opacity: fadeAnim }
-              ]}
-            >
-              <Text style={[styles.footerText, { color: colors.textSecondary }]}>{t('auth.dontHaveAccount')}</Text>
-              <Link href="/(auth)/register" asChild>
-                <TouchableOpacity disabled={isAnyLoading}>
-                  <Text style={[styles.footerLink, { color: colors.primary }]}>{t('auth.signUpLink')}</Text>
-                </TouchableOpacity>
-              </Link>
-            </Animated.View>
+            {/* Footer + Trust Indicators wrapped together to ensure spacing */}
+            <View style={{ paddingBottom: spacing(24), paddingHorizontal: spacing(24) }}>
+              {/* Footer */}
+              <Animated.View 
+                style={[
+                  styles.footer,
+                  { opacity: fadeAnim }
+                ]}
+              >
+                <Text style={[styles.footerText, { color: colors.textSecondary }]}>{t('auth.dontHaveAccount')}</Text>
+                <Link href="/(auth)/register" asChild>
+                  <TouchableOpacity disabled={isAnyLoading}>
+                    <Text style={[styles.footerLink, { color: colors.primary }]}>{t('auth.signUpLink')}</Text>
+                  </TouchableOpacity>
+                </Link>
+              </Animated.View>
 
-            {/* Trust Indicators */}
-            <Animated.View 
-              style={[
-                styles.trustIndicators,
-                { 
-                  backgroundColor: isDark ? '#064e3b' : '#f0fdf4',
-                  borderColor: isDark ? '#16a34a' : '#bbf7d0',
-                  opacity: fadeAnim 
-                }
-              ]}
-            >
-              <View style={styles.trustItem}>
-                <Shield size={18} color="#10b981" />
-                <Text style={[styles.trustText, { color: isDark ? '#86efac' : '#166534' }]}>{t('auth.secure')}</Text>
-              </View>
-              <View style={[styles.trustDivider, { backgroundColor: isDark ? '#16a34a' : '#bbf7d0' }]} />
-              <View style={styles.trustItem}>
-                <Zap size={18} color="#f59e0b" />
-                <Text style={[styles.trustText, { color: isDark ? '#86efac' : '#166534' }]}>{t('auth.fastPayout')}</Text>
-              </View>
-              <View style={[styles.trustDivider, { backgroundColor: isDark ? '#16a34a' : '#bbf7d0' }]} />
-              <View style={styles.trustItem}>
-                <Sparkles size={18} color="#8b5cf6" />
-                <Text style={[styles.trustText, { color: isDark ? '#86efac' : '#166534' }]}>{t('auth.bestRates')}</Text>
-              </View>
-            </Animated.View>
-          </View>
-        </KeyboardAvoidingView>
-      </View>
+              {/* Trust Indicators */}
+              <Animated.View 
+                style={[
+                  styles.trustIndicators,
+                  { 
+                    backgroundColor: isDark ? '#064e3b' : '#f0fdf4',
+                    borderColor: isDark ? '#16a34a' : '#bbf7d0',
+                    opacity: fadeAnim 
+                  }
+                ]}
+              >
+                <View style={styles.trustItem}>
+                  <Shield size={18} color="#10b981" />
+                  <Text style={[styles.trustText, { color: isDark ? '#86efac' : '#166534' }]}>{t('auth.secure')}</Text>
+                </View>
+                <View style={[styles.trustDivider, { backgroundColor: isDark ? '#16a34a' : '#bbf7d0' }]} />
+                <View style={styles.trustItem}>
+                  <Zap size={18} color="#f59e0b" />
+                  <Text style={[styles.trustText, { color: isDark ? '#86efac' : '#166534' }]}>{t('auth.fastPayout')}</Text>
+                </View>
+                <View style={[styles.trustDivider, { backgroundColor: isDark ? '#16a34a' : '#bbf7d0' }]} />
+                <View style={styles.trustItem}>
+                  <Sparkles size={18} color="#8b5cf6" />
+                  <Text style={[styles.trustText, { color: isDark ? '#86efac' : '#166534' }]}>{t('auth.bestRates')}</Text>
+                </View>
+              </Animated.View>
+            </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Account Linking Confirmation Modal - Task 8.3 */}
       {/* Requirements: 4.2 */}
@@ -705,6 +741,13 @@ export default function LoginScreen() {
         </View>
       </Modal>
 
+      {/* Force Update Modal */}
+      <ForceUpdateModal
+        visible={showForceUpdate}
+        updateUrl={updateUrl}
+        minVersion={minVersion}
+      />
+
       <Toast />
     </View>
   );
@@ -719,13 +762,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   greenHeader: {
-    position: 'absolute',
     width: '100%',
-    height: hp(36),
-    top: 0,
+    minHeight: hp(32),
     borderBottomLeftRadius: spacing(32),
     borderBottomRightRadius: spacing(32),
     overflow: 'hidden',
+    marginBottom: spacing(16),
   },
   texturePattern: {
     position: 'absolute',
@@ -766,17 +808,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    flex: 1,
-    paddingHorizontal: spacing(24),
-    paddingTop: hp(36) + spacing(20),
-    paddingBottom: spacing(30),
-    justifyContent: 'space-between',
+    flexGrow: 1,
+    paddingBottom: hp(10),
   },
   headerInGreen: {
-    position: 'absolute',
-    top: hp(7.4),
-    left: 0,
-    right: 0,
+    paddingTop: hp(6),
+    paddingBottom: spacing(8),
     alignItems: 'center',
     paddingHorizontal: spacing(20),
   },
@@ -787,12 +824,12 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing(16),
+    marginBottom: spacing(12),
     width: '100%',
   },
   logoImage: {
-    width: wp(80),
-    height: hp(14.8),
+    width: wp(70),
+    height: hp(10),
     marginBottom: spacing(8),
   },
   logoGlow: {
@@ -817,16 +854,16 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   welcomeText: {
-    fontSize: fs(20),
+    fontSize: fs(26),
     fontWeight: '800',
     color: '#ffffff',
-    marginBottom: spacing(8),
-    marginTop: spacing(4),
+    marginBottom: spacing(2),
+    marginTop: spacing(2),
     textAlign: 'center',
-    letterSpacing: -0.4,
+    letterSpacing: -0.5,
     textDecorationLine: 'none',
     paddingHorizontal: spacing(20),
-    lineHeight: fs(26),
+    lineHeight: fs(32),
   },
   subtitleText: {
     fontSize: fs(13),
@@ -838,18 +875,19 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     marginBottom: spacing(20),
+    paddingHorizontal: spacing(24),
   },
   inputContainer: {
-    marginBottom: spacing(14),
+    marginBottom: spacing(16),
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: spacing(16),
+    borderRadius: spacing(14),
     borderWidth: 1.5,
     paddingHorizontal: spacing(16),
     paddingVertical: spacing(4),
-    height: hp(7.1),
+    height: hp(6.5),
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -863,9 +901,9 @@ const styles = StyleSheet.create({
     }),
   },
   iconCircle: {
-    width: wp(10.1),
-    height: wp(10.1),
-    borderRadius: wp(5.05),
+    width: wp(9),
+    height: wp(9),
+    borderRadius: wp(4.5),
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing(12),
@@ -890,7 +928,8 @@ const styles = StyleSheet.create({
   },
   forgotPassword: {
     alignSelf: 'flex-end',
-    marginBottom: spacing(20),
+    marginBottom: spacing(24),
+    marginTop: spacing(-4),
   },
   forgotPasswordText: {
     fontSize: fs(14),
@@ -898,10 +937,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
   },
   loginButton: {
-    borderRadius: spacing(16),
-    height: hp(6.9),
+    borderRadius: spacing(14),
+    height: hp(6.5),
     overflow: 'hidden',
-    marginBottom: spacing(18),
+    marginBottom: spacing(24),
     ...Platform.select({
       ios: {
         shadowColor: '#16a34a',
@@ -933,7 +972,7 @@ const styles = StyleSheet.create({
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing(16),
+    marginBottom: spacing(20),
   },
   dividerLine: {
     flex: 1,
@@ -946,14 +985,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
   },
   googleButton: {
-    borderRadius: spacing(16),
-    height: hp(6.9),
+    borderRadius: spacing(14),
+    height: hp(6.5),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing(12),
     borderWidth: 1.5,
-    marginBottom: spacing(16),
+    marginBottom: spacing(12),
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -967,9 +1006,8 @@ const styles = StyleSheet.create({
     }),
   },
   googleIcon: {
-    width: fs(24),
-    height: fs(24),
-    resizeMode: 'contain',
+    width: wp(6),
+    height: wp(6),
   },
   googleButtonDisabled: {
     opacity: 0.6,
@@ -981,14 +1019,14 @@ const styles = StyleSheet.create({
   },
   // Phone Sign-In Button Styles (Task 16.1)
   phoneButton: {
-    borderRadius: spacing(16),
-    height: hp(6.9),
+    borderRadius: spacing(14),
+    height: hp(6.5),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing(12),
     borderWidth: 1.5,
-    marginBottom: spacing(16),
+    marginBottom: spacing(12),
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -1020,7 +1058,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing(12),
+    marginTop: spacing(8),
+    marginBottom: spacing(16),
   },
   footerText: {
     fontSize: fs(15),
@@ -1061,16 +1100,16 @@ const styles = StyleSheet.create({
   },
   // Apple Sign-In Button Styles (Task 8.1)
   appleButtonContainer: {
-    marginBottom: spacing(16),
+    marginBottom: spacing(12),
   },
   appleButton: {
     width: '100%',
-    height: hp(6.9),
+    height: hp(6.5),
   },
   appleButtonLoading: {
     width: '100%',
-    height: hp(6.9),
-    borderRadius: spacing(16),
+    height: hp(6.5),
+    borderRadius: spacing(14),
     borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',

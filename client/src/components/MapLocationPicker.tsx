@@ -119,16 +119,29 @@ export default function MapLocationPicker({
   const previousCenterRef = useRef<Coordinates | null>(null);
   const zoomOnlyTimeoutRef = useRef<NodeJS.Timeout>();
 
-    useEffect(() => {
-        if (visible && !isMapReady) {
-        const timer = setTimeout(() => {
+  // Set map as mounted when component mounts
+  useEffect(() => {
+    if (visible) {
+      console.log('🗺️ MapLocationPicker visible - initializing map');
+      // Small delay to ensure map is ready
+      const timer = setTimeout(() => {
+        console.log('🗺️ Setting map as mounted and ready');
+        mapMountedRef.current = true;
         setIsMapReady(true);
         getCurrentUserLocation();
-    }, 300);
+      }, 300);
 
-    return () => clearTimeout(timer);
-  }
-}, [visible]);
+      return () => {
+        console.log('🗺️ MapLocationPicker cleanup');
+        clearTimeout(timer);
+        mapMountedRef.current = false;
+      };
+    } else {
+      console.log('🗺️ MapLocationPicker not visible - resetting state');
+      mapMountedRef.current = false;
+      setIsMapReady(false);
+    }
+  }, [visible]);
 
   useEffect(() => {
     if (visible && autoOpenGPS && isMapReady && !hasTriggeredGPS.current) {
@@ -217,33 +230,32 @@ export default function MapLocationPicker({
     latitude: number,
     longitude: number,
     updateSearchBox: boolean = true,
-    force:boolean = false
+    force: boolean = false
   ): Promise<KrutrimReverseGeocodeResult | null> => {
     if (isSelectingFromSearch.current && !force) return null;
-  
-    
+
     try {
       // Use Google Geocoding API instead of Krutrim
       const url = buildGoogleReverseGeocodeUrl(latitude, longitude);
       const response = await fetch(url);
       const data = await response.json();
+      
       if (data.status === 'OK' && data.results && data.results.length > 0) {
         const result = data.results[0];
         
         setSelectedAddress(result.formatted_address);
         setSelectedAddressDetails(result); // Store Google structure
         
-        // if (updateSearchBox) {
-        //   setSearchQuery(result.formatted_address);
-        // }
+        return result;
       } else {
         console.warn('Google Reverse Geocode failed/empty');
         if (updateSearchBox) setSelectedAddress("Pinned Location");
+        return null;
       }
-      
-      }
-    catch (error) {
-      console.error('Reverse geocoding error:', error); 
+    } catch (error) {
+      console.error('Reverse geocoding error:', error);
+      if (updateSearchBox) setSelectedAddress("Pinned Location");
+      return null;
     } finally {
       setIsSearching(false);
     }
@@ -494,7 +506,12 @@ export default function MapLocationPicker({
   };
 
   return (
-   
+    <Modal
+      visible={visible}
+      animationType="slide"
+      onRequestClose={onClose}
+      presentationStyle="fullScreen"
+    >
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -507,6 +524,8 @@ export default function MapLocationPicker({
 
         {/* Map Container - Full Screen */}
         <View style={styles.mapContainer}>
+          {isMapReady ? (
+            <>
               <MapViewWrapper
                 center={selectedCoords}
                 marker={markerCoords}
@@ -597,7 +616,13 @@ export default function MapLocationPicker({
                 )}
                 <Text style={styles.currentLocationText}>Use Current Location</Text>
               </TouchableOpacity>
-          
+            </>
+          ) : (
+            <View style={styles.mapLoadingContainer}>
+              <ActivityIndicator size="large" color="#16a34a" />
+              <Text style={styles.loadingText}>Loading map...</Text>
+            </View>
+          )}
         </View>
 
         {/* Footer */}
@@ -705,7 +730,7 @@ export default function MapLocationPicker({
           </Modal>
         )}
       </View>
-  
+    </Modal>
   );
 }
 

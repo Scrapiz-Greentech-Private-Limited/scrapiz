@@ -117,6 +117,42 @@ export default function AddressesScreen() {
 
   useEffect(() => {
     loadAddresses();
+    
+    // Check if we need to auto-open the add modal with pre-filled location
+    const checkAutoOpen = async () => {
+      try {
+        // Get route params using expo-router
+        const params = router.params as any;
+        
+        if (params?.autoOpen === 'true' && params?.prefillLocation) {
+          const locationData = JSON.parse(params.prefillLocation);
+          
+          // Populate form with location data
+          const updatedFormData = populateFormFromLocation(emptyFormData, locationData);
+          
+          // Set default name to "Home"
+          updatedFormData.name = 'Home';
+          
+          setFormData(updatedFormData);
+          setAddressType('home');
+          setEditingId(null);
+          setFormErrors({});
+          
+          // Open the modal
+          setOpen(true);
+          
+          Toast.show({
+            type: 'success',
+            text1: 'Location Selected',
+            text2: 'Please add phone number and save',
+          });
+        }
+      } catch (error) {
+        console.error('Error processing auto-open params:', error);
+      }
+    };
+    
+    checkAutoOpen();
   }, []);
 
   const loadAddresses = async () => {
@@ -413,7 +449,16 @@ export default function AddressesScreen() {
     try {
       // Populate form fields with location data using helper function
       const updatedFormData = populateFormFromLocation(formData, location);
+      
+      // Set default name to "Home" if empty
+      if (!updatedFormData.name || updatedFormData.name === '') {
+        updatedFormData.name = 'Home';
+      }
+      
       setFormData(updatedFormData);
+      
+      // Set address type to home by default
+      setAddressType('home');
       
       // Close map picker - state cleanup will be handled by MapLocationPicker's useEffect
       setShowMapPicker(false);
@@ -421,7 +466,7 @@ export default function AddressesScreen() {
       Toast.show({
         type: 'success',
         text1: 'Location Selected',
-        text2: 'Address fields have been populated',
+        text2: 'Please add phone number and save',
       });
     } catch (error: any) {
       console.error('Error populating form from location:', error);
@@ -961,25 +1006,23 @@ export default function AddressesScreen() {
       </Modal>
 
       {/* Map Location Picker */}
-        {showMapPicker && (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      <MapLocationPicker
-        visible={true}
-        mode="form-populate"
-        autoOpenGPS
-        initialLocation={
-          currentLocation
-            ? {
-                latitude: currentLocation.latitude,
-                longitude: currentLocation.longitude,
-              }
-            : undefined
-        }
-        onClose={() => setShowMapPicker(false)}
-        onLocationSelect={handleMapLocationSelect}
-      />
-  </View>
-)}
+      {showMapPicker && (
+        <MapLocationPicker
+          visible={showMapPicker}
+          mode="form-populate"
+          autoOpenGPS
+          initialLocation={
+            currentLocation
+              ? {
+                  latitude: currentLocation.latitude,
+                  longitude: currentLocation.longitude,
+                }
+              : undefined
+          }
+          onClose={() => setShowMapPicker(false)}
+          onLocationSelect={handleMapLocationSelect}
+        />
+      )}
 
       <Toast />
     </View>

@@ -14,6 +14,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import {
   Plus,
@@ -32,6 +34,7 @@ import {
   FileText,
   Scale,
   AlertCircle,
+  Check,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -55,6 +58,7 @@ import {
   setSellServiceability,
   resetSellServiceability 
 } from '../../utils/sellServiceability';
+import { isSellScreenGateEnforcedCached } from '../../utils/sellScreenEnforcement';
 import FeedbackModal from '../../components/FeedbackModal';
 import NetworkRetryOverlay from '../../components/NetworkRetryOverlay';
 import { useNetworkRetry } from '../../hooks/useNetworkRetry';
@@ -149,6 +153,7 @@ export default function SellScreen() {
   
   // Serviceability gate state
   const [screenState, setScreenState] = useState<SellScreenState>('checking');
+  const [enforceSellGate, setEnforceSellGate] = useState<boolean>(true); // Default to enforced
   
   // Check serviceability on mount
   useEffect(() => {
@@ -156,26 +161,47 @@ export default function SellScreen() {
   }, []);
 
   const checkServiceability = async () => {
-    // If location is already set and service is available from context, allow access
-    if (locationSet && serviceAvailable) {
-      await setSellServiceability(true);
-      setScreenState('serviceable');
-      return;
-    }
-
-    // Check if we've already done the serviceability check for sell
-    const hasChecked = await hasSellServiceabilityBeenChecked();
-    
-    if (hasChecked) {
-      const isAvailable = await getSellServiceAvailability();
-      if (isAvailable) {
+    try {
+      // First, check if sell screen gating is enforced from backend
+      const shouldEnforce = await isSellScreenGateEnforcedCached();
+      
+      setEnforceSellGate(shouldEnforce);
+      
+      // If enforcement is disabled, skip gating logic entirely
+      if (!shouldEnforce) {
+        console.log('🚀 Sell screen gate enforcement disabled - allowing direct access');
         setScreenState('serviceable');
-      } else {
-        setScreenState('not_serviceable');
+        return;
       }
-    } else {
-      // Need to show location gate
-      setScreenState('location_gate');
+      
+      // Original gating logic (only runs if enforcement is enabled)
+      console.log('🔒 Sell screen gate enforcement enabled - checking serviceability');
+      
+      // If location is already set and service is available from context, allow access
+      if (locationSet && serviceAvailable) {
+        await setSellServiceability(true);
+        setScreenState('serviceable');
+        return;
+      }
+
+      // Check if we've already done the serviceability check for sell
+      const hasChecked = await hasSellServiceabilityBeenChecked();
+      
+      if (hasChecked) {
+        const isAvailable = await getSellServiceAvailability();
+        if (isAvailable) {
+          setScreenState('serviceable');
+        } else {
+          setScreenState('not_serviceable');
+        }
+      } else {
+        // Need to show location gate
+        setScreenState('location_gate');
+      }
+    } catch (error) {
+      console.error('Error checking sell screen enforcement:', error);
+      // On error, default to showing the content (fail open for better UX)
+      setScreenState('serviceable');
     }
   };
 
@@ -295,6 +321,11 @@ function SellScreenContent() {
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [notes, setNotes] = useState('');
+  
+  // Quantity selector modal state
+  const [showQuantityModal, setShowQuantityModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<ProductSummary | null>(null);
+  const [tempQuantity, setTempQuantity] = useState('1');
   
   // Referral wallet - use context
   const { walletBalance, setWalletBalance, updateBalanceAndCache, applyReferralDiscount } = useReferral();
@@ -477,17 +508,61 @@ function SellScreenContent() {
     setSelectedImages(prev => prev.filter(imageUri => imageUri !== uri));
   };
 
-  const addItem = (product: ProductSummary) => {
-    const rate = (product.max_rate + product.min_rate) / 2;
-    console.log(`Adding ${product.name}: min=${product.min_rate}, max=${product.max_rate}, avg=${rate}`);
-    addItemToStore({
-      id: product.id,
-      name: product.name,
-      rate,
-      unit: product.unit,
-      quantity: 1,
-      image: getImageForProduct(product)
-    });
+  const openQuantityModal = (product: ProductSummary) => {
+    setSelectedProduct(product);
+    const existingItem = selectedItems.find(i => i.id === product.id);
+    setTempQuantity(existingItem ? existingItem.quantity.toString() : '1');
+    setShowQuantityModal(true);
+  };
+
+  const closeQuantityModal = () => {
+    setShowQuantityModal(false);
+    setSelectedProduct(null);
+    setTempQuantity('1');
+  };
+
+  const handleQuantityConfirm = () => {
+    if (!selectedProduct) return;
+    
+    const quantity = parseFloat(tempQuantity);
+    if (isNaN(quantity) || quantity <= 0) {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid Quantity',
+        text2: 'Please enter a valid quantity',
+      });
+      return;
+    }
+
+    const rate = (selectedProduct.max_rate + selectedProduct.min_rate) / 2;
+    const existingItem = selectedItems.find(i => i.id === selectedProduct.id);
+
+    if (existingItem) {
+      updateItemQuantity(selectedProduct.id, quantity);
+    } else {
+      addItemToStore({
+        id: selectedProduct.id,
+        name: selectedProduct.name,
+        rate,
+        unit: selectedProduct.unit,
+        quantity,
+        image: getImageForProduct(selectedProduct)
+      });
+    }
+
+    closeQuantityModal();
+  };
+
+  const incrementQuantity = () => {
+    const current = parseFloat(tempQuantity) || 0;
+    setTempQuantity((current + 1).toString());
+  };
+
+  const decrementQuantity = () => {
+    const current = parseFloat(tempQuantity) || 0;
+    if (current > 1) {
+      setTempQuantity((current - 1).toString());
+    }
   };
 
   const updateQuantity = (id: number, change: number) => {
@@ -885,33 +960,26 @@ function SellScreenContent() {
                       </View>
                       
                       {isSelected ? (
-                        <View style={styles.quantityControls}>
+                        <View style={styles.itemActions}>
                           <TouchableOpacity
-                            style={[styles.quantityButton, { backgroundColor: colors.card }]}
-                            onPress={() => updateQuantity(product.id, -1)}
+                            style={[styles.quantityBadge, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#f0fdf4', borderColor: colors.primary }]}
+                            onPress={() => openQuantityModal(product)}
                           >
-                            <Minus size={14} color="#6b7280" />
-                          </TouchableOpacity>
-                          <Text style={[styles.quantityText, { color: colors.primary }]}>
-                            {selectedItem.quantity}{product.unit}
-                          </Text>
-                          <TouchableOpacity
-                            style={[styles.quantityButton, { backgroundColor: colors.card }]}
-                            onPress={() => updateQuantity(product.id, 1)}
-                          >
-                            <Plus size={14} color="#6b7280" />
+                            <Text style={[styles.quantityBadgeText, { color: colors.primary }]}>
+                              {selectedItem.quantity}{product.unit}
+                            </Text>
                           </TouchableOpacity>
                           <TouchableOpacity
-                            style={styles.removeButton}
+                            style={[styles.removeButtonSmall, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#fee2e2' }]}
                             onPress={() => removeItem(product.id)}
                           >
-                            <Trash2 size={14} color="#dc2626" />
+                            <Trash2 size={16} color="#dc2626" />
                           </TouchableOpacity>
                         </View>
                       ) : (
                         <TouchableOpacity
                           style={[styles.addButton, { backgroundColor: colors.primary }]}
-                          onPress={() => addItem(product)}
+                          onPress={() => openQuantityModal(product)}
                         >
                           <Plus size={16} color="white" />
                         </TouchableOpacity>
@@ -1798,6 +1866,161 @@ function SellScreenContent() {
         </View>
       )}
 
+      {/* Quantity Selector Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showQuantityModal}
+        onRequestClose={closeQuantityModal}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.quantityModalOverlay}>
+            <TouchableWithoutFeedback onPress={closeQuantityModal}>
+              <View style={styles.quantityModalOverlay} />
+            </TouchableWithoutFeedback>
+            
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={[styles.quantityModalContent, { backgroundColor: colors.surface }]}>
+                {/* Header */}
+                <View style={[styles.quantityModalHeader, { borderBottomColor: colors.border }]}>
+                  <View style={styles.quantityModalTitleContainer}>
+                    <Scale size={20} color={colors.primary} />
+                    <Text style={[styles.quantityModalTitle, { color: colors.text }]}>
+                      Select Quantity
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={closeQuantityModal} style={styles.quantityModalClose}>
+                    <X size={24} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Product Info */}
+                {selectedProduct && (
+                  <View style={styles.quantityModalProduct}>
+                    <View style={styles.quantityModalProductInfo}>
+                      {getImageForProduct(selectedProduct) && (
+                        <RemoteImage 
+                          source={getImageForProduct(selectedProduct)!} 
+                          fallback={getFallbackImageForProduct(selectedProduct.name)}
+                          style={styles.quantityModalProductImage}
+                          showLoadingIndicator={false}
+                        />
+                      )}
+                      <View style={styles.quantityModalProductDetails}>
+                        <Text style={[styles.quantityModalProductName, { color: colors.text }]}>
+                          {selectedProduct.name}
+                        </Text>
+                        <Text style={[styles.quantityModalProductRate, { color: colors.primary }]}>
+                          ₹{selectedProduct.min_rate}-{selectedProduct.max_rate}/{selectedProduct.unit}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
+
+                {/* Quantity Controls */}
+                <View style={styles.quantityModalControls}>
+                  <Text style={[styles.quantityModalLabel, { color: colors.textSecondary }]}>
+                    Quantity ({selectedProduct?.unit})
+                  </Text>
+                  
+                  <View style={styles.quantityModalInputContainer}>
+                    <TouchableOpacity
+                      style={[styles.quantityModalButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+                      onPress={decrementQuantity}
+                    >
+                      <Minus size={24} color={colors.text} strokeWidth={2.5} />
+                    </TouchableOpacity>
+
+                    <TextInput
+                      style={[styles.quantityModalInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+                      value={tempQuantity}
+                      onChangeText={setTempQuantity}
+                      keyboardType="decimal-pad"
+                      selectTextOnFocus
+                    />
+
+                    <TouchableOpacity
+                      style={[styles.quantityModalButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+                      onPress={incrementQuantity}
+                    >
+                      <Plus size={24} color={colors.text} strokeWidth={2.5} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Quick Select Buttons */}
+                  <View style={styles.quantityModalQuickSelect}>
+                    <Text style={[styles.quantityModalQuickLabel, { color: colors.textSecondary }]}>
+                      Quick Select:
+                    </Text>
+                    <View style={styles.quantityModalQuickButtons}>
+                      {[1, 5, 10, 20, 50].map((value) => (
+                        <TouchableOpacity
+                          key={value}
+                          style={[
+                            styles.quantityModalQuickButton,
+                            { backgroundColor: colors.card, borderColor: colors.border },
+                            tempQuantity === value.toString() && { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#f0fdf4', borderColor: colors.primary }
+                          ]}
+                          onPress={() => setTempQuantity(value.toString())}
+                        >
+                          <Text style={[
+                            styles.quantityModalQuickButtonText,
+                            { color: colors.textSecondary },
+                            tempQuantity === value.toString() && { color: colors.primary, fontWeight: '600' }
+                          ]}>
+                            {value}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+
+                  {/* Estimated Value */}
+                  {selectedProduct && (
+                    <View style={[styles.quantityModalEstimate, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.1)' : '#f0fdf4', borderColor: isDark ? colors.primary : '#dcfce7' }]}>
+                      <Text style={[styles.quantityModalEstimateLabel, { color: colors.textSecondary }]}>
+                        Estimated Value:
+                      </Text>
+                      <Text style={[styles.quantityModalEstimateValue, { color: colors.primary }]}>
+                        ₹{Math.round(((selectedProduct.max_rate + selectedProduct.min_rate) / 2) * (parseFloat(tempQuantity) || 0))}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Action Buttons */}
+                <View style={styles.quantityModalActions}>
+                  <TouchableOpacity
+                    style={[styles.quantityModalCancelButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={closeQuantityModal}
+                  >
+                    <Text style={[styles.quantityModalCancelText, { color: colors.textSecondary }]}>
+                      Cancel
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.quantityModalConfirmButton}
+                    onPress={handleQuantityConfirm}
+                    activeOpacity={0.8}
+                  >
+                    <LinearGradient
+                      colors={isDark ? ['#22c55e', '#16a34a'] : ['#16a34a', '#15803d']}
+                      style={styles.quantityModalConfirmGradient}
+                    >
+                      <Text style={styles.quantityModalConfirmText}>
+                        {selectedItems.find(i => i.id === selectedProduct?.id) ? 'Update' : 'Add Item'}
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
       {/* Guidelines Modal */}
       <Modal
         animationType="fade"
@@ -2073,6 +2296,28 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 16,
     backgroundColor: '#16a34a',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  itemActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  quantityBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1.5,
+  },
+  quantityBadgeText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  removeButtonSmall: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -3302,5 +3547,170 @@ const styles = StyleSheet.create({
     color: '#111827',
     textAlign: 'center',
     lineHeight: 16,
+  },
+  // Quantity Modal Styles
+  quantityModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  quantityModalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  quantityModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  quantityModalTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  quantityModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  quantityModalClose: {
+    padding: 4,
+  },
+  quantityModalProduct: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  quantityModalProductInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  quantityModalProductImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+  },
+  quantityModalProductDetails: {
+    flex: 1,
+  },
+  quantityModalProductName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  quantityModalProductRate: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  quantityModalControls: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  quantityModalLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  quantityModalInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 20,
+  },
+  quantityModalButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quantityModalInput: {
+    flex: 1,
+    height: 56,
+    borderRadius: 12,
+    borderWidth: 2,
+    fontSize: 24,
+    fontWeight: '700',
+    textAlign: 'center',
+    paddingHorizontal: 16,
+  },
+  quantityModalQuickSelect: {
+    marginBottom: 20,
+  },
+  quantityModalQuickLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  quantityModalQuickButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  quantityModalQuickButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    alignItems: 'center',
+  },
+  quantityModalQuickButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  quantityModalEstimate: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  quantityModalEstimateLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  quantityModalEstimateValue: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  quantityModalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+  quantityModalCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: 'center',
+  },
+  quantityModalCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  quantityModalConfirmButton: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  quantityModalConfirmGradient: {
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  quantityModalConfirmText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
   },
 });

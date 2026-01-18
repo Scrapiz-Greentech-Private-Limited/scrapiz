@@ -103,12 +103,12 @@ export default function ServiceDetailsScreen() {
       >
         <View style={styles.contentContainer}>
 
-            <View style={[styles.heroCard, { backgroundColor: service.bgColor }]}>
+            <View style={[styles.heroCard, { backgroundColor: isDark ? colors.card : service.bgColor }]}>
                 <View style={[styles.heroIcon, { backgroundColor: service.color }]}>
                     <service.icon size={fs(34)} color="white" />
                 </View>
                 <Text style={[styles.heroTitle, { color: service.color }]}>{t(service.titleKey)}</Text>
-                <Text style={styles.heroDescription}>{t(service.descKey)}</Text>
+                <Text style={[styles.heroDescription, { color: colors.textSecondary }]}>{t(service.descKey)}</Text>
                 <View style={styles.tagsContainer}>
                     <View style={[styles.tag, { backgroundColor: colors.surface, borderColor: colors.border }]}><Shield size={fs(14)} color={colors.textSecondary} /><Text style={[styles.tagText, { color: colors.textSecondary }]}>{t('services.insured')}</Text></View>
                     <View style={[styles.tag, { backgroundColor: colors.surface, borderColor: colors.border }]}><Clock size={fs(14)} color={colors.textSecondary} /><Text style={[styles.tagText, { color: colors.textSecondary }]}>{t('services.fast')}</Text></View>
