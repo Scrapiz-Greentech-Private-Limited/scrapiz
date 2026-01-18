@@ -3,7 +3,7 @@
  * This allows backend control over whether users need to pass serviceability checks
  */
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.scrapiz.in/api';
 
 export interface AppConfig {
   enforce_sell_screen_gate?: boolean;
@@ -19,7 +19,9 @@ export interface AppConfig {
  */
 export const isSellScreenGateEnforced = async (): Promise<boolean> => {
   try {
-    const response = await fetch(`${API_URL}/api/content/app-config/`, {
+    console.log('🔍 Checking sell screen enforcement from:', `${API_URL}/content/app-config/`);
+    
+    const response = await fetch(`${API_URL}/content/app-config/`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

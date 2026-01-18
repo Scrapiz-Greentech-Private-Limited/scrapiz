@@ -9,7 +9,7 @@
  * Requirements: 1.1, 15.2, 20.3, 2.4, 2.5, 20.5, 20.6
  */
 
-import React, { useRef, useImperativeHandle } from 'react';
+import React, { useRef, useImperativeHandle, useEffect } from 'react';
 import MapView, { Marker, PROVIDER_APPLE, Region } from 'react-native-maps';
 import { MapProviderProps, CameraController, Coordinates } from './types';
 import { CustomMarkerView } from './CustomMarkerView';
@@ -27,6 +27,13 @@ export function AppleMapView({
   initialRegion,
 }: MapProviderProps) {
   const mapRef = useRef<MapView>(null);
+
+  // Log initial coordinates
+  useEffect(() => {
+    console.log('🗺️ Apple Maps: Initial center prop:', center);
+    console.log('🗺️ Apple Maps: Initial zoom:', zoom);
+    console.log('🗺️ Apple Maps: Initial region prop:', initialRegion);
+  }, []);
 
   // Expose CameraController interface via ref
   // Requirements: 2.4, 2.5, 20.5
@@ -78,14 +85,6 @@ export function AppleMapView({
     }
   };
 
-  // Handle region change (continuous during pan/zoom)
-  // Requirement: 15.2, 20.6
-  const handleRegionChange = (region: Region) => {
-    // Convert {latitude, longitude} to [lng, lat]
-    const coords: Coordinates = [region.longitude, region.latitude];
-    onRegionChange(coords);
-  };
-
   // Handle region change complete (after pan/zoom completes)
   // Requirement: 15.2, 20.6
   const handleRegionChangeComplete = (region: Region) => {
@@ -97,9 +96,12 @@ export function AppleMapView({
   // Calculate initial region from props or center
   const getInitialRegion = (): Region => {
     if (initialRegion) {
+      console.log('🗺️ Apple Maps: Using initialRegion prop:', initialRegion);
       return initialRegion;
     }
-    return coordinatesToRegion(center, zoom);
+    const region = coordinatesToRegion(center, zoom);
+    console.log('🗺️ Apple Maps: Calculated region from center:', region);
+    return region;
   };
 
   return (
@@ -109,7 +111,6 @@ export function AppleMapView({
       style={style}
       initialRegion={getInitialRegion()}
       onPress={handlePress}
-      onRegionChange={handleRegionChange}
       onRegionChangeComplete={handleRegionChangeComplete}
       showsUserLocation={false}
       showsMyLocationButton={false}
@@ -121,17 +122,19 @@ export function AppleMapView({
         console.log('Apple Maps ready');
       }}
     >
-      {/* Location marker */}
-      <Marker
-        coordinate={{
-          latitude: marker[1],
-          longitude: marker[0],
-        }}
-        anchor={{ x: 0.5, y: 0.5 }}
-        centerOffset={{ x: 0, y: 0 }}
-      >
-        <CustomMarkerView />
-      </Marker>
+      {/* Location marker - HIDDEN: Using fixed overlay marker instead */}
+      {false && (
+        <Marker
+          coordinate={{
+            latitude: marker[1],
+            longitude: marker[0],
+          }}
+          anchor={{ x: 0.5, y: 0.5 }}
+          centerOffset={{ x: 0, y: 0 }}
+        >
+          <CustomMarkerView />
+        </Marker>
+      )}
     </MapView>
   );
 }

@@ -93,7 +93,8 @@ export default function LocationPermissionScreen() {
     // Optionally check backend for skip permission
     // This allows dynamic control without app updates
     try {
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/content/app-config/`, {
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.scrapiz.in/api';
+      const response = await fetch(`${API_URL}/content/app-config/`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

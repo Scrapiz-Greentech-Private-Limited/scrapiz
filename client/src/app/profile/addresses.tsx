@@ -12,7 +12,8 @@ import {
   Platform,
   StyleSheet,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import {
   ArrowLeft,
@@ -90,6 +91,7 @@ const emptyFormData: AddressFormData = {
 
 export default function AddressesScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams(); // Use useLocalSearchParams instead of router.params
   const { colors, isDark } = useTheme();
   const [addresses, setAddresses] = useState<AddressSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,43 +119,64 @@ export default function AddressesScreen() {
 
   useEffect(() => {
     loadAddresses();
-    
-    // Check if we need to auto-open the add modal with pre-filled location
-    const checkAutoOpen = async () => {
-      try {
-        // Get route params using expo-router
-        const params = router.params as any;
-        
-        if (params?.autoOpen === 'true' && params?.prefillLocation) {
-          const locationData = JSON.parse(params.prefillLocation);
+  }, []);
+
+  // Use useFocusEffect to handle route params when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      const checkAutoOpen = async () => {
+        try {
+          console.log('📍 Addresses screen focused - checking params:', params);
           
-          // Populate form with location data
-          const updatedFormData = populateFormFromLocation(emptyFormData, locationData);
-          
-          // Set default name to "Home"
-          updatedFormData.name = 'Home';
-          
-          setFormData(updatedFormData);
-          setAddressType('home');
-          setEditingId(null);
-          setFormErrors({});
-          
-          // Open the modal
-          setOpen(true);
-          
+          if (params?.autoOpen === 'true' && params?.prefillLocation) {
+            console.log('📍 Auto-opening address form with prefilled location');
+            console.log('📍 Prefill location data:', params.prefillLocation);
+            
+            const locationData = JSON.parse(params.prefillLocation as string);
+            console.log('📍 Parsed location data:', locationData);
+            
+            // Populate form with location data
+            const updatedFormData = populateFormFromLocation(emptyFormData, locationData);
+            console.log('📍 Updated form data:', updatedFormData);
+            
+            // Set default name to "Home"
+            updatedFormData.name = 'Home';
+            
+            setFormData(updatedFormData);
+            setAddressType('home');
+            setEditingId(null);
+            setFormErrors({});
+            
+            // Small delay to ensure screen is fully mounted
+            setTimeout(() => {
+              console.log('📍 Opening modal with form data');
+              setOpen(true);
+            }, 300);
+            
+            Toast.show({
+              type: 'success',
+              text1: 'Location Selected',
+              text2: 'Please add phone number and save',
+            });
+            
+            // Clear params after processing to prevent re-opening on next focus
+            router.setParams({ autoOpen: undefined, prefillLocation: undefined } as any);
+          } else {
+            console.log('📍 No auto-open params found or invalid params');
+          }
+        } catch (error) {
+          console.error('❌ Error processing auto-open params:', error);
           Toast.show({
-            type: 'success',
-            text1: 'Location Selected',
-            text2: 'Please add phone number and save',
+            type: 'error',
+            text1: 'Error',
+            text2: 'Failed to load location data',
           });
         }
-      } catch (error) {
-        console.error('Error processing auto-open params:', error);
-      }
-    };
-    
-    checkAutoOpen();
-  }, []);
+      };
+      
+      checkAutoOpen();
+    }, [params])
+  );
 
   const loadAddresses = async () => {
     try {

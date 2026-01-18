@@ -63,6 +63,7 @@ export default function LocationSelectionModal({
   const [selectedAddress, setSelectedAddress] = useState<SavedLocation | null>(null);
   const [parentModalVisible, setParentModalVisible] = useState(visible);
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const locationConfirmedRef = useRef(false); // Track if location was confirmed
   
   // Sync parent modal visibility with prop, but allow local control
   useEffect(() => {
@@ -185,17 +186,41 @@ export default function LocationSelectionModal({
 
   const handleMapLocationConfirm = async (location: any) => {
     try {
-      // Don't save here - redirect to addresses screen instead
+      console.log('🗺️ Map location confirmed:', location);
+      console.log('🗺️ Navigating to addresses screen');
+      
+      // Mark that location was confirmed (not cancelled)
+      locationConfirmedRef.current = true;
+      
+      // Close map picker first
       setShowMapPickerForGPS(false);
-      onClose(); // Close the location selection modal
+      
+      // Small delay to ensure map picker closes cleanly
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Close the location selection modal (don't reopen it)
+      setParentModalVisible(false);
+      onClose();
+      
+      // Small delay before navigation to ensure modals are closed
+      await new Promise(resolve => setTimeout(resolve, 150));
+      
+      // Prepare location data for navigation
+      const locationString = JSON.stringify(location);
+      console.log('🗺️ Location string to pass:', locationString);
       
       // Navigate to addresses screen with pre-filled data
       router.push({
         pathname: '/profile/addresses',
         params: {
-          prefillLocation: JSON.stringify(location),
+          prefillLocation: locationString,
           autoOpen: 'true'
         }
+      });
+      
+      console.log('🗺️ Navigation triggered with params:', {
+        prefillLocation: locationString,
+        autoOpen: 'true'
       });
       
       Toast.show({
@@ -204,7 +229,10 @@ export default function LocationSelectionModal({
         text2: 'Please add phone number and other details',
       });
     } catch (error: any) {
-      console.error('Navigation error:', error);
+      console.error('❌ Navigation error:', error);
+      
+      // Reset flag on error
+      locationConfirmedRef.current = false;
       
       Toast.show({
         type: 'error',
@@ -218,12 +246,20 @@ export default function LocationSelectionModal({
   };
 
   const handleMapPickerClose = () => {
-    console.log('🗺️ GPS map picker closed - showing parent modal');
+    console.log('🗺️ GPS map picker closed by user');
     setShowMapPickerForGPS(false);
-    // Show parent modal again
-    setTimeout(() => {
-      setParentModalVisible(true);
-    }, 100);
+    
+    // Only show parent modal again if user cancelled (didn't confirm location)
+    if (!locationConfirmedRef.current) {
+      console.log('🗺️ Location was not confirmed, showing parent modal');
+      setTimeout(() => {
+        setParentModalVisible(true);
+      }, 100);
+    } else {
+      console.log('🗺️ Location was confirmed, not showing parent modal');
+      // Reset flag for next time
+      locationConfirmedRef.current = false;
+    }
   };
 
   const handleSearchMapPickerClose = () => {

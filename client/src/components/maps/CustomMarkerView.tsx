@@ -10,7 +10,12 @@ import { View, StyleSheet } from 'react-native';
  * 
  * Requirements: 3.4, 17.3
  */
-export function CustomMarkerView() {
+export function CustomMarkerView({ invisible = false }: { invisible?: boolean }) {
+  if (invisible) {
+    // Return an invisible marker (used when we have a fixed overlay marker)
+    return <View style={styles.invisibleMarker} />;
+  }
+
   return (
     <View style={styles.markerOuter}>
       <View style={styles.markerInner} />
@@ -19,6 +24,11 @@ export function CustomMarkerView() {
 }
 
 const styles = StyleSheet.create({
+  invisibleMarker: {
+    width: 1,
+    height: 1,
+    opacity: 0,
+  },
   markerOuter: {
     width: 36,
     height: 36,

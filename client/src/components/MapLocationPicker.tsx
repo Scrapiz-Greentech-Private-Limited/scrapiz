@@ -19,6 +19,7 @@ import {
   MAP_SETTINGS,
   DEFAULT_CENTER,
   KRUTRIM_API_KEY,
+  GOOGLE_API_KEY,
   getSessionToken,
   buildKrutrimAutocompleteUrl,
   buildGoogleReverseGeocodeUrl,
@@ -99,11 +100,21 @@ export default function MapLocationPicker({
   const [showResults, setShowResults] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
   const sessionTokenRef = useRef<string>(getSessionToken());
-  const [selectedCoords, setSelectedCoords] = useState<Coordinates>(
-    initialLocation ? [initialLocation.longitude, initialLocation.latitude] : DEFAULT_CENTER
-  );
+  const [selectedCoords, setSelectedCoords] = useState<Coordinates>(() => {
+    if (initialLocation) {
+      console.log('🗺️ Using initialLocation:', initialLocation);
+      return [initialLocation.longitude, initialLocation.latitude];
+    }
+    console.log('🗺️ Using DEFAULT_CENTER (Mumbai/Thane):', DEFAULT_CENTER);
+    return DEFAULT_CENTER;
+  });
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
-  const [markerCoords, setMarkerCoords] = useState<Coordinates>(selectedCoords);
+  const [markerCoords, setMarkerCoords] = useState<Coordinates>(() => {
+    if (initialLocation) {
+      return [initialLocation.longitude, initialLocation.latitude];
+    }
+    return DEFAULT_CENTER;
+  });
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [currentUserLocation, setCurrentUserLocation] = useState<Coordinates | null>(null);
   const [isUserTyping, setIsUserTyping] = useState(false);
@@ -123,13 +134,13 @@ export default function MapLocationPicker({
   useEffect(() => {
     if (visible) {
       console.log('🗺️ MapLocationPicker visible - initializing map');
-      // Small delay to ensure map is ready
+      // Longer delay for Android to ensure proper initialization
       const timer = setTimeout(() => {
         console.log('🗺️ Setting map as mounted and ready');
         mapMountedRef.current = true;
         setIsMapReady(true);
         getCurrentUserLocation();
-      }, 300);
+      }, Platform.OS === 'android' ? 500 : 300);
 
       return () => {
         console.log('🗺️ MapLocationPicker cleanup');
@@ -140,6 +151,7 @@ export default function MapLocationPicker({
       console.log('🗺️ MapLocationPicker not visible - resetting state');
       mapMountedRef.current = false;
       setIsMapReady(false);
+      hasTriggeredGPS.current = false; // Reset GPS trigger flag
     }
   }, [visible]);
 
@@ -234,24 +246,59 @@ export default function MapLocationPicker({
   ): Promise<KrutrimReverseGeocodeResult | null> => {
     if (isSelectingFromSearch.current && !force) return null;
 
+    // Prevent multiple simultaneous reverse geocode calls
+    if (isSearching && !force) {
+      console.log('🔄 Skipping reverse geocode - already in progress');
+      return null;
+    }
+
+    setIsSearching(true);
+
     try {
-      // Use Google Geocoding API instead of Krutrim
-      const url = buildGoogleReverseGeocodeUrl(latitude, longitude);
+      // Use Google Geocoding API with result_type and location_type filters for rooftop precision
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&result_type=street_address|premise|subpremise&location_type=ROOFTOP|RANGE_INTERPOLATED&key=${GOOGLE_API_KEY}`;
+      console.log('🏢 Requesting rooftop-level address for:', { latitude, longitude });
+      
       const response = await fetch(url);
       const data = await response.json();
       
       if (data.status === 'OK' && data.results && data.results.length > 0) {
-        const result = data.results[0];
+        // Prioritize results by location_type accuracy
+        const rooftopResult = data.results.find((r: any) => r.geometry?.location_type === 'ROOFTOP');
+        const rangeResult = data.results.find((r: any) => r.geometry?.location_type === 'RANGE_INTERPOLATED');
+        const result = rooftopResult || rangeResult || data.results[0];
         
-        setSelectedAddress(result.formatted_address);
+        console.log('🏢 Found address with location_type:', result.geometry?.location_type);
+        console.log('🏢 Address:', result.formatted_address);
+        
+        if (updateSearchBox) {
+          setSelectedAddress(result.formatted_address);
+        }
         setSelectedAddressDetails(result); // Store Google structure
         
         return result;
-      } else {
-        console.warn('Google Reverse Geocode failed/empty');
-        if (updateSearchBox) setSelectedAddress("Pinned Location");
-        return null;
+      } else if (data.status === 'ZERO_RESULTS') {
+        // Fallback: Try without filters to get any nearby address
+        console.log('🏢 No rooftop result, trying broader search...');
+        const fallbackUrl = buildGoogleReverseGeocodeUrl(latitude, longitude);
+        const fallbackResponse = await fetch(fallbackUrl);
+        const fallbackData = await fallbackResponse.json();
+        
+        if (fallbackData.status === 'OK' && fallbackData.results && fallbackData.results.length > 0) {
+          const result = fallbackData.results[0];
+          console.log('🏢 Fallback address found:', result.formatted_address);
+          
+          if (updateSearchBox) {
+            setSelectedAddress(result.formatted_address);
+          }
+          setSelectedAddressDetails(result);
+          return result;
+        }
       }
+      
+      console.warn('Google Reverse Geocode failed/empty');
+      if (updateSearchBox) setSelectedAddress("Pinned Location");
+      return null;
     } catch (error) {
       console.error('Reverse geocoding error:', error);
       if (updateSearchBox) setSelectedAddress("Pinned Location");
@@ -291,13 +338,18 @@ export default function MapLocationPicker({
 
   try {
     const url = buildKrutrimPlaceDetailsUrl(result.place_id);
+    console.log('🔍 Fetching place details from:', url);
+    
     const response = await fetch(url);
     const data = await response.json();
+    console.log('📍 Place details response:', data);
+    
     const locationData = data.result?.geometry?.location;
     const formattedAddress = data.result?.formatted_address || result.description;
 
     if (locationData) {
       const coords: Coordinates = [locationData.lng, locationData.lat];
+      console.log('🗺️ Moving map to coordinates:', coords);
 
       setSelectedCoords(coords);
       setMarkerCoords(coords);
@@ -306,9 +358,18 @@ export default function MapLocationPicker({
       // ✅ Pickup field gets the detailed address
       setSelectedAddress(formattedAddress);
       setSelectedAddressDetails(data.result);
-    if (!mapMountedRef.current) return;
+      
+      if (!mapMountedRef.current) {
+        console.warn('🗺️ Map not mounted, skipping camera update');
+        return;
+      }
+      
+      // Wait for map to be ready
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       cameraRef.current?.setCamera({
         centerCoordinate: coords,
+        zoomLevel: MAP_SETTINGS.defaultZoom,
         animationDuration: MAP_SETTINGS.animationDuration,
       });
 
@@ -316,9 +377,21 @@ export default function MapLocationPicker({
         isSelectingFromSearch.current = false;
         setIsSearching(false);
       }, MAP_SETTINGS.animationDuration + 800);
+    } else {
+      console.error('❌ No location data in place details response');
+      Toast.show({
+        type: 'error',
+        text1: 'Location Error',
+        text2: 'Could not find coordinates for this location',
+      });
     }
   } catch (error) {
-    console.error('Error resolving Krutrim place:', error);
+    console.error('❌ Error resolving Krutrim place:', error);
+    Toast.show({
+      type: 'error',
+      text1: 'Search Error',
+      text2: 'Failed to load location details',
+    });
     isSelectingFromSearch.current = false;
   } finally {
     setIsSearching(false);
@@ -326,6 +399,17 @@ export default function MapLocationPicker({
 };
 
  const handleUseCurrentLocation = async () => {
+  if (!isMapReady) {
+    console.warn('🗺️ Map not ready yet, waiting...');
+    Toast.show({
+      type: 'info',
+      text1: 'Please wait',
+      text2: 'Map is still loading...',
+      visibilityTime: 2000,
+    });
+    return;
+  }
+
   setIsLoadingLocation(true);
   setShowActionMenu(false);
 
@@ -363,11 +447,23 @@ export default function MapLocationPicker({
         position.coords.latitude,
       ];
 
+      console.log('🗺️ Got GPS location:', coords);
+
       setSelectedCoords(coords);
       setMarkerCoords(coords);
       setCurrentUserLocation(coords);
       previousCenterRef.current = coords;
-      if (!mapMountedRef.current) return;
+      
+      if (!mapMountedRef.current) {
+        console.warn('🗺️ Map not mounted, skipping camera update');
+        isSelectingFromSearch.current = false;
+        setIsLoadingLocation(false);
+        return;
+      }
+
+      // Wait a bit before moving camera to ensure map is fully ready
+      await new Promise(resolve => setTimeout(resolve, 200));
+
       // Use setCamera for consistent programmatic movement
       cameraRef.current?.setCamera({
         centerCoordinate: coords,
@@ -407,6 +503,8 @@ export default function MapLocationPicker({
   }
 };
   const handleMapPress = async (coords: Coordinates) => {
+    if (!isMapReady) return;
+    
     isSelectingFromSearch.current = true;
     
     setSelectedCoords(coords);
@@ -425,38 +523,40 @@ export default function MapLocationPicker({
   };
 
   // IMPROVED: Only update marker position, don't reverse geocode yet
+  // Don't call parent callbacks during active dragging
   const handleCameraChanged = async (coords: Coordinates) => {
     if (isSelectingFromSearch.current) {
       return;
     }
     
+    // Only update local state, no parent callbacks to prevent re-renders
     setMarkerCoords(coords);
     setSelectedCoords(coords);
   };
 
-  // FIX: Detect if this is a zoom-only operation
+  // FIX: Only trigger updates when user stops moving
   const handleMapIdle = async (coords: Coordinates) => {
     if (isSelectingFromSearch.current || isUserTyping) return;
     
-    // NEW: Check if center has significantly changed (not just zoom)
-    // Reduced threshold from ~11m to ~2m for more precise location
+    // Check if center has significantly changed (not just zoom)
+    // Threshold: ~10 meters for faster response
     const hasSignificantMove = !previousCenterRef.current || 
-      Math.abs(coords[0] - previousCenterRef.current[0]) > 0.00002 || // ~2 meters
-      Math.abs(coords[1] - previousCenterRef.current[1]) > 0.00002;
+      Math.abs(coords[0] - previousCenterRef.current[0]) > 0.0001 || // ~10 meters
+      Math.abs(coords[1] - previousCenterRef.current[1]) > 0.0001;
     
-    // Only reverse geocode if the map actually moved (pan), not just zoomed
+    // Only reverse geocode if the map actually moved significantly
     if (hasSignificantMove) {
       // Clear existing timeout
       if (regionChangeTimeoutRef.current) {
         clearTimeout(regionChangeTimeoutRef.current);
       }
       
-      // Debounce: Wait 600ms after user stops moving map (reduced from 800ms)
-      regionChangeTimeoutRef.current = setTimeout(() => {
-        // Update both selectedAddress and searchQuery when manually dragging
-        reverseGeocode(coords[1], coords[0], true);
+      // Debounce: Wait 500ms after user stops moving map (faster response)
+      regionChangeTimeoutRef.current = setTimeout(async () => {
+        console.log('📍 Reverse geocoding for:', coords);
+        await reverseGeocode(coords[1], coords[0], true);
         previousCenterRef.current = coords; // Update tracked position
-      }, 600);
+      }, 500);
     }
   };
 
@@ -536,6 +636,26 @@ export default function MapLocationPicker({
                 cameraRef={cameraRef}
                 style={styles.map}
               />
+              
+              {/* Debug info - remove in production */}
+              {__DEV__ && (
+                <View style={{
+                  position: 'absolute',
+                  top: 80,
+                  right: 16,
+                  backgroundColor: 'rgba(0,0,0,0.7)',
+                  padding: 8,
+                  borderRadius: 4,
+                  zIndex: 1000,
+                }}>
+                  <Text style={{ color: 'white', fontSize: 10 }}>
+                    Center: [{selectedCoords[0].toFixed(4)}, {selectedCoords[1].toFixed(4)}]
+                  </Text>
+                  <Text style={{ color: 'white', fontSize: 10 }}>
+                    Marker: [{markerCoords[0].toFixed(4)}, {markerCoords[1].toFixed(4)}]
+                  </Text>
+                </View>
+              )}
 
               {/* Search Bar Overlay */}
               <View style={styles.searchOverlay}>
@@ -594,12 +714,18 @@ export default function MapLocationPicker({
                 )}
               </View>
 
-              {/* Center Tooltip Only (no pin marker) */}
-              <View style={styles.centerTooltipContainer} pointerEvents="none">
+              {/* Center Marker (Fixed Position) */}
+              <View style={styles.centerMarkerContainer} pointerEvents="none">
+                {/* Tooltip above marker */}
                 <View style={styles.pinTooltip}>
                   <Text style={styles.tooltipText}>Pickup point for agent</Text>
-                  <Text style={styles.tooltipSubtext}>Move the pin to change location</Text>
+                  <Text style={styles.tooltipSubtext}>Move the map to change location</Text>
                   <View style={styles.tooltipArrow} />
+                </View>
+                
+                {/* Green circle marker */}
+                <View style={styles.centerMarker}>
+                  <View style={styles.centerMarkerInner} />
                 </View>
               </View>
 
@@ -764,6 +890,8 @@ const styles = StyleSheet.create({
   mapContainer: {
     flex: 1,
     position: 'relative',
+    backgroundColor: '#f9fafb', // Fallback background color
+    minHeight: 300, // Ensure minimum height for Android
   },
   mapLoadingContainer: {
     flex: 1,
@@ -835,15 +963,15 @@ const styles = StyleSheet.create({
     color: '#111827',
     lineHeight: 20,
   },
-  // Center Tooltip Only (no pin marker)
-  centerTooltipContainer: {
+  // Center Marker (Fixed Position)
+  centerMarkerContainer: {
     position: 'absolute',
     top: '50%',
     left: '50%',
-    marginLeft: -110,
-    marginTop: -100,
     alignItems: 'center',
     zIndex: 5,
+    // Transform to center the marker
+    transform: [{ translateX: -20 }, { translateY: -20 }],
   },
   pinTooltip: {
     backgroundColor: '#111827',
@@ -852,6 +980,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     maxWidth: 220,
     alignItems: 'center',
+    marginBottom: 8,
   },
   tooltipText: {
     color: '#ffffff',
@@ -876,6 +1005,27 @@ const styles = StyleSheet.create({
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
     borderTopColor: '#111827',
+  },
+  centerMarker: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(22, 163, 74, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  centerMarkerInner: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#16a34a',
+    borderWidth: 3,
+    borderColor: '#ffffff',
   },
   currentLocationButton: {
     position: 'absolute',

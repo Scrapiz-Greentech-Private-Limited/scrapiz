@@ -141,8 +141,12 @@ export function buildReverseGeocodingUrl(longitude: number, latitude: number) {
   return `${KRUTRIM_API_URL}/reverse-geocode?${params.toString()}`;
 }
 
-// Default center - Bhayandar, Maharashtra
-export const DEFAULT_CENTER: [number, number] = [72.8537, 19.2952];
+// Default center - Mumbai, Maharashtra (Bandra area - central Mumbai location)
+// Coordinates: Longitude 72.8295°E, Latitude 19.0596°N
+// Format: [longitude, latitude] - Mapbox/GeoJSON standard
+export const DEFAULT_CENTER: [number, number] = [72.8295, 19.0596];
+
+console.log('📍 Map Config: DEFAULT_CENTER set to Mumbai:', DEFAULT_CENTER);
 
 export const MAP_SETTINGS = {
   defaultZoom: 16,
