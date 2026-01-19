@@ -20,7 +20,7 @@ import * as Updates from 'expo-updates';
 import { useRouter } from 'expo-router';
 import { setupNotificationListener } from '../utils/notifications';
 import { initializeNotificationChannels, setupNotifeeEventHandler } from '../services/notifeeService';
-import MapboxGL from '@rnmapbox/maps';
+
 
 import '../localization/i18n';
 
@@ -59,12 +59,7 @@ function AppContent() {
   const notificationListener = useRef<Notifications.Subscription>();
 
   // Initialize Mapbox for Android - disable telemetry for new architecture
-  useEffect(() => {
-    if (Platform.OS === 'android') {
-      MapboxGL.setTelemetryEnabled(false);
-      console.log('Mapbox telemetry disabled for Android');
-    }
-  }, []);
+
 
   // OTA Updates check
   const checkForOTAUpdate = useCallback(async () => {
