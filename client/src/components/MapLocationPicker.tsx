@@ -628,7 +628,7 @@ export default function MapLocationPicker({
 
         {/* Map Container - Full Screen */}
         <View style={styles.mapContainer}>
-          {isMapReady && permissionSettled  &&  ? (
+          {isMapReady && permissionSettled  &&   (
             <>
               <MapViewWrapper
                 center={selectedCoords}
