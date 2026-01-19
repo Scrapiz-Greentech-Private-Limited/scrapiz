@@ -138,7 +138,7 @@ export function MapboxMapView({
     <View style={style}>
       <MapboxGL.MapView
         ref={mapRef}
-        surfaceView={Platform.OS === 'android'} // Android performance optimization
+        surfaceView={false} // Android performance optimization
         style={StyleSheet.absoluteFillObject}
         styleURL={DEFAULT_MAP_STYLE}
         onPress={handlePress}

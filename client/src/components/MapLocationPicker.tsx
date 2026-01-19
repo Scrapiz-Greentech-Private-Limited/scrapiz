@@ -98,6 +98,7 @@ export default function MapLocationPicker({
   const [selectedAddress, setSelectedAddress] = useState<string>('');
   const [selectedAddressDetails, setSelectedAddressDetails] = useState<any>(null);
   const [showResults, setShowResults] = useState(false);
+  const [permissionSettled, setPermissionSettled] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
   const sessionTokenRef = useRef<string>(getSessionToken());
   const [selectedCoords, setSelectedCoords] = useState<Coordinates>(() => {
@@ -436,6 +437,9 @@ export default function MapLocationPicker({
       setIsLoadingLocation(false);
       return;
     }
+    if (finalStatus === 'granted') {
+          setPermissionSettled(true);
+    }
 
     try {
       const position = await Location.getCurrentPositionAsync({
@@ -624,7 +628,7 @@ export default function MapLocationPicker({
 
         {/* Map Container - Full Screen */}
         <View style={styles.mapContainer}>
-          {isMapReady ? (
+          {isMapReady && permissionSettled  &&  ? (
             <>
               <MapViewWrapper
                 center={selectedCoords}
