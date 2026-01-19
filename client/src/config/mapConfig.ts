@@ -149,9 +149,9 @@ export const DEFAULT_CENTER: [number, number] = [72.8295, 19.0596];
 console.log('📍 Map Config: DEFAULT_CENTER set to Mumbai:', DEFAULT_CENTER);
 
 export const MAP_SETTINGS = {
-  defaultZoom: 16,
-  minZoom: 5,
-  maxZoom: 20,
+  defaultZoom: 18, // Increased from 16 for rooftop-level precision
+  minZoom: 10, // Prevent zooming out too far
+  maxZoom: 20, // Maximum detail level
   searchMinCharacters: 3,
   searchDebounceMs: 500,
   animationDuration: 1000,

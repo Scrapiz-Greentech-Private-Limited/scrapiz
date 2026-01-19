@@ -11,9 +11,11 @@ import {
   Keyboard,
   Platform,
   TouchableWithoutFeedback,
+  StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
-import { X, MapPin, Navigation, Search, Plus } from 'lucide-react-native';
+import { X, MapPin, Navigation, Search, Plus, ArrowLeft } from 'lucide-react-native';
 import Toast from 'react-native-toast-message';
 import {
   MAP_SETTINGS,
@@ -92,6 +94,7 @@ export default function MapLocationPicker({
   autoOpenGPS = false,
   saving = false,
 }: MapLocationPickerProps) {
+  const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<KrutrimAutocompleteResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -119,6 +122,8 @@ export default function MapLocationPicker({
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [currentUserLocation, setCurrentUserLocation] = useState<Coordinates | null>(null);
   const [isUserTyping, setIsUserTyping] = useState(false);
+  const [lastCameraUpdate, setLastCameraUpdate] = useState(0);
+  const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
 
   const cameraRef = useRef<CameraController>(null);
   const mapMountedRef = useRef(false);
@@ -129,23 +134,32 @@ export default function MapLocationPicker({
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
 
   const previousCenterRef = useRef<Coordinates | null>(null);
-  const zoomOnlyTimeoutRef = useRef<NodeJS.Timeout>();
+  const previousZoomRef = useRef<number>(MAP_SETTINGS.defaultZoom);
+  const cameraUpdateThrottleRef = useRef<NodeJS.Timeout>();
+  const lastReverseGeocodeRef = useRef<number>(0);
 
   // Set map as mounted when component mounts
   useEffect(() => {
     if (visible) {
       console.log('🗺️ MapLocationPicker visible - initializing map');
-      // Longer delay for Android to ensure proper initialization
+      // Increased delay for Android to ensure proper initialization
       const timer = setTimeout(() => {
         console.log('🗺️ Setting map as mounted and ready');
         mapMountedRef.current = true;
         setIsMapReady(true);
-        getCurrentUserLocation();
-      }, Platform.OS === 'android' ? 500 : 300);
+        
+        // Get user location after map is ready
+        setTimeout(() => {
+          getCurrentUserLocation();
+        }, 300);
+      }, Platform.OS === 'android' ? 800 : 500);
 
       return () => {
         console.log('🗺️ MapLocationPicker cleanup');
         clearTimeout(timer);
+        if (regionChangeTimeoutRef.current) clearTimeout(regionChangeTimeoutRef.current);
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
         mapMountedRef.current = false;
       };
     } else {
@@ -176,9 +190,12 @@ export default function MapLocationPicker({
       
       if (finalStatus === 'granted') {
         const position = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Highest,
+          accuracy: Location.Accuracy.BestForNavigation, // Highest possible accuracy
+          timeInterval: 1000,
+          distanceInterval: 0,
         });
         const coords: Coordinates = [position.coords.longitude, position.coords.latitude];
+        console.log('🗺️ User location for search bias:', coords, 'accuracy:', position.coords.accuracy, 'm');
         setCurrentUserLocation(coords);
       }
     } catch (error) {
@@ -248,12 +265,20 @@ export default function MapLocationPicker({
     if (isSelectingFromSearch.current && !force) return null;
 
     // Prevent multiple simultaneous reverse geocode calls
-    if (isSearching && !force) {
+    if (isReverseGeocoding && !force) {
       console.log('🔄 Skipping reverse geocode - already in progress');
       return null;
     }
 
-    setIsSearching(true);
+    // Throttle reverse geocode calls - minimum 2 seconds between calls
+    const now = Date.now();
+    if (!force && now - lastReverseGeocodeRef.current < 2000) {
+      console.log('🔄 Skipping reverse geocode - throttled');
+      return null;
+    }
+    lastReverseGeocodeRef.current = now;
+
+    setIsReverseGeocoding(true);
 
     try {
       // Use Google Geocoding API with result_type and location_type filters for rooftop precision
@@ -305,7 +330,7 @@ export default function MapLocationPicker({
       if (updateSearchBox) setSelectedAddress("Pinned Location");
       return null;
     } finally {
-      setIsSearching(false);
+      setIsReverseGeocoding(false);
     }
   };
 
@@ -368,6 +393,7 @@ export default function MapLocationPicker({
       // Wait for map to be ready
       await new Promise(resolve => setTimeout(resolve, 100));
       
+      // Move to location with default zoom (only when searching)
       cameraRef.current?.setCamera({
         centerCoordinate: coords,
         zoomLevel: MAP_SETTINGS.defaultZoom,
@@ -400,7 +426,7 @@ export default function MapLocationPicker({
 };
 
  const handleUseCurrentLocation = async () => {
-  if (!isMapReady) {
+  if (!isMapReady || !mapMountedRef.current) {
     console.warn('🗺️ Map not ready yet, waiting...');
     Toast.show({
       type: 'info',
@@ -443,7 +469,9 @@ export default function MapLocationPicker({
 
     try {
       const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Highest,
+        accuracy: Location.Accuracy.BestForNavigation, // Highest possible accuracy
+        timeInterval: 1000,
+        distanceInterval: 0,
       });
 
       const coords: Coordinates = [
@@ -452,25 +480,29 @@ export default function MapLocationPicker({
       ];
 
       console.log('🗺️ Got GPS location:', coords);
+      console.log('🗺️ GPS accuracy:', position.coords.accuracy, 'meters');
+      console.log('🗺️ GPS altitude:', position.coords.altitude, 'meters');
 
       setSelectedCoords(coords);
       setMarkerCoords(coords);
       setCurrentUserLocation(coords);
       previousCenterRef.current = coords;
       
+      // Double-check map is mounted before camera update
       if (!mapMountedRef.current) {
-        console.warn('🗺️ Map not mounted, skipping camera update');
+        console.warn('🗺️ Map not mounted after GPS, skipping camera update');
         isSelectingFromSearch.current = false;
         setIsLoadingLocation(false);
         return;
       }
 
       // Wait a bit before moving camera to ensure map is fully ready
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
-      // Use setCamera for consistent programmatic movement
+      // Use setCamera for consistent programmatic movement (with default zoom for GPS)
       cameraRef.current?.setCamera({
         centerCoordinate: coords,
+        zoomLevel: MAP_SETTINGS.defaultZoom, // Set zoom for GPS location
         animationDuration: MAP_SETTINGS.animationDuration,
       });
 
@@ -513,12 +545,17 @@ export default function MapLocationPicker({
     
     setSelectedCoords(coords);
     setMarkerCoords(coords);
-    previousCenterRef.current = coords; // Track this position
+    previousCenterRef.current = coords;
+    
     if (!mapMountedRef.current) return;
+    
+    // Move camera to pressed location WITHOUT forcing zoom
     cameraRef.current?.setCamera({
       centerCoordinate: coords,
       animationDuration: 300,
+      // No zoomLevel - keep current zoom
     });
+    
     await reverseGeocode(coords[1], coords[0]);
     
     setTimeout(() => {
@@ -526,27 +563,39 @@ export default function MapLocationPicker({
     }, 800);
   };
 
-  // IMPROVED: Only update marker position, don't reverse geocode yet
-  // Don't call parent callbacks during active dragging
-  const handleCameraChanged = async (coords: Coordinates) => {
+  // Update marker to follow map center - OPTIMIZED with minimal updates
+  const handleCameraChanged = (coords: Coordinates) => {
     if (isSelectingFromSearch.current) {
       return;
     }
     
-    // Only update local state, no parent callbacks to prevent re-renders
+    // Very aggressive throttle: Only update every 300ms for ultra-smooth performance
+    const now = Date.now();
+    if (now - lastCameraUpdate < 300) {
+      return;
+    }
+    setLastCameraUpdate(now);
+    
+    // Update marker position only (no API calls here)
     setMarkerCoords(coords);
     setSelectedCoords(coords);
   };
 
-  // FIX: Only trigger updates when user stops moving
+  // Trigger reverse geocode ONLY when user stops moving the map
   const handleMapIdle = async (coords: Coordinates) => {
     if (isSelectingFromSearch.current || isUserTyping) return;
     
+    console.log('🗺️ Map idle - final position:', coords);
+    
+    // Update marker position to match final map center
+    setMarkerCoords(coords);
+    setSelectedCoords(coords);
+    
     // Check if center has significantly changed (not just zoom)
-    // Threshold: ~10 meters for faster response
+    // Threshold: ~50 meters to avoid unnecessary API calls
     const hasSignificantMove = !previousCenterRef.current || 
-      Math.abs(coords[0] - previousCenterRef.current[0]) > 0.0001 || // ~10 meters
-      Math.abs(coords[1] - previousCenterRef.current[1]) > 0.0001;
+      Math.abs(coords[0] - previousCenterRef.current[0]) > 0.0005 || // ~50 meters
+      Math.abs(coords[1] - previousCenterRef.current[1]) > 0.0005;
     
     // Only reverse geocode if the map actually moved significantly
     if (hasSignificantMove) {
@@ -555,16 +604,19 @@ export default function MapLocationPicker({
         clearTimeout(regionChangeTimeoutRef.current);
       }
       
-      // Debounce: Wait 500ms after user stops moving map (faster response)
+      // Debounce: Wait 800ms after user stops moving map
       regionChangeTimeoutRef.current = setTimeout(async () => {
         console.log('📍 Reverse geocoding for:', coords);
         await reverseGeocode(coords[1], coords[0], true);
         previousCenterRef.current = coords; // Update tracked position
-      }, 500);
+      }, 800);
+    } else {
+      console.log('🔄 Skipping reverse geocode - zoom only or small movement');
     }
   };
 
   const handleRecenterToMarker = () => {
+    // Recenter without changing zoom level
     cameraRef.current?.flyTo(markerCoords, MAP_SETTINGS.animationDuration);
   };
 
@@ -617,10 +669,11 @@ export default function MapLocationPicker({
       presentationStyle="fullScreen"
     >
       <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) }]}>
           <TouchableOpacity onPress={onClose} style={styles.backButton}>
-            <X size={24} color="#111827" />
+            <ArrowLeft size={24} color="#111827" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Select Pickup location</Text>
           <View style={{ width: 40 }} />
@@ -641,25 +694,14 @@ export default function MapLocationPicker({
                 style={styles.map}
               />
               
-              {/* Debug info - remove in production */}
-              {__DEV__ && (
-                <View style={{
-                  position: 'absolute',
-                  top: 80,
-                  right: 16,
-                  backgroundColor: 'rgba(0,0,0,0.7)',
-                  padding: 8,
-                  borderRadius: 4,
-                  zIndex: 1000,
-                }}>
-                  <Text style={{ color: 'white', fontSize: 10 }}>
-                    Center: [{selectedCoords[0].toFixed(4)}, {selectedCoords[1].toFixed(4)}]
-                  </Text>
-                  <Text style={{ color: 'white', fontSize: 10 }}>
-                    Marker: [{markerCoords[0].toFixed(4)}, {markerCoords[1].toFixed(4)}]
-                  </Text>
+              {/* Tooltip above map center - positioned absolutely */}
+              <View style={styles.tooltipContainer} pointerEvents="none">
+                <View style={styles.pinTooltip}>
+                  <Text style={styles.tooltipText}>Pickup point for agent</Text>
+                  <Text style={styles.tooltipSubtext}>Move the map to change location</Text>
+                  <View style={styles.tooltipArrow} />
                 </View>
-              )}
+              </View>
 
               {/* Search Bar Overlay */}
               <View style={styles.searchOverlay}>
@@ -716,21 +758,6 @@ export default function MapLocationPicker({
                     />
                   </View>
                 )}
-              </View>
-
-              {/* Center Marker (Fixed Position) */}
-              <View style={styles.centerMarkerContainer} pointerEvents="none">
-                {/* Tooltip above marker */}
-                <View style={styles.pinTooltip}>
-                  <Text style={styles.tooltipText}>Pickup point for agent</Text>
-                  <Text style={styles.tooltipSubtext}>Move the map to change location</Text>
-                  <View style={styles.tooltipArrow} />
-                </View>
-                
-                {/* Green circle marker */}
-                <View style={styles.centerMarker}>
-                  <View style={styles.centerMarkerInner} />
-                </View>
               </View>
 
               {/* Use Current Location Button */}
@@ -874,14 +901,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 60 : 24,
     paddingBottom: 16,
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
   backButton: {
-    padding: 4,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 18,
@@ -967,15 +997,14 @@ const styles = StyleSheet.create({
     color: '#111827',
     lineHeight: 20,
   },
-  // Center Marker (Fixed Position)
-  centerMarkerContainer: {
+  // Tooltip positioned above map center
+  tooltipContainer: {
     position: 'absolute',
     top: '50%',
     left: '50%',
+    transform: [{ translateX: -110 }, { translateY: -100 }], // Center and position above marker
     alignItems: 'center',
     zIndex: 5,
-    // Transform to center the marker
-    transform: [{ translateX: -20 }, { translateY: -20 }],
   },
   pinTooltip: {
     backgroundColor: '#111827',
@@ -984,7 +1013,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     maxWidth: 220,
     alignItems: 'center',
-    marginBottom: 8,
   },
   tooltipText: {
     color: '#ffffff',
@@ -1009,27 +1037,6 @@ const styles = StyleSheet.create({
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
     borderTopColor: '#111827',
-  },
-  centerMarker: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(22, 163, 74, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  centerMarkerInner: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#16a34a',
-    borderWidth: 3,
-    borderColor: '#ffffff',
   },
   currentLocationButton: {
     position: 'absolute',

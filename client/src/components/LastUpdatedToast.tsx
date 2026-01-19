@@ -138,26 +138,26 @@ export const LastUpdatedToast: React.FC<LastUpdatedToastProps> = ({
               <View style={styles.iconContainer}>
                 <Clock size={fs(18)} color="#ffffff" strokeWidth={2.5} />
               </View>
-              <View style={styles.textContainer}>
+              <View style={styles.countdownTextContainer}>
                 <Text style={styles.countdownLabel}>Updating rates in</Text>
-                <Animated.View
-                  style={[
-                    styles.countdownBadge,
-                    {
-                      transform: [
-                        {
-                          scale: scaleAnim.interpolate({
-                            inputRange: [0.8, 1],
-                            outputRange: [0.9, 1.1],
-                          }),
-                        },
-                      ],
-                    },
-                  ]}
-                >
-                  <Text style={styles.countdownNumber}>{countdown}</Text>
-                </Animated.View>
               </View>
+              <Animated.View
+                style={[
+                  styles.countdownBadge,
+                  {
+                    transform: [
+                      {
+                        scale: scaleAnim.interpolate({
+                          inputRange: [0.8, 1],
+                          outputRange: [0.9, 1.1],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                <Text style={styles.countdownNumber}>{countdown}</Text>
+              </Animated.View>
             </>
           ) : (
             // Date display phase
@@ -165,9 +165,9 @@ export const LastUpdatedToast: React.FC<LastUpdatedToastProps> = ({
               <View style={styles.iconContainer}>
                 <TrendingUp size={fs(18)} color="#ffffff" strokeWidth={2.5} />
               </View>
-              <View style={styles.textContainer}>
+              <View style={styles.dateDisplayContainer}>
                 <Text style={styles.label}>Last Updated</Text>
-                <View style={styles.dateTimeContainer}>
+                <View style={styles.dateTimeRow}>
                   <Text style={styles.date}>{formattedDate}</Text>
                   <View style={styles.timeBadge}>
                     <Text style={styles.time}>{formattedTime}</Text>
@@ -231,22 +231,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  textContainer: {
+  countdownTextContainer: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing(8),
   },
   countdownLabel: {
-    fontSize: fs(13),
+    fontSize: fs(14),
     color: '#ffffff',
     fontWeight: '600',
     fontFamily: 'Inter-SemiBold',
   },
   countdownBadge: {
-    width: spacing(28),
-    height: spacing(28),
-    borderRadius: spacing(14),
+    width: spacing(36),
+    height: spacing(36),
+    borderRadius: spacing(18),
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -254,24 +251,27 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.4)',
   },
   countdownNumber: {
-    fontSize: fs(16),
+    fontSize: fs(18),
     color: '#ffffff',
     fontWeight: '800',
     fontFamily: 'Inter-Bold',
   },
+  dateDisplayContainer: {
+    flex: 1,
+  },
   label: {
-    fontSize: fs(11),
-    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: fs(10),
+    color: 'rgba(255, 255, 255, 0.85)',
     fontWeight: '600',
     fontFamily: 'Inter-SemiBold',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    marginBottom: spacing(2),
   },
-  dateTimeContainer: {
+  dateTimeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing(8),
-    flex: 1,
   },
   date: {
     fontSize: fs(14),
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
   timeBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: spacing(8),
-    paddingVertical: spacing(4),
+    paddingVertical: spacing(3),
     borderRadius: spacing(8),
   },
   time: {

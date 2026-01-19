@@ -11,7 +11,9 @@ import {
   Platform,
   Alert,
   TouchableWithoutFeedback,
+  StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   MapPin,
   Navigation,
@@ -20,7 +22,7 @@ import {
   Home,
   Building,
   MoreVertical,
-  X,
+  ArrowLeft,
   Plus,
   Edit,
   Trash2,
@@ -43,6 +45,7 @@ export default function LocationSelectionModal({
 }: LocationSelectionModalProps) {
   const router = useRouter();
   const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
   const {
     currentLocation,
     savedLocations,
@@ -382,15 +385,21 @@ export default function LocationSelectionModal({
         }}
       >
         <View style={[styles.container, { backgroundColor: colors.background }]}>
+          <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} />
           {/* Header */}
-          <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+          <View style={[styles.header, { 
+            backgroundColor: colors.background, 
+            borderBottomColor: colors.border,
+            paddingTop: Math.max(insets.top, 16)
+          }]}>
             <TouchableOpacity onPress={() => {
               setParentModalVisible(false);
               onClose();
-            }} style={styles.closeButton}>
-              <X size={24} color={colors.text} />
+            }} style={styles.backButton}>
+              <ArrowLeft size={24} color={colors.text} />
             </TouchableOpacity>
             <Text style={[styles.headerTitle, { color: colors.text }]}>Enter your location</Text>
+            <View style={{ width: 40 }} />
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
@@ -612,7 +621,7 @@ export default function LocationSelectionModal({
                   <View style={styles.menuHeader}>
                     <Text style={[styles.menuTitle, { color: colors.text }]}>{selectedAddress.label}</Text>
                     <TouchableOpacity onPress={() => setShowAddressMenu(false)}>
-                      <X size={20} color={colors.textSecondary} />
+                      <ArrowLeft size={20} color={colors.textSecondary} />
                     </TouchableOpacity>
                   </View>
                   
@@ -648,21 +657,27 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 50 : 16,
     paddingHorizontal: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  closeButton: {
-    padding: 8,
-    alignSelf: 'flex-start',
-    marginBottom: 8,
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 20,
     textAlign: 'center',
     fontWeight: '700',
     letterSpacing: -0.3,
+    flex: 1,
+    marginRight: -40,
   },
   searchSection: {
     paddingHorizontal: 16,
