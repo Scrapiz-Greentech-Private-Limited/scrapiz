@@ -534,7 +534,7 @@ function SellScreenContent() {
       return;
     }
 
-    const rate = (selectedProduct.max_rate + selectedProduct.min_rate) / 2;
+    const rate = selectedProduct.min_rate; // Use minimum rate for estimated value
     const existingItem = selectedItems.find(i => i.id === selectedProduct.id);
 
     if (existingItem) {
@@ -1983,7 +1983,7 @@ function SellScreenContent() {
                         Estimated Value:
                       </Text>
                       <Text style={[styles.quantityModalEstimateValue, { color: colors.primary }]}>
-                        ₹{Math.round(((selectedProduct.max_rate + selectedProduct.min_rate) / 2) * (parseFloat(tempQuantity) || 0))}
+                        ₹{Math.round(selectedProduct.min_rate * (parseFloat(tempQuantity) || 0))}
                       </Text>
                     </View>
                   )}
