@@ -34,9 +34,13 @@
     },
     "production-android": {
       "distribution": "store",
+
       "channel": "production-android",
       "autoIncrement": true,
       "environment": "production",
+      "env":{
+        "MAPBOX_DOWNLOAD_TOKEN": "@MAPBOX_DOWNLOAD_TOKEN"
+      },
       "android": {
         "credentialsSource": "local"
       }
