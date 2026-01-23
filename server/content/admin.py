@@ -3,7 +3,41 @@ from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.db import models
-from .models import CarouselImage
+from .models import CarouselImage, AppConfig
+
+
+@admin.register(AppConfig)
+class AppConfigAdmin(admin.ModelAdmin):
+    list_display = ['id', 'min_app_version', 'enforce_sell_screen_gate', 'maintenance_mode', 'enable_location_skip', 'updated_at', 'updated_by']
+    readonly_fields = ['updated_at', 'updated_by']
+    
+    fieldsets = (
+        ('Version Control', {
+            'fields': ('min_app_version', 'force_update_url_android', 'force_update_url_ios'),
+            'description': 'Control app version requirements and update URLs'
+        }),
+        ('Feature Flags', {
+            'fields': ('enforce_sell_screen_gate', 'enable_location_skip', 'maintenance_mode'),
+            'description': 'Toggle app features and modes'
+        }),
+        ('Metadata', {
+            'fields': ('updated_at', 'updated_by'),
+            'classes': ('collapse',),
+        }),
+    )
+    
+    def has_add_permission(self, request):
+        # Only allow one instance
+        return not AppConfig.objects.exists()
+    
+    def has_delete_permission(self, request, obj=None):
+        # Don't allow deletion
+        return False
+    
+    def save_model(self, request, obj, form, change):
+        obj.updated_by = request.user
+        super().save_model(request, obj, form, change)
+
 
 @admin.register(CarouselImage)
 class CarouselImageAdmin(admin.ModelAdmin):

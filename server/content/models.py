@@ -2,6 +2,69 @@ from django.db import models
 from django.core.validators import URLValidator
 from django.core.exceptions import ValidationError
 
+
+class AppConfig(models.Model):
+    """
+    Global application configuration (Singleton)
+    Only one instance should exist
+    """
+    enforce_sell_screen_gate = models.BooleanField(
+        default=True,
+        help_text="If True, users must pass serviceability checks to access sell screen"
+    )
+    maintenance_mode = models.BooleanField(
+        default=False,
+        help_text="If True, app shows maintenance screen"
+    )
+    min_app_version = models.CharField(
+        max_length=20,
+        default="1.0.0",
+        help_text="Minimum required app version (e.g., '1.2.0')"
+    )
+    enable_location_skip = models.BooleanField(
+        default=False,
+        help_text="If True, allows skipping location selection for testing"
+    )
+    force_update_url_android = models.URLField(
+        max_length=500,
+        default="https://play.google.com/store/apps/details?id=com.scrapiz.app",
+        help_text="Play Store URL for Android app updates"
+    )
+    force_update_url_ios = models.URLField(
+        max_length=500,
+        default="https://apps.apple.com/app/scrapiz/id123456789",
+        help_text="App Store URL for iOS app updates"
+    )
+    
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        'auth.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='app_config_updates'
+    )
+    
+    class Meta:
+        verbose_name = "App Configuration"
+        verbose_name_plural = "App Configuration"
+    
+    def __str__(self):
+        return "App Configuration"
+    
+    def save(self, *args, **kwargs):
+        # Ensure only one instance exists (singleton pattern)
+        if not self.pk and AppConfig.objects.exists():
+            raise ValueError("Only one AppConfig instance is allowed")
+        return super().save(*args, **kwargs)
+    
+    @classmethod
+    def get_config(cls):
+        """Get or create the singleton config instance"""
+        config, created = cls.objects.get_or_create(pk=1)
+        return config
+
+
 class CarouselImage(models.Model):
     """Model for managing carousel images displayed on the home screen"""
     title = models.CharField(

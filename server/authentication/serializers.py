@@ -97,18 +97,53 @@ class ReferredUserSerializer(serializers.ModelSerializer):
 
 class AuditLogSerializer(serializers.ModelSerializer):
   user = serializers.SerializerMethodField()
+  deletion_feedback = serializers.SerializerMethodField()
   
   class Meta:
     model = AuditLog
-    fields = ['id', 'user', 'action', 'ip_address', 'timestamp']
+    fields = ['id', 'user', 'action', 'ip_address', 'timestamp', 'deleted_user_id', 'deleted_user_email', 'deleted_user_name', 'deletion_feedback']
     read_only_fields = fields
   
   def get_user(self, obj):
-    """Return user information if user exists"""
+    """Return user information if user exists, or deleted user info for account_deleted actions"""
     if obj.user:
       return {
         'id': obj.user.id,
         'email': obj.user.email,
         'name': obj.user.name,
       }
+    # For account_deleted actions, return the preserved user info
+    if obj.action == 'account_deleted' and obj.deleted_user_email:
+      return {
+        'id': obj.deleted_user_id,
+        'email': obj.deleted_user_email,
+        'name': obj.deleted_user_name or 'Deleted User',
+      }
     return None
+  
+  def get_deletion_feedback(self, obj):
+    """Return deletion feedback if available"""
+    if obj.deletion_feedback:
+      return {
+        'id': obj.deletion_feedback.id,
+        'reason': obj.deletion_feedback.reason,
+        'reason_display': dict(obj.deletion_feedback.REASON_CHOICES).get(obj.deletion_feedback.reason, obj.deletion_feedback.reason),
+        'comments': obj.deletion_feedback.comments,
+        'deleted_at': obj.deletion_feedback.deleted_at.isoformat() if obj.deletion_feedback.deleted_at else None,
+      }
+    return None
+
+
+from .models import AccountDeletionFeedback
+
+class DeletionFeedbackSerializer(serializers.ModelSerializer):
+  reason_display = serializers.SerializerMethodField()
+  
+  class Meta:
+    model = AccountDeletionFeedback
+    fields = ['id', 'user_id', 'user_email', 'user_name', 'reason', 'reason_display', 'comments', 'deleted_at']
+    read_only_fields = fields
+  
+  def get_reason_display(self, obj):
+    """Return human-readable reason"""
+    return dict(obj.REASON_CHOICES).get(obj.reason, obj.reason)

@@ -445,7 +445,8 @@ class UserView(APIView):
             user_email = user.email
             user_name = user.name
             user_id = user.id
-            AccountDeletionFeedback.objects.create(
+            # Create deletion feedback
+            deletion_feedback = AccountDeletionFeedback.objects.create(
               user_id=user_id,
               user_email=user_email,
               user_name=user_name,
@@ -455,10 +456,15 @@ class UserView(APIView):
             anonymize_user_account(user)
             send_deletion_confirmation_email(user_email, user_name)
             ip = get_client_ip(request)
+            # Create audit log with preserved user info and link to feedback
             AuditLog.objects.create(
               user=None, 
               action="account_deleted",
-              ip_address=ip
+              ip_address=ip,
+              deleted_user_id=user_id,
+              deleted_user_email=user_email,
+              deleted_user_name=user_name,
+              deletion_feedback=deletion_feedback
             )
             return Response({
               "message": "Your account has been deleted successfully"
@@ -656,7 +662,7 @@ class AuditLogView(APIView):
       )
     
     # Build queryset with optional filters
-    queryset = AuditLog.objects.all().select_related('user').order_by('-timestamp')
+    queryset = AuditLog.objects.all().select_related('user', 'deletion_feedback').order_by('-timestamp')
     
     # Filter by action
     action = request.query_params.get('action')
@@ -687,4 +693,59 @@ class AuditLogView(APIView):
         pass
     
     serializer = AuditLogSerializer(queryset, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+# ----------------- Deletion Feedback (Admin Only) -----------------
+class DeletionFeedbackView(APIView):
+  """
+  Admin endpoint to get account deletion feedback.
+  Requires admin/staff privileges.
+  
+  GET /authentication/deletion-feedback/
+  Query params:
+    - reason: Filter by reason (better_alternative, not_using, privacy_concerns, difficult_to_use, other)
+    - start_date: Filter by deletion date (YYYY-MM-DD)
+    - end_date: Filter by deletion date (YYYY-MM-DD)
+  """
+  @csrf_exempt
+  def get(self, request):
+    from ..serializers import DeletionFeedbackSerializer
+    
+    try:
+      user = authenticate_request(request, need_user=True)
+    except AuthenticationFailed as auth_error:
+      raise auth_error
+    
+    # Check admin privileges
+    if not user.is_staff and not user.is_superuser:
+      return Response(
+        {"error": "Admin privileges required"},
+        status=status.HTTP_403_FORBIDDEN
+      )
+    
+    # Build queryset with optional filters
+    queryset = AccountDeletionFeedback.objects.all().order_by('-deleted_at')
+    
+    # Filter by reason
+    reason = request.query_params.get('reason')
+    if reason:
+      queryset = queryset.filter(reason=reason)
+    
+    # Filter by date range
+    start_date = request.query_params.get('start_date')
+    if start_date:
+      try:
+        queryset = queryset.filter(deleted_at__gte=start_date)
+      except ValueError:
+        pass
+    
+    end_date = request.query_params.get('end_date')
+    if end_date:
+      try:
+        queryset = queryset.filter(deleted_at__lte=end_date)
+      except ValueError:
+        pass
+    
+    serializer = DeletionFeedbackSerializer(queryset, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)

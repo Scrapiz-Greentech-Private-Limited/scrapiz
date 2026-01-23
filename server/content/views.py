@@ -2,7 +2,7 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from django.conf import settings
-from .models import CarouselImage
+from .models import CarouselImage, AppConfig
 from .serializers import CarouselImageSerializer
 from authentication.views.admin_auth import get_admin_from_request
 
@@ -98,25 +98,128 @@ class CarouselImageViewSet(viewsets.ModelViewSet):
 def app_config(request):
     """
     Public endpoint that returns app configuration flags.
-    Used for feature toggles and testing modes.
+    Used for feature toggles, version enforcement, and testing modes.
     
     GET /api/content/app-config/
+    
+    Query params:
+    - app_version: Client app version (e.g., '1.2.0')
+    - platform: 'ios' or 'android'
     
     Returns:
     {
         "enable_location_skip": true/false,
         "maintenance_mode": false,
-        "min_app_version": "1.0.0"
+        "min_app_version": "1.0.0",
+        "force_update": true/false,
+        "update_url": "https://play.google.com/..."
     }
     """
-    config = {
-        # Enable location skip for testers
-        # Can be controlled via Django settings or environment variable
-        'enable_location_skip': getattr(settings, 'ENABLE_LOCATION_SKIP', False),
-        
-        # Other app-wide configuration flags
-        'maintenance_mode': getattr(settings, 'MAINTENANCE_MODE', False),
-        'min_app_version': getattr(settings, 'MIN_APP_VERSION', '1.0.0'),
-    }
+    from packaging import version as version_parser
     
-    return Response(config)
+    try:
+        config = AppConfig.get_config()
+        
+        # Get client version and platform from query params
+        client_version = request.GET.get('app_version', '0.0.0')
+        platform = request.GET.get('platform', 'android').lower()
+        
+        # Check if force update is required
+        force_update = False
+        update_url = config.force_update_url_android
+        
+        try:
+            if version_parser.parse(client_version) < version_parser.parse(config.min_app_version):
+                force_update = True
+                update_url = config.force_update_url_ios if platform == 'ios' else config.force_update_url_android
+        except Exception as e:
+            # If version parsing fails, don't force update
+            print(f"Version parsing error: {e}")
+        
+        response_data = {
+            'enable_location_skip': config.enable_location_skip,
+            'maintenance_mode': config.maintenance_mode,
+            'min_app_version': config.min_app_version,
+            'enforce_sell_screen_gate': config.enforce_sell_screen_gate,
+            'force_update': force_update,
+            'update_url': update_url,
+        }
+        
+        return Response(response_data)
+        
+    except Exception as e:
+        # Return safe defaults on error
+        return Response({
+            'enable_location_skip': False,
+            'maintenance_mode': False,
+            'min_app_version': '1.0.0',
+            'enforce_sell_screen_gate': True,
+            'force_update': False,
+            'update_url': 'https://play.google.com/store/apps/details?id=com.scrapiz.app',
+        })
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAdminDashboardUser])
+def update_app_config(request):
+    """
+    Update application configuration
+    Admin only endpoint
+    
+    PATCH /api/content/app-config/update/
+    
+    Body:
+    {
+        "enforce_sell_screen_gate": true/false,
+        "maintenance_mode": true/false,
+        "min_app_version": "1.2.0",
+        "enable_location_skip": true/false,
+        "force_update_url_android": "https://...",
+        "force_update_url_ios": "https://..."
+    }
+    """
+    try:
+        config = AppConfig.get_config()
+        
+        # Update fields if provided
+        if 'enforce_sell_screen_gate' in request.data:
+            config.enforce_sell_screen_gate = request.data['enforce_sell_screen_gate']
+        
+        if 'maintenance_mode' in request.data:
+            config.maintenance_mode = request.data['maintenance_mode']
+        
+        if 'min_app_version' in request.data:
+            config.min_app_version = request.data['min_app_version']
+        
+        if 'enable_location_skip' in request.data:
+            config.enable_location_skip = request.data['enable_location_skip']
+        
+        if 'force_update_url_android' in request.data:
+            config.force_update_url_android = request.data['force_update_url_android']
+        
+        if 'force_update_url_ios' in request.data:
+            config.force_update_url_ios = request.data['force_update_url_ios']
+        
+        # Set updated_by if user is authenticated
+        if hasattr(request, 'admin_user'):
+            # AdminUser from admin dashboard
+            config.updated_by = None  # AdminUser is separate model
+        elif request.user and request.user.is_authenticated:
+            config.updated_by = request.user
+        
+        config.save()
+        
+        return Response({
+            'enforce_sell_screen_gate': config.enforce_sell_screen_gate,
+            'maintenance_mode': config.maintenance_mode,
+            'min_app_version': config.min_app_version,
+            'enable_location_skip': config.enable_location_skip,
+            'force_update_url_android': config.force_update_url_android,
+            'force_update_url_ios': config.force_update_url_ios,
+            'message': 'Configuration updated successfully'
+        })
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

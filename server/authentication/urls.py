@@ -1,5 +1,5 @@
 from django.urls import path
-from .views.user import  RegisterView, LoginView, LogoutView, PasswordResetView, PasswordResetRequestView, ResendotpView, UserView,ReferredUsersView , ReferralTransactionsView,RedeemReferralBalanceView, AuditLogView
+from .views.user import  RegisterView, LoginView, LogoutView, PasswordResetView, PasswordResetRequestView, ResendotpView, UserView,ReferredUsersView , ReferralTransactionsView,RedeemReferralBalanceView, AuditLogView, DeletionFeedbackView
 from .views.oauth import GoogleOAuthLoginView, AppleOAuthLoginView, AppleOAuthConfirmLinkView
 from .views.phone_auth import PhoneVerifyView, PhoneCompleteProfileView, PhoneConfirmLinkView
 from .views.admin_referral import (
@@ -61,6 +61,7 @@ urlpatterns = [
     path('referrals/user/<int:user_id>/', AdminUserReferralDetailsView.as_view(), name='admin-user-referral-details'),
     path('referrals/stats/', AdminReferralStatsView.as_view(), name='admin-referral-stats'),
     path('audit-logs/', AuditLogView.as_view(), name='audit-logs'),
+    path('deletion-feedback/', DeletionFeedbackView.as_view(), name='deletion-feedback'),
     # Admin user management endpoints
     path('admin/users/', AdminUserListView.as_view(), name='admin-user-list'),
     path('admin/users/stats/', AdminUserStatsView.as_view(), name='admin-user-stats'),

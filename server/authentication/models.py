@@ -115,8 +115,22 @@ class AuditLog(models.Model):
     action = models.CharField(max_length=50, choices=ACTION_CHOICES, null=True, blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
+    # Fields to preserve user info for account_deleted actions
+    deleted_user_id = models.IntegerField(null=True, blank=True, help_text="Original user ID for deleted accounts")
+    deleted_user_email = models.EmailField(max_length=254, null=True, blank=True, help_text="Email at time of deletion")
+    deleted_user_name = models.CharField(max_length=50, null=True, blank=True, help_text="Name at time of deletion")
+    deletion_feedback = models.ForeignKey(
+        'AccountDeletionFeedback',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='audit_logs',
+        help_text="Link to deletion feedback if account was deleted"
+    )
 
     def __str__(self):
+        if self.action == 'account_deleted' and self.deleted_user_email:
+            return f"{self.deleted_user_email} - {self.action} at {self.timestamp}"
         return f"{self.user.email if self.user else 'Unknown'} - {self.action} at {self.timestamp}"
         
 class AccountDeletionFeedback(models.Model):
