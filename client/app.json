@@ -76,7 +76,7 @@
         "compileSdkVersion": 36,
         "targetSdkVersion": 36,
         "ndkVersion": "26.1.10909125",
-        "newArchEnabled": true
+        "newArchEnabled": false
       }
     }
   ],

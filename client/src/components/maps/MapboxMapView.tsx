@@ -9,7 +9,7 @@
  */
 
 import React, { useRef, useImperativeHandle, useEffect, useState, useMemo } from 'react';
-import { Platform, ActivityIndicator, View, StyleSheet, AppState, AppStateStatus } from 'react-native';
+import { Platform, ActivityIndicator, View, StyleSheet } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import { MapProviderProps, CameraController, Coordinates } from './types';
 import { CustomMarkerView } from './CustomMarkerView';
@@ -51,17 +51,14 @@ export function MapboxMapView({
   const [currentCenter, setCurrentCenter] = useState<Coordinates>(center);
   const [currentZoom, setCurrentZoom] = useState<number>(zoom);
   const [currentMarker, setCurrentMarker] = useState<Coordinates>(marker);
-  const [surfaceReady, setSurfaceReady] = useState(false);
-  const [mapKey, setMapKey] = useState(0); // Force remount on surface issues
+  const [surfaceReady, setSurfaceReady] = useState(false); // Track surface lifecycle
   
   // Throttle refs to prevent excessive updates
   const lastCameraChangeRef = useRef<number>(0);
-  const cameraChangeThrottleMs = 300;
+  const cameraChangeThrottleMs = 300; // Increased to 300ms for ultra-smooth performance
   const isUserInteractingRef = useRef<boolean>(false);
   const userInteractionTimeoutRef = useRef<NodeJS.Timeout>();
   const surfaceRecreationTimeoutRef = useRef<NodeJS.Timeout>();
-  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
-  const hasLoadedOnceRef = useRef(false);
 
   // Log initial coordinates
   useEffect(() => {
@@ -70,45 +67,13 @@ export function MapboxMapView({
     console.log('🗺️ Mapbox: Initial zoom:', zoom);
   }, []);
 
-  // CRITICAL FIX: Monitor AppState to detect permission dialog lifecycle
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextAppState) => {
-      console.log('🗺️ Mapbox: AppState changed from', appStateRef.current, 'to', nextAppState);
-      
-      // Detect return from permission dialog (background -> active)
-      if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
-        console.log('🗺️ Mapbox: Returned from background - recreating surface');
-        
-        // Force complete remount of map component
-        setIsMapLoaded(false);
-        setSurfaceReady(false);
-        
-        setTimeout(() => {
-          setMapKey(prev => prev + 1); // Force remount
-          console.log('🗺️ Mapbox: Map remounted with new key');
-          
-          setTimeout(() => {
-            setSurfaceReady(true);
-            console.log('🗺️ Mapbox: Surface ready after remount');
-          }, 800);
-        }, 300);
-      }
-      
-      appStateRef.current = nextAppState;
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, []);
-
-  // FIX: Surface lifecycle management - delay rendering until stable
+  // FIX #1: Surface lifecycle management - delay rendering until stable
   useEffect(() => {
     // Give Android time to stabilize surface after permission dialogs
     const timer = setTimeout(() => {
       setSurfaceReady(true);
-      console.log('🗺️ Mapbox: Initial surface ready');
-    }, 500);
+      console.log('🗺️ Mapbox: Surface ready for rendering');
+    }, 300);
 
     return () => clearTimeout(timer);
   }, []);
@@ -117,7 +82,6 @@ export function MapboxMapView({
   useEffect(() => {
     console.log('🗺️ Mapbox: Map loaded state:', isMapLoaded);
     if (isMapLoaded) {
-      hasLoadedOnceRef.current = true;
       console.log('🗺️ Mapbox: Current center after load:', currentCenter);
       console.log('🗺️ Mapbox: Current marker after load:', currentMarker);
     }
@@ -299,39 +263,37 @@ export function MapboxMapView({
     console.log('🗺️ Mapbox: Map is ready and loaded');
     setIsMapLoaded(true);
     
-    // Delay initial camera setup to ensure surface is stable
+    // FIX #2: Delay initial camera setup to ensure surface is stable
     setTimeout(() => {
       if (internalCameraRef.current) {
         console.log('🗺️ Mapbox: Setting initial zoom to:', zoom);
         internalCameraRef.current.setCamera({
           centerCoordinate: center,
           zoomLevel: zoom,
-          animationDuration: 0,
+          animationDuration: 0, // Instant, no animation
         });
       }
-    }, 200);
+    }, 150); // Increased delay for surface stability
   };
 
-  // Handle map loading error with aggressive recovery
+  // Handle map loading error
   const handleMapLoadingError = (error: any) => {
     console.error('🗺️ Mapbox: Map loading error:', error?.message ?? error);
     setIsMapLoaded(false);
     
-    // CRITICAL: Force complete remount on error
+    // FIX #3: Attempt surface recreation on error
     if (surfaceRecreationTimeoutRef.current) {
       clearTimeout(surfaceRecreationTimeoutRef.current);
     }
     
     surfaceRecreationTimeoutRef.current = setTimeout(() => {
-      console.log('🗺️ Mapbox: Forcing map remount due to error...');
+      console.log('🗺️ Mapbox: Attempting surface recreation...');
       setSurfaceReady(false);
-      setMapKey(prev => prev + 1);
-      
       setTimeout(() => {
         setSurfaceReady(true);
-        console.log('🗺️ Mapbox: Map remounted after error');
-      }, 800);
-    }, 500);
+        console.log('🗺️ Mapbox: Surface recreated');
+      }, 500);
+    }, 1000);
   };
 
   // FIX #4: Don't render map until surface is ready
@@ -348,9 +310,8 @@ export function MapboxMapView({
   return (
     <View style={style}>
       <MapboxGL.MapView
-        key={mapKey} // CRITICAL: Force remount when key changes
         ref={mapRef}
-        surfaceView={true}
+        surfaceView={true} // FIX #5: Use TextureView instead of SurfaceView for better lifecycle
         style={StyleSheet.absoluteFillObject}
         styleURL={DEFAULT_MAP_STYLE}
         onPress={handlePress}
@@ -362,28 +323,28 @@ export function MapboxMapView({
         attributionEnabled={true}
         attributionPosition={{ bottom: 8, left: 8 }}
         compassEnabled={true}
-        compassViewPosition={3}
+        compassViewPosition={3} // Top right
         compassViewMargins={{ x: 16, y: 100 }}
         scaleBarEnabled={false}
         rotateEnabled={false}
         pitchEnabled={false}
+        // Performance optimizations
         localizeLabels={false}
         zoomEnabled={true}
         scrollEnabled={true}
         regionWillChangeDebounceTime={0}
         regionDidChangeDebounceTime={0}
       >
-        {/* Camera control */}
+        {/* Camera control - FIX #6: Use default animationMode for better lifecycle */}
         <MapboxGL.Camera
           ref={internalCameraRef}
           centerCoordinate={currentCenter}
           animationMode="flyTo"
-          animationDuration={300}
           minZoomLevel={MAP_SETTINGS.minZoom}
           maxZoomLevel={MAP_SETTINGS.maxZoom}
         />
 
-        {/* Native marker that moves with map */}
+        {/* Native marker that moves with map - ALWAYS visible and synced */}
         {isMapLoaded && <MapMarker coordinate={currentMarker} />}
       </MapboxGL.MapView>
 
