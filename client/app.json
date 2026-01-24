@@ -7,14 +7,14 @@
     "icon": "./assets/images/newapp.png",
     "scheme": "com.scrapiz.app",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/images/newapp.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.scrapiz.app",
       "config": {
         "usesNonExemptEncryption": false
