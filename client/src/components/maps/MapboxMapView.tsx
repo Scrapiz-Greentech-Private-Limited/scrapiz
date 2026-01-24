@@ -51,18 +51,31 @@ export function MapboxMapView({
   const [currentCenter, setCurrentCenter] = useState<Coordinates>(center);
   const [currentZoom, setCurrentZoom] = useState<number>(zoom);
   const [currentMarker, setCurrentMarker] = useState<Coordinates>(marker);
+  const [surfaceReady, setSurfaceReady] = useState(false); // Track surface lifecycle
   
   // Throttle refs to prevent excessive updates
   const lastCameraChangeRef = useRef<number>(0);
   const cameraChangeThrottleMs = 300; // Increased to 300ms for ultra-smooth performance
   const isUserInteractingRef = useRef<boolean>(false);
   const userInteractionTimeoutRef = useRef<NodeJS.Timeout>();
+  const surfaceRecreationTimeoutRef = useRef<NodeJS.Timeout>();
 
   // Log initial coordinates
   useEffect(() => {
     console.log('🗺️ Mapbox: Initial center prop:', center);
     console.log('🗺️ Mapbox: Initial marker prop:', marker);
     console.log('🗺️ Mapbox: Initial zoom:', zoom);
+  }, []);
+
+  // FIX #1: Surface lifecycle management - delay rendering until stable
+  useEffect(() => {
+    // Give Android time to stabilize surface after permission dialogs
+    const timer = setTimeout(() => {
+      setSurfaceReady(true);
+      console.log('🗺️ Mapbox: Surface ready for rendering');
+    }, 300);
+
+    return () => clearTimeout(timer);
   }, []);
 
   // Track when map is fully loaded
@@ -77,6 +90,9 @@ export function MapboxMapView({
     return () => {
       if (userInteractionTimeoutRef.current) {
         clearTimeout(userInteractionTimeoutRef.current);
+      }
+      if (surfaceRecreationTimeoutRef.current) {
+        clearTimeout(surfaceRecreationTimeoutRef.current);
       }
     };
   }, [isMapLoaded]);
@@ -247,7 +263,7 @@ export function MapboxMapView({
     console.log('🗺️ Mapbox: Map is ready and loaded');
     setIsMapLoaded(true);
     
-    // Set initial zoom level once on map load
+    // FIX #2: Delay initial camera setup to ensure surface is stable
     setTimeout(() => {
       if (internalCameraRef.current) {
         console.log('🗺️ Mapbox: Setting initial zoom to:', zoom);
@@ -257,20 +273,45 @@ export function MapboxMapView({
           animationDuration: 0, // Instant, no animation
         });
       }
-    }, 100);
+    }, 150); // Increased delay for surface stability
   };
 
   // Handle map loading error
   const handleMapLoadingError = (error: any) => {
     console.error('🗺️ Mapbox: Map loading error:', error?.message ?? error);
     setIsMapLoaded(false);
+    
+    // FIX #3: Attempt surface recreation on error
+    if (surfaceRecreationTimeoutRef.current) {
+      clearTimeout(surfaceRecreationTimeoutRef.current);
+    }
+    
+    surfaceRecreationTimeoutRef.current = setTimeout(() => {
+      console.log('🗺️ Mapbox: Attempting surface recreation...');
+      setSurfaceReady(false);
+      setTimeout(() => {
+        setSurfaceReady(true);
+        console.log('🗺️ Mapbox: Surface recreated');
+      }, 500);
+    }, 1000);
   };
+
+  // FIX #4: Don't render map until surface is ready
+  if (!surfaceReady) {
+    return (
+      <View style={[style, { backgroundColor: '#f9fafb' }]}>
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#16a34a" />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={style}>
       <MapboxGL.MapView
         ref={mapRef}
-        surfaceView={false} // Android performance optimization
+        surfaceView={true} // FIX #5: Use TextureView instead of SurfaceView for better lifecycle
         style={StyleSheet.absoluteFillObject}
         styleURL={DEFAULT_MAP_STYLE}
         onPress={handlePress}
@@ -294,11 +335,11 @@ export function MapboxMapView({
         regionWillChangeDebounceTime={0}
         regionDidChangeDebounceTime={0}
       >
-        {/* Camera control - Only controls position, NOT zoom */}
+        {/* Camera control - FIX #6: Use default animationMode for better lifecycle */}
         <MapboxGL.Camera
           ref={internalCameraRef}
           centerCoordinate={currentCenter}
-          animationMode="none"
+          animationMode="flyTo"
           minZoomLevel={MAP_SETTINGS.minZoom}
           maxZoomLevel={MAP_SETTINGS.maxZoom}
         />

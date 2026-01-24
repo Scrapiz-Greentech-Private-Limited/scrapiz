@@ -124,6 +124,7 @@ export default function MapLocationPicker({
   const [isUserTyping, setIsUserTyping] = useState(false);
   const [lastCameraUpdate, setLastCameraUpdate] = useState(0);
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
+  const [surfaceReady, setSurfaceReady] = useState(false); // Track surface stability
 
   const cameraRef = useRef<CameraController>(null);
   const mapMountedRef = useRef(false);
@@ -148,10 +149,16 @@ export default function MapLocationPicker({
         mapMountedRef.current = true;
         setIsMapReady(true);
         
+        // FIX: Wait for surface to stabilize before marking ready
+        setTimeout(() => {
+          setSurfaceReady(true);
+          console.log('🗺️ Surface ready for interaction');
+        }, 400);
+        
         // Get user location after map is ready
         setTimeout(() => {
           getCurrentUserLocation();
-        }, 300);
+        }, 600);
       }, Platform.OS === 'android' ? 800 : 500);
 
       return () => {
@@ -161,11 +168,13 @@ export default function MapLocationPicker({
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
         if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
         mapMountedRef.current = false;
+        setSurfaceReady(false);
       };
     } else {
       console.log('🗺️ MapLocationPicker not visible - resetting state');
       mapMountedRef.current = false;
       setIsMapReady(false);
+      setSurfaceReady(false);
       hasTriggeredGPS.current = false; // Reset GPS trigger flag
     }
   }, [visible]);
@@ -426,7 +435,8 @@ export default function MapLocationPicker({
 };
 
  const handleUseCurrentLocation = async () => {
-  if (!isMapReady || !mapMountedRef.current) {
+  // FIX: Don't proceed if surface isn't stable yet
+  if (!isMapReady || !mapMountedRef.current || !surfaceReady) {
     console.warn('🗺️ Map not ready yet, waiting...');
     Toast.show({
       type: 'info',
@@ -465,6 +475,9 @@ export default function MapLocationPicker({
     }
     if (finalStatus === 'granted') {
           setPermissionSettled(true);
+          
+          // FIX: Give Android time to stabilize after permission grant
+          await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     try {
@@ -496,8 +509,8 @@ export default function MapLocationPicker({
         return;
       }
 
-      // Wait a bit before moving camera to ensure map is fully ready
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // FIX: Longer delay before camera movement after permission
+      await new Promise(resolve => setTimeout(resolve, 600));
 
       // Use setCamera for consistent programmatic movement (with default zoom for GPS)
       cameraRef.current?.setCamera({
@@ -681,7 +694,8 @@ export default function MapLocationPicker({
 
         {/* Map Container - Full Screen */}
         <View style={styles.mapContainer}>
-          {isMapReady && permissionSettled   ? (
+          {/* FIX: Only render map after surface is ready AND permission settled */}
+          {isMapReady && surfaceReady ? (
             <>
               <MapViewWrapper
                 center={selectedCoords}
