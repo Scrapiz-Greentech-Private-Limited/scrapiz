@@ -12,6 +12,8 @@ import {
   Platform,
   TouchableWithoutFeedback,
   StatusBar,
+  AppState,
+  AppStateStatus,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -125,6 +127,8 @@ export default function MapLocationPicker({
   const [lastCameraUpdate, setLastCameraUpdate] = useState(0);
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
   const [surfaceReady, setSurfaceReady] = useState(false); // Track surface stability
+  const [mapComponentKey, setMapComponentKey] = useState(0); // Force map remount
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
   const cameraRef = useRef<CameraController>(null);
   const mapMountedRef = useRef(false);
@@ -138,6 +142,44 @@ export default function MapLocationPicker({
   const previousZoomRef = useRef<number>(MAP_SETTINGS.defaultZoom);
   const cameraUpdateThrottleRef = useRef<NodeJS.Timeout>();
   const lastReverseGeocodeRef = useRef<number>(0);
+
+  // CRITICAL: Monitor AppState to detect permission dialog return
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      console.log('🗺️ Picker: AppState changed from', appStateRef.current, 'to', nextAppState);
+      
+      // Detect return from permission dialog
+      if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active' && visible) {
+        console.log('🗺️ Picker: Returned from permission dialog - forcing map recreation');
+        
+        // Force complete map recreation
+        setIsMapReady(false);
+        setSurfaceReady(false);
+        mapMountedRef.current = false;
+        
+        setTimeout(() => {
+          setMapComponentKey(prev => prev + 1);
+          console.log('🗺️ Picker: Map component remounted');
+          
+          setTimeout(() => {
+            mapMountedRef.current = true;
+            setIsMapReady(true);
+            
+            setTimeout(() => {
+              setSurfaceReady(true);
+              console.log('🗺️ Picker: Map fully ready after permission');
+            }, 600);
+          }, 400);
+        }, 300);
+      }
+      
+      appStateRef.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [visible]);
 
   // Set map as mounted when component mounts
   useEffect(() => {
@@ -153,13 +195,13 @@ export default function MapLocationPicker({
         setTimeout(() => {
           setSurfaceReady(true);
           console.log('🗺️ Surface ready for interaction');
-        }, 400);
+        }, 600);
         
         // Get user location after map is ready
         setTimeout(() => {
           getCurrentUserLocation();
-        }, 600);
-      }, Platform.OS === 'android' ? 800 : 500);
+        }, 800);
+      }, Platform.OS === 'android' ? 1000 : 500);
 
       return () => {
         console.log('🗺️ MapLocationPicker cleanup');
@@ -169,6 +211,7 @@ export default function MapLocationPicker({
         if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
         mapMountedRef.current = false;
         setSurfaceReady(false);
+        setIsMapReady(false);
       };
     } else {
       console.log('🗺️ MapLocationPicker not visible - resetting state');
@@ -456,9 +499,36 @@ export default function MapLocationPicker({
   try {
     const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
     let finalStatus = existingStatus;
+    
     if (existingStatus !== 'granted') {
+      console.log('🗺️ Requesting location permission...');
       const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
       finalStatus = newStatus;
+      
+      // CRITICAL: After permission dialog, wait for AppState listener to recreate map
+      if (finalStatus === 'granted') {
+        console.log('🗺️ Permission granted - waiting for map recreation...');
+        setPermissionSettled(true);
+        
+        // Wait for AppState listener to trigger map recreation
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Check if map is still ready after permission
+        if (!mapMountedRef.current || !surfaceReady) {
+          console.warn('🗺️ Map not ready after permission - aborting');
+          Toast.show({
+            type: 'info',
+            text1: 'Please try again',
+            text2: 'Map is reloading after permission grant',
+            visibilityTime: 3000,
+          });
+          isSelectingFromSearch.current = false;
+          setIsLoadingLocation(false);
+          return;
+        }
+      }
+    } else {
+      setPermissionSettled(true);
     }
 
     if (finalStatus !== 'granted') {
@@ -473,16 +543,10 @@ export default function MapLocationPicker({
       setIsLoadingLocation(false);
       return;
     }
-    if (finalStatus === 'granted') {
-          setPermissionSettled(true);
-          
-          // FIX: Give Android time to stabilize after permission grant
-          await new Promise(resolve => setTimeout(resolve, 500));
-    }
 
     try {
       const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.BestForNavigation, // Highest possible accuracy
+        accuracy: Location.Accuracy.BestForNavigation,
         timeInterval: 1000,
         distanceInterval: 0,
       });
@@ -494,7 +558,6 @@ export default function MapLocationPicker({
 
       console.log('🗺️ Got GPS location:', coords);
       console.log('🗺️ GPS accuracy:', position.coords.accuracy, 'meters');
-      console.log('🗺️ GPS altitude:', position.coords.altitude, 'meters');
 
       setSelectedCoords(coords);
       setMarkerCoords(coords);
@@ -509,20 +572,19 @@ export default function MapLocationPicker({
         return;
       }
 
-      // FIX: Longer delay before camera movement after permission
-      await new Promise(resolve => setTimeout(resolve, 600));
+      // Wait before camera movement
+      await new Promise(resolve => setTimeout(resolve, 400));
 
-      // Use setCamera for consistent programmatic movement (with default zoom for GPS)
+      // Use setCamera for consistent programmatic movement
       cameraRef.current?.setCamera({
         centerCoordinate: coords,
-        zoomLevel: MAP_SETTINGS.defaultZoom, // Set zoom for GPS location
+        zoomLevel: MAP_SETTINGS.defaultZoom,
         animationDuration: MAP_SETTINGS.animationDuration,
       });
 
-      // Force reverse geocode even though isSelectingFromSearch is true
+      // Force reverse geocode
       await reverseGeocode(coords[1], coords[0], true, true);
 
-      // small delay then allow other handlers again
       setTimeout(() => {
         isSelectingFromSearch.current = false;
       }, MAP_SETTINGS.animationDuration + 500);
@@ -698,6 +760,7 @@ export default function MapLocationPicker({
           {isMapReady && surfaceReady ? (
             <>
               <MapViewWrapper
+                key={mapComponentKey} // Force remount when key changes
                 center={selectedCoords}
                 marker={markerCoords}
                 zoom={MAP_SETTINGS.defaultZoom}
