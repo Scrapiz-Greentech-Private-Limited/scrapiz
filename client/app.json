@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Scrapiz",
+    "name": "Scrapiz",  
     "slug": "scrapiz-client",
     "version": "1.2.1",
     "orientation": "portrait",

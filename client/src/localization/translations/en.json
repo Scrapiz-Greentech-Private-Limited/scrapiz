@@ -150,6 +150,26 @@
     "genderPreferNotToSay": "Prefer not to say",
     "optional": "(Optional)"
   },
+  "guestProfile": {
+    "welcome": "Welcome to Scrapiz!",
+    "subtitle": "Create an account to unlock rewards, track orders, and make a positive environmental impact",
+    "createAccount": "Create Free Account",
+    "signIn": "Sign In",
+    "whyJoin": "Why Join Scrapiz?",
+    "settings": "Settings",
+    "alreadyHaveAccount": "Already have an account?",
+    "signInLink": "Sign In →",
+    "benefits": {
+      "trackOrders": "Track Orders",
+      "trackOrdersDesc": "View order history and track pickups in real-time",
+      "earnRewards": "Earn Rewards",
+      "earnRewardsDesc": "Get ₹20 for every friend you refer!",
+      "saveAddresses": "Save Addresses",
+      "saveAddressesDesc": "Quick checkout with saved pickup locations",
+      "trackImpact": "Track Impact",
+      "trackImpactDesc": "See how much you're helping the environment"
+    }
+  },
   "auth": {
     "login": "Login",
     "signup": "Sign Up",

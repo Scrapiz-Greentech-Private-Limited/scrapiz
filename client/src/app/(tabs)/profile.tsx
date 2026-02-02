@@ -33,6 +33,8 @@ import { SUPPORTED_LANGUAGES } from '../../localization/languages';
 import Toast from 'react-native-toast-message';
 import { getAvatarSource } from '../../utils/avatarUtils';
 import { useNetworkRetry } from '../../hooks/useNetworkRetry';
+import { useAuthGuard } from '../../hooks/useAuthGuard';
+import GuestProfileView from '../../components/GuestProfileView';
 
 type MenuItem = {
   icon: any;
@@ -68,16 +70,19 @@ export default function Profile() {
   const [avatarModalVisible, setAvatarModalVisible] = useState(false);
   const [avatarOptionsVisible, setAvatarOptionsVisible] = useState(false);
 
+  // Auth guard for guest flow - check if user is authenticated
+  const { isGuest, isAuthenticated: isAuthGuardAuthenticated, isLoading: isAuthLoading } = useAuthGuard();
+
   // Data loading function
   const loadUserProfile = useCallback(async () => {
     // Check authentication first before making API calls
     const isAuthenticated = await AuthService.isAuthenticated();
     if (!isAuthenticated) {
-      // Not authenticated - redirect to login
-      router.replace('/(auth)/login');
+      // Not authenticated - don't load profile data, GuestProfileView will be shown
+      setLoading(false);
       return;
     }
-    
+
     setLoading(true);
     setErrors(null);
     const [userData, productsData] = await Promise.all([
@@ -87,7 +92,7 @@ export default function Profile() {
     setUser(userData);
     setProducts(productsData);
     setLoading(false);
-  }, [router]);
+  }, []);
 
   // Network retry hook
   const {
@@ -110,7 +115,7 @@ export default function Profile() {
     useCallback(() => {
       // Reset image error state when screen gains focus (e.g., after profile edit)
       setImageError(false);
-      
+
       const initLoad = async () => {
         const isConnected = await checkNetworkAndLoad();
         if (isConnected) {
@@ -118,24 +123,24 @@ export default function Profile() {
             await loadUserProfile();
           } catch (error: any) {
             const errorMsg = error.message || 'Failed to load profile';
-            
+
             // Check if it's an authentication error
-            const isAuthError = 
+            const isAuthError =
               errorMsg.toLowerCase().includes('unauthenticated') ||
               errorMsg.toLowerCase().includes('unauthorized') ||
               errorMsg.toLowerCase().includes('authentication');
-            
+
             if (isAuthError) {
               // Auth error - redirect to login (the global handler should also trigger)
               router.replace('/(auth)/login');
               return;
             }
-            
-            const isNetworkError = 
+
+            const isNetworkError =
               errorMsg.toLowerCase().includes('network') ||
               errorMsg.toLowerCase().includes('internet') ||
               errorMsg.toLowerCase().includes('connection');
-            
+
             if (isNetworkError) {
               startRetryFlow(errorMsg);
             } else {
@@ -145,13 +150,13 @@ export default function Profile() {
           }
         }
       };
-      
+
       initLoad();
     }, [loadUserProfile, checkNetworkAndLoad, startRetryFlow, router])
   );
 
   const environmentalImpact = useEnvironmentalImpact(user?.orders || []);
-  
+
   const totalEarnings = useMemo(() => {
     if (!user?.orders || !products.length) return 0;
     return user.orders.reduce((total, order) => {
@@ -177,42 +182,42 @@ export default function Profile() {
   };
 
   const handlePickImage = async () => {
-  try {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
 
-    if (!result.canceled && result.assets?.length) {
-      await updateProfileImage(result.assets[0].uri);
+      if (!result.canceled && result.assets?.length) {
+        await updateProfileImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      Alert.alert(
+        t('alerts.titles.error'),
+        t('toasts.error.imagePickerFailed')
+      );
+      console.error(error);
     }
-  } catch (error) {
-    Alert.alert(
-      t('alerts.titles.error'),
-      t('toasts.error.imagePickerFailed')
-    );
-    console.error(error);
-  }
-};
+  };
   const updateProfileImage = async (imageUri: string) => {
     try {
       setUpdatingImage(true);
-      
+
       const updateData = {
         profile_image: imageUri
       };
-      
+
       const updatedUser = await AuthService.updateUserProfile(updateData);
-      
+
       setUser(prevUser => ({
         ...prevUser!,
         profile_image: updatedUser.profile_image || ''
       }));
-      
+
       setImageError(false);
-      
+
       Toast.show({
         type: 'success',
         text1: t('toasts.success.profileImageUpdated') || 'Profile image updated successfully',
@@ -229,7 +234,7 @@ export default function Profile() {
       setUpdatingImage(false);
     }
   };
-  
+
   const handleRemoveImage = () => {
     Alert.alert(
       t('alerts.titles.removeProfilePicture'),
@@ -242,20 +247,20 @@ export default function Profile() {
           onPress: async () => {
             try {
               setUpdatingImage(true);
-              
+
               const updateData = {
                 profile_image: null
               };
-              
+
               const updatedUser = await AuthService.updateUserProfile(updateData);
-              
+
               setUser(prevUser => ({
                 ...prevUser!,
                 profile_image: ''
               }));
-              
+
               setImageError(false);
-              
+
               Toast.show({
                 type: 'success',
                 text1: t('toasts.success.profileImageRemoved') || 'Profile image removed successfully',
@@ -279,12 +284,12 @@ export default function Profile() {
 
   const formatJoinDate = (orders: OrderSummary[]): string => {
     if (!orders.length) return 'Recently joined';
-    
+
     const oldestOrder = orders.reduce((oldest, order) => {
       const orderDate = new Date(order.created_at);
       return orderDate < oldest ? orderDate : oldest;
     }, new Date(orders[0].created_at));
-    
+
     return oldestOrder.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
 
@@ -446,10 +451,10 @@ export default function Profile() {
   const confirmDeletion = async (feedback: DeletionFeedback) => {
     try {
       setDeletingAccount(true);
-      
+
       // Delete account
       await AuthService.deleteUserWithFeedback(feedback);
-      
+
       // Clear auth state (ignore any errors since account is already deleted)
       try {
         await clearAuthState();
@@ -515,7 +520,7 @@ export default function Profile() {
         <TouchableOpacity style={styles.retryButton} onPress={retryNow}>
           <Text style={styles.retryButtonText}>{t('profile.retry')}</Text>
         </TouchableOpacity>
-        
+
         {/* Network Retry Overlay */}
         <NetworkRetryOverlay
           visible={showRetryOverlay}
@@ -566,32 +571,41 @@ export default function Profile() {
     }
   ]
 
+  /**
+   * Guest View: Show GuestProfileView for unauthenticated users
+   * This provides a premium-looking welcome screen with sign-in/sign-up CTAs
+   * instead of redirecting guests away from the profile tab
+   */
+  if (isGuest && !isAuthLoading) {
+    return <GuestProfileView />;
+  }
+
   return (
-    <ScrollView 
-      style={[styles.container, { backgroundColor: colors.background }]} 
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
       showsVerticalScrollIndicator={false}
     >
-        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
-        <LinearGradient
-          colors={isDark ? ['#22c55e', '#16a34a'] : ['#16a34a', '#15803d']}
-          style={styles.header}
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
+      <LinearGradient
+        colors={isDark ? ['#22c55e', '#16a34a'] : ['#16a34a', '#15803d']}
+        style={styles.header}
+      >
+        <TouchableOpacity
+          style={styles.themeToggleButton}
+          onPress={toggleTheme}
+          activeOpacity={0.7}
         >
-          <TouchableOpacity
-            style={styles.themeToggleButton}
-            onPress={toggleTheme}
-            activeOpacity={0.7}
-          >
-            <View style={styles.themeToggleIcon}>
-              {isDark ? (
-                <Sun size={fs(20)} color="#ffffff" strokeWidth={2.5} />
-              ) : (
-                <Moon size={fs(20)} color="#ffffff" strokeWidth={2.5} />
-              )}
-            </View>
-          </TouchableOpacity>
-          <View style={styles.profileContainer}>
+          <View style={styles.themeToggleIcon}>
+            {isDark ? (
+              <Sun size={fs(20)} color="#ffffff" strokeWidth={2.5} />
+            ) : (
+              <Moon size={fs(20)} color="#ffffff" strokeWidth={2.5} />
+            )}
+          </View>
+        </TouchableOpacity>
+        <View style={styles.profileContainer}>
           {/* Clean Avatar - Tap to open options */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.avatarWrapper}
             onPress={() => !updatingImage && setAvatarOptionsVisible(true)}
             activeOpacity={0.8}
@@ -615,7 +629,7 @@ export default function Profile() {
                 if (avatarSource) {
                   // Check if it's a DiceBear URL (for using ExpoImage with better caching)
                   const isDiceBearUrl = avatarSource.uri.includes('api.dicebear.com');
-                  
+
                   if (isDiceBearUrl) {
                     return (
                       <ExpoImage
@@ -627,7 +641,7 @@ export default function Profile() {
                       />
                     );
                   }
-                  
+
                   return (
                     <Image
                       source={{ uri: avatarSource.uri }}
@@ -636,7 +650,7 @@ export default function Profile() {
                     />
                   );
                 }
-                
+
                 // Fallback to initials
                 return <Text style={styles.avatarText}>{getInitials(user.name)}</Text>;
               })()}

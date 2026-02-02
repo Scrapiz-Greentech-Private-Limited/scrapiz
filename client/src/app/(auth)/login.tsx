@@ -29,7 +29,7 @@ import {
   Link as LinkIcon,
   Phone,
 } from 'lucide-react-native';
-import { Link, useRouter } from 'expo-router';
+import { Link, useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import ScrapizLogo from '../../components/ScrapizLogo';
@@ -38,21 +38,28 @@ import Toast from 'react-native-toast-message';
 import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 import { useAppleAuth, AppleAuthError, appleAuthErrorMessages } from '../../hooks/useAppleAuth';
 import { useLocalization } from '../../context/LocalizationContext';
-import {wp, hp, fs, spacing} from '../../utils/responsive'
-import {useTheme} from '../../context/ThemeContext.tsx';
+import { wp, hp, fs, spacing } from '../../utils/responsive'
+import { useTheme } from '../../context/ThemeContext.tsx';
 import { ForceUpdateModal } from '../../components/ForceUpdateModal';
 import { checkAppVersion } from '../../utils/versionCheck';
+import { loadGuestOrderState, clearGuestOrderState } from '../../utils/guestOrderPersistence';
 
 export default function LoginScreen() {
   const router = useRouter();
   const { t } = useLocalization();
-   const { colors, isDark } = useTheme();
+  const { colors, isDark } = useTheme();
+
+  // Get returnTo parameter for post-auth navigation (guest flow support)
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?
-    : string; password?: string }>({});
+  const [errors, setErrors] = useState<{
+    email?
+    : string; password?: string
+  }>({});
 
   // Force update state
   const [showForceUpdate, setShowForceUpdate] = useState(false);
@@ -90,7 +97,7 @@ export default function LoginScreen() {
     const checkVersion = async () => {
       try {
         const versionCheck = await checkAppVersion();
-        
+
         if (versionCheck.force_update) {
           setShowForceUpdate(true);
           setUpdateUrl(versionCheck.update_url);
@@ -101,7 +108,7 @@ export default function LoginScreen() {
         // Fail open - don't block users if check fails
       }
     };
-    
+
     checkVersion();
   }, []);
 
@@ -121,6 +128,46 @@ export default function LoginScreen() {
     ]).start();
   }, [fadeAnim, slideAnim]);
 
+  /**
+   * Shared navigation helper for post-auth flow
+   * Handles returnTo parameter for guest flow and notification permission check
+   */
+  const navigateAfterAuth = async () => {
+    // Check if we should show notification permission screen
+    const { hasShownNotificationPermission } = await import('../../utils/notificationPermission');
+    const hasShown = await hasShownNotificationPermission();
+
+    // Small delay to ensure auth state is fully propagated before navigation
+    // This prevents race conditions on iOS that can cause app crashes
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Determine destination based on returnTo parameter
+    let destination = '/(tabs)/home';
+
+    if (returnTo) {
+      // Decode the returnTo parameter
+      const decodedReturnTo = decodeURIComponent(returnTo);
+      console.log('🔄 Post-auth redirect to:', decodedReturnTo);
+
+      // Clear any saved guest order state if we're returning to sell screen
+      // (the state will be restored by the sell screen itself)
+      if (decodedReturnTo.includes('/sell')) {
+        console.log('📦 Returning to sell flow, guest order state will be restored');
+      }
+
+      destination = decodedReturnTo;
+    }
+
+    if (!hasShown) {
+      // Navigate to notification permission screen first
+      // After that, user will be redirected appropriately
+      router.replace('/notification-permission');
+    } else {
+      // Navigate to destination (either returnTo path or home)
+      router.replace(destination as any);
+    }
+  };
+
   // Handle Google auth success
   useEffect(() => {
     const handleAuthSuccess = async () => {
@@ -130,27 +177,13 @@ export default function LoginScreen() {
           text1: t('common.success'),
           text2: t('notifications.languageChanged'),
         });
-        
-        // Check if we should show notification permission screen
-        const { hasShownNotificationPermission } = await import('../../utils/notificationPermission');
-        const hasShown = await hasShownNotificationPermission();
-        
-        // Small delay to ensure auth state is fully propagated before navigation
-        // This prevents race conditions on iOS that can cause app crashes
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        if (!hasShown) {
-          // Navigate to notification permission screen first
-          router.replace('/notification-permission');
-        } else {
-          // Navigate directly to home
-          router.replace('/(tabs)/home');
-        }
+
+        await navigateAfterAuth();
       }
     };
-    
+
     handleAuthSuccess();
-  }, [authSuccess, t]);
+  }, [authSuccess, t, returnTo]);
 
   // Handle Apple auth success (Requirements: 1.5)
   useEffect(() => {
@@ -161,24 +194,13 @@ export default function LoginScreen() {
           text1: t('common.success'),
           text2: t('auth.appleSignInSuccess') || 'Signed in with Apple successfully',
         });
-        
-        // Check if we should show notification permission screen
-        const { hasShownNotificationPermission } = await import('../../utils/notificationPermission');
-        const hasShown = await hasShownNotificationPermission();
-        
-        // Small delay to ensure auth state is fully propagated before navigation
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        if (!hasShown) {
-          router.replace('/notification-permission');
-        } else {
-          router.replace('/(tabs)/home');
-        }
+
+        await navigateAfterAuth();
       }
     };
-    
+
     handleAppleAuthSuccess();
-  }, [appleAuthSuccess, t]);
+  }, [appleAuthSuccess, t, returnTo]);
 
   // Show account linking confirmation modal when pendingLinkEmail is set (Requirements: 4.2)
   useEffect(() => {
@@ -189,25 +211,25 @@ export default function LoginScreen() {
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
-    
+
     // Improved email validation regex
     const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    
+
     const trimmedEmail = email.trim();
     const trimmedPassword = password.trim();
-    
+
     if (!trimmedEmail) {
       newErrors.email = t('auth.errors.emailRequired');
     } else if (!emailRegex.test(trimmedEmail)) {
       newErrors.email = t('auth.errors.invalidEmail');
     }
-    
+
     if (!trimmedPassword) {
       newErrors.password = t('auth.errors.passwordRequired');
     } else if (trimmedPassword.length < 6) {
       newErrors.password = t('auth.errors.passwordMinLength');
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -215,40 +237,27 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     // Prevent multiple submissions
     if (isLoading) return;
-    
+
     if (!validateForm()) return;
-    
+
     setIsLoading(true);
-    
+
     try {
       // Trim inputs before sending
       const trimmedEmail = email.trim();
       const trimmedPassword = password.trim();
-      
+
       // Call API service
       await AuthService.login({ email: trimmedEmail, password: trimmedPassword });
-      
+
       Toast.show({
         type: 'success',
         text1: t('common.success'),
         text2: t('notifications.languageChanged'),
       });
-      
-      // Check if we should show notification permission screen
-      const { hasShownNotificationPermission } = await import('../../utils/notificationPermission');
-      const hasShown = await hasShownNotificationPermission();
-      
-      // Small delay to ensure auth state is fully propagated before navigation
-      // This prevents race conditions on iOS that can cause app crashes
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      if (!hasShown) {
-        // Navigate to notification permission screen first
-        router.replace('/notification-permission');
-      } else {
-        // Navigate directly to home
-        router.replace('/(tabs)/home');
-      }
+
+      // Navigate using shared helper (handles returnTo parameter)
+      await navigateAfterAuth();
     } catch (error: any) {
       Toast.show({
         type: 'error',
@@ -304,13 +313,13 @@ export default function LoginScreen() {
    */
   const handleConfirmLink = async (confirmed: boolean) => {
     setShowLinkConfirmModal(false);
-    
+
     if (!confirmed) {
       // User declined linking
       await confirmAccountLink(false);
       return;
     }
-    
+
     try {
       const success = await confirmAccountLink(true);
       // Navigation will be handled by useEffect when appleAuthSuccess changes
@@ -371,7 +380,7 @@ export default function LoginScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
@@ -389,19 +398,19 @@ export default function LoginScreen() {
             end={{ x: 1, y: 1 }}
           >
             {/* Texture Pattern */}
-            <View 
-            style={styles.texturePattern}>
+            <View
+              style={styles.texturePattern}>
               {Array.from({ length: 80 }).map((_, i) => (
                 <View key={i} style={styles.textureDot} />
               ))}
             </View>
-            
+
             {/* Decorative Circles */}
-            <Animated.View 
+            <Animated.View
               style={[
                 styles.bgCircle1,
                 {
-                  zIndex:1,
+                  zIndex: 1,
                   opacity: fadeAnim.interpolate({
                     inputRange: [0, 1],
                     outputRange: [0, 0.15]
@@ -409,10 +418,11 @@ export default function LoginScreen() {
                 }
               ]}
             />
-            <Animated.View 
+            <Animated.View
               style={[
                 styles.bgCircle2,
-                {zIndex:1,
+                {
+                  zIndex: 1,
                   opacity: fadeAnim.interpolate({
                     inputRange: [0, 1],
                     outputRange: [0, 0.1]
@@ -420,176 +430,177 @@ export default function LoginScreen() {
                 }
               ]}
             />
-            
+
             {/* Header Content in Green Section */}
-            <Animated.View 
+            <Animated.View
               style={[
                 styles.headerInGreen,
-                {zIndex:10,
+                {
+                  zIndex: 10,
                   opacity: fadeAnim,
                   transform: [{ translateY: slideAnim }],
                 },
               ]}
             >
               <View style={styles.logoContainer}>
-                <Image source={require('../../../assets/images/LogowithoutS.png')} style={styles.logoImage} resizeMode='contain'/>
+                <Image source={require('../../../assets/images/LogowithoutS.png')} style={styles.logoImage} resizeMode='contain' />
                 <View style={styles.badge}>
                   <Sparkles size={12} color="#ffffff" />
                   <Text style={styles.badgeText}>{t('auth.trustedBy')}</Text>
                 </View>
               </View>
-              
+
               <Text style={styles.welcomeText}>{t('auth.welcomeBack')}</Text>
-              
+
             </Animated.View>
           </LinearGradient>
-            {/* Login Form */}
-            <Animated.View 
-              style={[
-                styles.formContainer,
-                {
-                  opacity: fadeAnim,
-                  transform: [{ translateY: slideAnim }],
-                },
-              ]}
-            >
-              <View style={styles.inputContainer}>
-                 <View style={[styles.inputWrapper, { backgroundColor: colors.inputBackground, borderColor: errors.email ? colors.error : colors.inputBorder }]}>
-                  <View style={[styles.iconCircle, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
-                    <Mail size={20} color={colors.primary} />
-                  </View>
-                  <TextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder={t('auth.enterEmail')}
-                    placeholderTextColor={colors.inputPlaceholder}
-                    value={email}
-                    onChangeText={(text) => {
-                      setEmail(text.toLowerCase());
-                      if (errors.email) {
-                        setErrors(prev => ({ ...prev, email: undefined }));
-                      }
-                    }}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoComplete="email"
-                    returnKeyType="next"
-                    onSubmitEditing={() => passwordInputRef.current?.focus()}
-                    blurOnSubmit={false}
-                    editable={!isAnyLoading}
-                  />
+          {/* Login Form */}
+          <Animated.View
+            style={[
+              styles.formContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            <View style={styles.inputContainer}>
+              <View style={[styles.inputWrapper, { backgroundColor: colors.inputBackground, borderColor: errors.email ? colors.error : colors.inputBorder }]}>
+                <View style={[styles.iconCircle, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
+                  <Mail size={20} color={colors.primary} />
                 </View>
-                {errors.email && (
-                  <View className='mt-1.5 ml-1'>
-                   <Text style={styles.errorText}>⚠️ {errors.email}</Text>
-                  </View>
-                )}
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  placeholder={t('auth.enterEmail')}
+                  placeholderTextColor={colors.inputPlaceholder}
+                  value={email}
+                  onChangeText={(text) => {
+                    setEmail(text.toLowerCase());
+                    if (errors.email) {
+                      setErrors(prev => ({ ...prev, email: undefined }));
+                    }
+                  }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordInputRef.current?.focus()}
+                  blurOnSubmit={false}
+                  editable={!isAnyLoading}
+                />
               </View>
-
-               <View style={styles.inputContainer}>
-                 <View style={[styles.inputWrapper, { backgroundColor: colors.inputBackground, borderColor: errors.password ? colors.error : colors.inputBorder }]}>
-                  <View style={[styles.iconCircle, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
-                    <Lock size={20} color={colors.primary} />
-                  </View>
-                  <TextInput
-                    ref={passwordInputRef}
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder={t('auth.enterPassword')}
-                    placeholderTextColor={colors.inputPlaceholder}
-                    value={password}
-                    onChangeText={(text) => {
-                      setPassword(text);
-                      if (errors.password) {
-                        setErrors(prev => ({ ...prev, password: undefined }));
-                      }
-                    }}
-                    secureTextEntry={!showPassword}
-                    autoComplete="password"
-                    returnKeyType="done"
-                    onSubmitEditing={handleLogin}
-                    editable={!isAnyLoading}
-                  />
-                  <TouchableOpacity
-                    style={styles.eyeIcon}
-                    onPress={() => setShowPassword(!showPassword)}
-                    disabled={isAnyLoading}
-                  >
-                    {showPassword ? (
-                      <EyeOff size={22} color={colors.textSecondary} />
-                    ) : (
-                      <Eye size={22} color={colors.textSecondary} />
-                    )}
-                  </TouchableOpacity>
+              {errors.email && (
+                <View className='mt-1.5 ml-1'>
+                  <Text style={styles.errorText}>⚠️ {errors.email}</Text>
                 </View>
-                {errors.password && (
-                  <View style={styles.errorContainer}>
-                    <Text style={styles.errorText}>⚠️ {errors.password}</Text>
-                  </View>
-                )}
-              </View>
+              )}
+            </View>
 
-              <Link href="/(auth)/forgot-password" asChild>
-                <TouchableOpacity style={styles.forgotPassword} activeOpacity={0.7} disabled={isAnyLoading}>
-                  <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>{t('auth.forgotPasswordLink')}</Text>
-                </TouchableOpacity>
-              </Link>
-
-              <TouchableOpacity
-              activeOpacity={0.8}
-                style={[styles.loginButton, isAnyLoading && styles.loginButtonDisabled]}
-                onPress={handleLogin}
-                disabled={isAnyLoading}
-              >
-                <LinearGradient
-                  colors={['#16a34a', '#15803d', '#14532d']}
-                   style={styles.loginButtonGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
+            <View style={styles.inputContainer}>
+              <View style={[styles.inputWrapper, { backgroundColor: colors.inputBackground, borderColor: errors.password ? colors.error : colors.inputBorder }]}>
+                <View style={[styles.iconCircle, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
+                  <Lock size={20} color={colors.primary} />
+                </View>
+                <TextInput
+                  ref={passwordInputRef}
+                  style={[styles.input, { color: colors.text }]}
+                  placeholder={t('auth.enterPassword')}
+                  placeholderTextColor={colors.inputPlaceholder}
+                  value={password}
+                  onChangeText={(text) => {
+                    setPassword(text);
+                    if (errors.password) {
+                      setErrors(prev => ({ ...prev, password: undefined }));
+                    }
+                  }}
+                  secureTextEntry={!showPassword}
+                  autoComplete="password"
+                  returnKeyType="done"
+                  onSubmitEditing={handleLogin}
+                  editable={!isAnyLoading}
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setShowPassword(!showPassword)}
+                  disabled={isAnyLoading}
                 >
-                  {isLoading ? (
-                    <ActivityIndicator color="white" size="small" />
+                  {showPassword ? (
+                    <EyeOff size={22} color={colors.textSecondary} />
                   ) : (
-                    <>
-                      <Text style={styles.loginButtonText}>{t('auth.signIn')}</Text>
-                      <ArrowRight size={22} color="white" />
-                    </>
+                    <Eye size={22} color={colors.textSecondary} />
                   )}
-                </LinearGradient>
-              </TouchableOpacity>
-
-              <View style={styles.divider}>
-                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-                <Text style={[styles.dividerText, { color: colors.textSecondary }]}>{t('auth.orContinueWith')}</Text>
-                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+                </TouchableOpacity>
               </View>
+              {errors.password && (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>⚠️ {errors.password}</Text>
+                </View>
+              )}
+            </View>
 
-              <TouchableOpacity
-                activeOpacity={0.8}
-                style={[
-                  styles.googleButton,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
-                  isAnyLoading && styles.googleButtonDisabled
-                ]}
-                onPress={handleGoogleLogin}
-                disabled={isAnyLoading}
+            <Link href="/(auth)/forgot-password" asChild>
+              <TouchableOpacity style={styles.forgotPassword} activeOpacity={0.7} disabled={isAnyLoading}>
+                <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>{t('auth.forgotPasswordLink')}</Text>
+              </TouchableOpacity>
+            </Link>
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[styles.loginButton, isAnyLoading && styles.loginButtonDisabled]}
+              onPress={handleLogin}
+              disabled={isAnyLoading}
+            >
+              <LinearGradient
+                colors={['#16a34a', '#15803d', '#14532d']}
+                style={styles.loginButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
               >
-                {isGoogleLoading ? (
-                  <ActivityIndicator color={colors.textSecondary} size="small" />
+                {isLoading ? (
+                  <ActivityIndicator color="white" size="small" />
                 ) : (
                   <>
-                    <Image 
-                      source={require('../../../assets/images/GoogleFavicon.png')}
-                      style={styles.googleIcon}
-                      resizeMode="contain"
-                    />
-                    <Text style={[styles.googleButtonText, { color: colors.text }]}>{t('auth.continueWithGoogle')}</Text>
+                    <Text style={styles.loginButtonText}>{t('auth.signIn')}</Text>
+                    <ArrowRight size={22} color="white" />
                   </>
                 )}
-              </TouchableOpacity>
+              </LinearGradient>
+            </TouchableOpacity>
 
-              {/* Continue with Phone Button - Task 16.1 */}
-              {/* Requirements: 10.1 */}
-              {/* TEMPORARILY HIDDEN: Phone authentication postponed - uncomment when ready to enable */}
-              {/* <TouchableOpacity
+            <View style={styles.divider}>
+              <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+              <Text style={[styles.dividerText, { color: colors.textSecondary }]}>{t('auth.orContinueWith')}</Text>
+              <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+            </View>
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[
+                styles.googleButton,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+                isAnyLoading && styles.googleButtonDisabled
+              ]}
+              onPress={handleGoogleLogin}
+              disabled={isAnyLoading}
+            >
+              {isGoogleLoading ? (
+                <ActivityIndicator color={colors.textSecondary} size="small" />
+              ) : (
+                <>
+                  <Image
+                    source={require('../../../assets/images/GoogleFavicon.png')}
+                    style={styles.googleIcon}
+                    resizeMode="contain"
+                  />
+                  <Text style={[styles.googleButtonText, { color: colors.text }]}>{t('auth.continueWithGoogle')}</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {/* Continue with Phone Button - Task 16.1 */}
+            {/* Requirements: 10.1 */}
+            {/* TEMPORARILY HIDDEN: Phone authentication postponed - uncomment when ready to enable */}
+            {/* <TouchableOpacity
                 style={[
                   styles.phoneButton,
                   { backgroundColor: colors.surface, borderColor: colors.border },
@@ -604,74 +615,74 @@ export default function LoginScreen() {
                 <Text style={[styles.phoneButtonText, { color: colors.text }]}>{t('auth.continueWithPhone') || 'Continue with Phone'}</Text>
               </TouchableOpacity> */}
 
-              {/* Apple Sign-In Button (iOS only) - Task 8.1 */}
-              {/* Requirements: 6.1, 6.2, 6.3 */}
-              {Platform.OS === 'ios' && isAppleAvailable && (
-                <View style={styles.appleButtonContainer}>
-                  {isAppleLoading ? (
-                    <View style={[styles.appleButtonLoading, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                      <ActivityIndicator color={colors.textSecondary} size="small" />
-                    </View>
-                  ) : (
-                    <AppleAuthentication.AppleAuthenticationButton
-                      buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-                      buttonStyle={isDark 
-                        ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE 
-                        : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
-                      }
-                      cornerRadius={spacing(14)}
-                      style={styles.appleButton}
-                      onPress={handleAppleLogin}
-                    />
-                  )}
-                </View>
-              )}
+            {/* Apple Sign-In Button (iOS only) - Task 8.1 */}
+            {/* Requirements: 6.1, 6.2, 6.3 */}
+            {Platform.OS === 'ios' && isAppleAvailable && (
+              <View style={styles.appleButtonContainer}>
+                {isAppleLoading ? (
+                  <View style={[styles.appleButtonLoading, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <ActivityIndicator color={colors.textSecondary} size="small" />
+                  </View>
+                ) : (
+                  <AppleAuthentication.AppleAuthenticationButton
+                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                    buttonStyle={isDark
+                      ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                      : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                    }
+                    cornerRadius={spacing(14)}
+                    style={styles.appleButton}
+                    onPress={handleAppleLogin}
+                  />
+                )}
+              </View>
+            )}
+          </Animated.View>
+
+          {/* Footer + Trust Indicators wrapped together to ensure spacing */}
+          <View style={{ paddingBottom: spacing(24), paddingHorizontal: spacing(24) }}>
+            {/* Footer */}
+            <Animated.View
+              style={[
+                styles.footer,
+                { opacity: fadeAnim }
+              ]}
+            >
+              <Text style={[styles.footerText, { color: colors.textSecondary }]}>{t('auth.dontHaveAccount')}</Text>
+              <Link href="/(auth)/register" asChild>
+                <TouchableOpacity disabled={isAnyLoading}>
+                  <Text style={[styles.footerLink, { color: colors.primary }]}>{t('auth.signUpLink')}</Text>
+                </TouchableOpacity>
+              </Link>
             </Animated.View>
 
-            {/* Footer + Trust Indicators wrapped together to ensure spacing */}
-            <View style={{ paddingBottom: spacing(24), paddingHorizontal: spacing(24) }}>
-              {/* Footer */}
-              <Animated.View 
-                style={[
-                  styles.footer,
-                  { opacity: fadeAnim }
-                ]}
-              >
-                <Text style={[styles.footerText, { color: colors.textSecondary }]}>{t('auth.dontHaveAccount')}</Text>
-                <Link href="/(auth)/register" asChild>
-                  <TouchableOpacity disabled={isAnyLoading}>
-                    <Text style={[styles.footerLink, { color: colors.primary }]}>{t('auth.signUpLink')}</Text>
-                  </TouchableOpacity>
-                </Link>
-              </Animated.View>
-
-              {/* Trust Indicators */}
-              <Animated.View 
-                style={[
-                  styles.trustIndicators,
-                  { 
-                    backgroundColor: isDark ? '#064e3b' : '#f0fdf4',
-                    borderColor: isDark ? '#16a34a' : '#bbf7d0',
-                    opacity: fadeAnim 
-                  }
-                ]}
-              >
-                <View style={styles.trustItem}>
-                  <Shield size={18} color="#10b981" />
-                  <Text style={[styles.trustText, { color: isDark ? '#86efac' : '#166534' }]}>{t('auth.secure')}</Text>
-                </View>
-                <View style={[styles.trustDivider, { backgroundColor: isDark ? '#16a34a' : '#bbf7d0' }]} />
-                <View style={styles.trustItem}>
-                  <Zap size={18} color="#f59e0b" />
-                  <Text style={[styles.trustText, { color: isDark ? '#86efac' : '#166534' }]}>{t('auth.fastPayout')}</Text>
-                </View>
-                <View style={[styles.trustDivider, { backgroundColor: isDark ? '#16a34a' : '#bbf7d0' }]} />
-                <View style={styles.trustItem}>
-                  <Sparkles size={18} color="#8b5cf6" />
-                  <Text style={[styles.trustText, { color: isDark ? '#86efac' : '#166534' }]}>{t('auth.bestRates')}</Text>
-                </View>
-              </Animated.View>
-            </View>
+            {/* Trust Indicators */}
+            <Animated.View
+              style={[
+                styles.trustIndicators,
+                {
+                  backgroundColor: isDark ? '#064e3b' : '#f0fdf4',
+                  borderColor: isDark ? '#16a34a' : '#bbf7d0',
+                  opacity: fadeAnim
+                }
+              ]}
+            >
+              <View style={styles.trustItem}>
+                <Shield size={18} color="#10b981" />
+                <Text style={[styles.trustText, { color: isDark ? '#86efac' : '#166534' }]}>{t('auth.secure')}</Text>
+              </View>
+              <View style={[styles.trustDivider, { backgroundColor: isDark ? '#16a34a' : '#bbf7d0' }]} />
+              <View style={styles.trustItem}>
+                <Zap size={18} color="#f59e0b" />
+                <Text style={[styles.trustText, { color: isDark ? '#86efac' : '#166534' }]}>{t('auth.fastPayout')}</Text>
+              </View>
+              <View style={[styles.trustDivider, { backgroundColor: isDark ? '#16a34a' : '#bbf7d0' }]} />
+              <View style={styles.trustItem}>
+                <Sparkles size={18} color="#8b5cf6" />
+                <Text style={[styles.trustText, { color: isDark ? '#86efac' : '#166534' }]}>{t('auth.bestRates')}</Text>
+              </View>
+            </Animated.View>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -691,20 +702,20 @@ export default function LoginScreen() {
             >
               <X size={24} color={colors.textSecondary} />
             </TouchableOpacity>
-            
+
             <View style={[styles.modalIconContainer, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
               <LinkIcon size={32} color={colors.primary} />
             </View>
-            
+
             <Text style={[styles.modalTitle, { color: colors.text }]}>
               {t('auth.linkAccountTitle') || 'Link Your Account?'}
             </Text>
-            
+
             <Text style={[styles.modalMessage, { color: colors.textSecondary }]}>
-              {t('auth.linkAccountMessage', { email: pendingLinkEmail }) || 
+              {t('auth.linkAccountMessage', { email: pendingLinkEmail }) ||
                 `An account with the email ${pendingLinkEmail} already exists. Would you like to link your Apple ID to this existing account?`}
             </Text>
-            
+
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButtonCancel, { borderColor: colors.border }]}
@@ -715,7 +726,7 @@ export default function LoginScreen() {
                   {t('common.cancel') || 'Cancel'}
                 </Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={styles.modalButtonConfirm}
                 onPress={() => handleConfirmLink(true)}

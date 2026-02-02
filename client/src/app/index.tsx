@@ -9,17 +9,17 @@ import { useTheme } from '../context/ThemeContext';
 import SplashScreen from '../components/SplashScreen';
 
 
-export default function IndexScreen(){
+export default function IndexScreen() {
   const router = useRouter();
   const segments = useSegments();
-  const {isLanguageSet, isLoading: isLanguageLoading} = useLocalization();
+  const { isLanguageSet, isLoading: isLanguageLoading } = useLocalization();
   const { colors, isDark } = useTheme();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthCheckDone, setIsAuthCheckDone] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const hasNavigatedRef = useRef(false);
 
-   useEffect(() => {
+  useEffect(() => {
     let isActive = true;
     const runInitialChecks = async () => {
       try {
@@ -42,16 +42,16 @@ export default function IndexScreen(){
   const handleSplashFinish = () => {
     setShowSplash(false);
   };
-  useEffect(()=>{
+  useEffect(() => {
     // Wait for splash screen, auth check, and language initialization to complete
     if (showSplash || !isAuthCheckDone || isLanguageLoading) return;
-    
+
     // Prevent duplicate navigation - only navigate once from index
     if (hasNavigatedRef.current) {
       console.log('🛑 Navigation already performed, skipping...');
       return;
     }
-    
+
     // Check if we're still on the index route - if not, don't navigate
     // This prevents race conditions when auth state changes after user already navigated
     const currentRoute = '/' + segments.join('/');
@@ -60,65 +60,64 @@ export default function IndexScreen(){
       hasNavigatedRef.current = true;
       return;
     }
-    
+
     console.log('🚀 Navigation Debug:', {
       isLanguageSet,
       isAuthenticated: isAuthenticated,
     });
-    
+
     let routeToNavigate = ""
-    
+
     /**
      * Navigation Flow Priority:
      * Priority 0: Language Selection (highest priority)
      *   - First-time users must select language before anything else
      *   - Returning users skip this step (language already set)
      * 
-     * Priority 1: Authentication
-     *   - Authenticated users go to home
-     *   - Non-authenticated users go to login
+     * Priority 1: Home Screen (GUEST-ACCESSIBLE)
+     *   - All users (authenticated and guests) go to home
+     *   - Authentication is now CONTEXTUAL - triggered only when needed
+     *   - This follows modern e-commerce patterns (browse before buy)
      * 
-     * Note: Location/serviceability check is now handled in the Sell screen
-     * Users can browse the app freely, but will be prompted for location
-     * when they try to sell scrap.
+     * Note: Auth checks are now handled by:
+     * - useAuthGuard hook for protected actions
+     * - Individual screens that require authentication
+     * - Sell flow auth gate at step 3
      */
-    
+
     // Priority 0: Check language selection first
     if (!isLanguageSet) {
       console.log('➡️ Navigating to: language-selection (no language set)');
       routeToNavigate = '/(auth)/language-selection';
     }
-    // Priority 1: Check authentication
+    // Priority 1: Always go to home (guests welcome!)
     else {
-      if (isAuthenticated) {
-        console.log('➡️ Navigating to: tabs/home (authenticated)');
-        routeToNavigate = '/(tabs)/home'; 
-      } else {
-        console.log('➡️ Navigating to: login (not authenticated)');
-        routeToNavigate = '/(auth)/login';
-      }
+      console.log('➡️ Navigating to: tabs/home (guest-accessible entry)');
+      routeToNavigate = '/(tabs)/home';
+      // Note: Auth state is still tracked for conditional UI rendering,
+      // but no longer blocks app entry
     }
-    
-    if(routeToNavigate) {
+
+    if (routeToNavigate) {
       hasNavigatedRef.current = true;
       router.replace(routeToNavigate);
     }
-  },[
-  showSplash,
-  isAuthCheckDone,
-  isLanguageLoading,
-  isLanguageSet,
-  isAuthenticated,
-  router,
-  segments
-]);
+  }, [
+    showSplash,
+    isAuthCheckDone,
+    isLanguageLoading,
+    isLanguageSet,
+    isAuthenticated,
+    router,
+    segments
+  ]);
 
-if(showSplash) return <SplashScreen onFinish={handleSplashFinish} />;
+  if (showSplash) return <SplashScreen onFinish={handleSplashFinish} />;
 
-return (
+  return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar style={isDark ? "light" : "dark"} />
     </View>
-)
+  )
 }
 

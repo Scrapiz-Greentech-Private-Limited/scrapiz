@@ -38,12 +38,12 @@ import {
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
 import { AuthService, ProductSummary, AddressSummary, CategorySummary } from '../../api/apiService';
 import { useReferral } from '../../context/ReferralContext';
-import {useOrderCalculationStore} from '../../store/orderCalculationStore';
+import { useOrderCalculationStore } from '../../store/orderCalculationStore';
 import { RemoteImage } from '../../components/RemoteImage';
 import { useTheme } from '../../context/ThemeContext';
 import { sellTutorialConfig } from '../../config/tutorials/homeTutorial';
@@ -52,16 +52,24 @@ import TutorialOverlay from '../../components/TutorialOverlay';
 import { useLocation } from '../../context/LocationContext';
 import SellLocationGate from '../../components/SellLocationGate';
 import SellServiceUnavailable from '../../components/SellServiceUnavailable';
-import { 
-  hasSellServiceabilityBeenChecked, 
+import {
+  hasSellServiceabilityBeenChecked,
   getSellServiceAvailability,
   setSellServiceability,
-  resetSellServiceability 
+  resetSellServiceability
 } from '../../utils/sellServiceability';
 import { isSellScreenGateEnforcedCached } from '../../utils/sellScreenEnforcement';
 import FeedbackModal from '../../components/FeedbackModal';
 import NetworkRetryOverlay from '../../components/NetworkRetryOverlay';
 import { useNetworkRetry } from '../../hooks/useNetworkRetry';
+import { useAuthGuard } from '../../hooks/useAuthGuard';
+import {
+  saveGuestOrderState,
+  loadGuestOrderState,
+  clearGuestOrderState,
+  hasGuestOrderState,
+  type GuestOrderState
+} from '../../utils/guestOrderPersistence';
 const { width, height } = Dimensions.get('window');
 
 type SelectedItem = {
@@ -94,7 +102,7 @@ const getImageForProduct = (product: ProductSummary) => {
   if (product.image_url) {
     return { uri: product.image_url };
   }
-  
+
   // Priority 2: Fallback to local assets based on product name
   const name = product.name.toLowerCase();
   if (name.includes('newspaper')) return require('../../../assets/images/Scrap_Rates_Photos/Newspaper.jpg');
@@ -150,11 +158,11 @@ export default function SellScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
   const { locationSet, serviceAvailable } = useLocation();
-  
+
   // Serviceability gate state
   const [screenState, setScreenState] = useState<SellScreenState>('checking');
   const [enforceSellGate, setEnforceSellGate] = useState<boolean>(true); // Default to enforced
-  
+
   // Check serviceability on mount
   useEffect(() => {
     checkServiceability();
@@ -164,19 +172,19 @@ export default function SellScreen() {
     try {
       // First, check if sell screen gating is enforced from backend
       const shouldEnforce = await isSellScreenGateEnforcedCached();
-      
+
       setEnforceSellGate(shouldEnforce);
-      
+
       // If enforcement is disabled, skip gating logic entirely
       if (!shouldEnforce) {
         console.log('🚀 Sell screen gate enforcement disabled - allowing direct access');
         setScreenState('serviceable');
         return;
       }
-      
+
       // Original gating logic (only runs if enforcement is enabled)
       console.log('🔒 Sell screen gate enforcement enabled - checking serviceability');
-      
+
       // If location is already set and service is available from context, allow access
       if (locationSet && serviceAvailable) {
         await setSellServiceability(true);
@@ -186,7 +194,7 @@ export default function SellScreen() {
 
       // Check if we've already done the serviceability check for sell
       const hasChecked = await hasSellServiceabilityBeenChecked();
-      
+
       if (hasChecked) {
         const isAvailable = await getSellServiceAvailability();
         if (isAvailable) {
@@ -239,7 +247,7 @@ export default function SellScreen() {
   // Show location gate if not checked yet
   if (screenState === 'location_gate') {
     return (
-      <SellLocationGate 
+      <SellLocationGate
         onServiceable={handleServiceable}
         onNotServiceable={handleNotServiceable}
       />
@@ -249,8 +257,8 @@ export default function SellScreen() {
   // Show service unavailable screen
   if (screenState === 'not_serviceable') {
     return (
-      <SellServiceUnavailable 
-        onGoHome={handleGoHome} 
+      <SellServiceUnavailable
+        onGoHome={handleGoHome}
         onRetryPincode={handleRetryPincode}
       />
     );
@@ -264,7 +272,13 @@ export default function SellScreen() {
 function SellScreenContent() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
-  
+
+  // Auth guard for guest flow - check if user is authenticated
+  const { isGuest, isAuthenticated } = useAuthGuard();
+
+  // Get step parameter for restoring guest order flow after authentication
+  const { step: stepParam } = useLocalSearchParams<{ step?: string }>();
+
   const [products, setProducts] = useState<ProductSummary[]>([]);
   const [categories, setCategories] = useState<CategorySummary[]>([]);
   const [addresses, setAddresses] = useState<AddressSummary[]>([]);
@@ -276,11 +290,11 @@ function SellScreenContent() {
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
   const [loadingData, setLoadingData] = useState(false);
   const [submittingOrder, setSubmittingOrder] = useState(false);
-  
+
   // Feedback modal state
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [lastOrderId, setLastOrderId] = useState<number | null>(null);
-  
+
   // Tutorial system integration
   const { setStepTarget, currentScreen } = useTutorialStore();
   const stepIndicatorRef = useRef<View>(null);
@@ -289,7 +303,7 @@ function SellScreenContent() {
   const dateTimeRef = useRef<View>(null);
   const addressRef = useRef<View>(null);
   const summaryRef = useRef<View>(null);
-    const {
+  const {
     items: selectedItems,
     estimatedValue,
     referralBonus,
@@ -304,7 +318,7 @@ function SellScreenContent() {
     resetOrder,
     setTotalPayout,
   } = useOrderCalculationStore();
-  
+
   const [addressForm, setAddressForm] = useState({
     title: '',
     addressLine: '',
@@ -312,21 +326,21 @@ function SellScreenContent() {
     city: '',
     pinCode: ''
   });
-  
+
   const [contactForm, setContactForm] = useState({
     name: '',
     mobile: ''
   });
-  
-  const [errors, setErrors] = useState<{[key: string]: string}>({});
+
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [notes, setNotes] = useState('');
-  
+
   // Quantity selector modal state
   const [showQuantityModal, setShowQuantityModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductSummary | null>(null);
   const [tempQuantity, setTempQuantity] = useState('1');
-  
+
   // Referral wallet - use context
   const { walletBalance, setWalletBalance, updateBalanceAndCache, applyReferralDiscount } = useReferral();
   const [useReferralBalance, setUseReferralBalance] = useState(false);
@@ -343,7 +357,7 @@ function SellScreenContent() {
       setProducts(prods);
       setCategories(cats);
       setAddresses(addrs);
-      
+
       if (addrs.length > 0) {
         setSelectedAddressId(addrs[0].id);
         setUseNewAddress(false);
@@ -370,16 +384,97 @@ function SellScreenContent() {
     maxRetries: 3,
   });
 
-   useEffect(()=>{
+  useEffect(() => {
     setAvailableReferralBalance(walletBalance);
-  },[walletBalance, setAvailableReferralBalance])
+  }, [walletBalance, setAvailableReferralBalance])
 
   // Load products, addresses, and user data
   useEffect(() => {
     loadData();
     loadUserData();
   }, []);
-  
+
+  /**
+   * Guest Order Flow Restoration
+   * When a guest returns from authentication with step parameter,
+   * restore their previous order state from AsyncStorage
+   */
+  useEffect(() => {
+    const restoreGuestOrderState = async () => {
+      // Only proceed if:
+      // 1. User is now authenticated (just came back from login)
+      // 2. There's a step parameter in the URL
+      // 3. There's saved guest order state
+      if (!isAuthenticated || !stepParam) {
+        return;
+      }
+
+      try {
+        // Check if there's saved guest order state
+        const hasSavedState = await hasGuestOrderState();
+        if (!hasSavedState) {
+          console.log('📦 No saved guest order state found');
+          // Still navigate to the requested step
+          const targetStep = parseInt(stepParam, 10);
+          if (targetStep >= 1 && targetStep <= 4) {
+            setCurrentStep(targetStep);
+          }
+          return;
+        }
+
+        // Load the saved state
+        const savedState = await loadGuestOrderState();
+        if (!savedState) {
+          console.log('📦 Guest order state expired or invalid');
+          return;
+        }
+
+        console.log('📦 Restoring guest order state:', {
+          itemCount: savedState.items?.length || 0,
+          date: savedState.selectedDate,
+          time: savedState.selectedTime,
+          step: stepParam,
+        });
+
+        // Restore items to Zustand store
+        if (savedState.items && savedState.items.length > 0) {
+          setItems(savedState.items);
+        }
+
+        // Restore date/time selections
+        if (savedState.selectedDate) {
+          setSelectedDate(savedState.selectedDate);
+        }
+        if (savedState.selectedTime) {
+          setSelectedTime(savedState.selectedTime);
+        }
+
+        // Set the step from URL parameter
+        const targetStep = parseInt(stepParam, 10);
+        if (targetStep >= 1 && targetStep <= 4) {
+          setCurrentStep(targetStep);
+          // Skip guidelines modal when returning from auth
+          setShowGuidelinesModal(false);
+        }
+
+        // Clear the saved state after restoration
+        await clearGuestOrderState();
+        console.log('✅ Guest order state restored and cleared');
+
+        Toast.show({
+          type: 'success',
+          text1: 'Welcome back!',
+          text2: 'Your order has been restored. Please review and confirm.',
+        });
+      } catch (error) {
+        console.error('Error restoring guest order state:', error);
+      }
+    };
+
+    restoreGuestOrderState();
+  }, [isAuthenticated, stepParam, setItems]);
+
+
   // Tutorial system: Measure element positions when tutorial is active
   useEffect(() => {
     if (currentScreen === 'sell') {
@@ -389,35 +484,35 @@ function SellScreenContent() {
         stepIndicatorRef.current?.measure((x, y, width, height, pageX, pageY) => {
           setStepTarget('sell-step-indicator', { x: pageX, y: pageY, width, height });
         });
-        
+
         // Measure item selection (first category section)
         itemSelectionRef.current?.measure((x, y, width, height, pageX, pageY) => {
           setStepTarget('sell-item-selection', { x: pageX, y: pageY, width, height });
         });
-        
+
         // Measure quantity controls (if items are selected)
         if (selectedItems.length > 0) {
           quantityControlsRef.current?.measure((x, y, width, height, pageX, pageY) => {
             setStepTarget('sell-quantity', { x: pageX, y: pageY, width, height });
           });
         }
-        
+
         // Measure date/time selection
         dateTimeRef.current?.measure((x, y, width, height, pageX, pageY) => {
           setStepTarget('sell-datetime', { x: pageX, y: pageY, width, height });
         });
-        
+
         // Measure address section
         addressRef.current?.measure((x, y, width, height, pageX, pageY) => {
           setStepTarget('sell-address', { x: pageX, y: pageY, width, height });
         });
-        
+
         // Measure summary section
         summaryRef.current?.measure((x, y, width, height, pageX, pageY) => {
           setStepTarget('sell-summary', { x: pageX, y: pageY, width, height });
         });
       }, 100);
-      
+
       return () => clearTimeout(timer);
     }
   }, [currentScreen, currentStep, selectedItems.length, setStepTarget]);
@@ -432,7 +527,7 @@ function SellScreenContent() {
       console.log('Could not load user data:', error);
     }
   };
- 
+
 
   const loadData = async () => {
     const isConnected = await checkNetworkAndLoad();
@@ -441,11 +536,11 @@ function SellScreenContent() {
         await loadDataFn();
       } catch (error: any) {
         const errorMsg = error.message || 'Failed to load data';
-        const isNetworkError = 
+        const isNetworkError =
           errorMsg.toLowerCase().includes('network') ||
           errorMsg.toLowerCase().includes('internet') ||
           errorMsg.toLowerCase().includes('connection');
-        
+
         if (isNetworkError) {
           startRetryFlow(errorMsg);
         }
@@ -469,40 +564,40 @@ function SellScreenContent() {
   };
 
   const pickImage = async () => {
-  const MAX_IMAGES = 5;
+    const MAX_IMAGES = 5;
 
-  if (selectedImages.length >= MAX_IMAGES) {
-    Alert.alert(
-      'Limit Reached',
-      `You can upload a maximum of ${MAX_IMAGES} images per order.`
-    );
-    return;
-  }
-
-  const result = await ImagePicker.launchImageLibraryAsync({
-    allowsMultipleSelection: true,
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    quality: 0.8,
-    selectionLimit: MAX_IMAGES - selectedImages.length, // Android-safe
-  });
-
-  if (!result.canceled) {
-    const compressedUris: string[] = [];
-
-    for (const asset of result.assets) {
-      const compressedUri = await compressImage(asset.uri);
-      compressedUris.push(compressedUri);
+    if (selectedImages.length >= MAX_IMAGES) {
+      Alert.alert(
+        'Limit Reached',
+        `You can upload a maximum of ${MAX_IMAGES} images per order.`
+      );
+      return;
     }
 
-    setSelectedImages(prev => [...prev, ...compressedUris]);
-
-    Toast.show({
-      type: 'success',
-      text1: 'Images Added',
-      text2: `${compressedUris.length} images ready`,
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsMultipleSelection: true,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      selectionLimit: MAX_IMAGES - selectedImages.length, // Android-safe
     });
-  }
-};
+
+    if (!result.canceled) {
+      const compressedUris: string[] = [];
+
+      for (const asset of result.assets) {
+        const compressedUri = await compressImage(asset.uri);
+        compressedUris.push(compressedUri);
+      }
+
+      setSelectedImages(prev => [...prev, ...compressedUris]);
+
+      Toast.show({
+        type: 'success',
+        text1: 'Images Added',
+        text2: `${compressedUris.length} images ready`,
+      });
+    }
+  };
 
   const removeImage = (uri: string) => {
     setSelectedImages(prev => prev.filter(imageUri => imageUri !== uri));
@@ -523,7 +618,7 @@ function SellScreenContent() {
 
   const handleQuantityConfirm = () => {
     if (!selectedProduct) return;
-    
+
     const quantity = parseFloat(tempQuantity);
     if (isNaN(quantity) || quantity <= 0) {
       Toast.show({
@@ -567,13 +662,13 @@ function SellScreenContent() {
 
   const updateQuantity = (id: number, change: number) => {
     const item = selectedItems.find(i => i.id === id);
-    if(item){
-       const newQuantity = item.quantity + change;
-       if (newQuantity <= 0) {
-         removeItemFromStore(id);
-       } else {
-         updateItemQuantity(id, newQuantity);
-       }
+    if (item) {
+      const newQuantity = item.quantity + change;
+      if (newQuantity <= 0) {
+        removeItemFromStore(id);
+      } else {
+        updateItemQuantity(id, newQuantity);
+      }
     }
   };
 
@@ -645,7 +740,7 @@ function SellScreenContent() {
   };
 
   const validateForm = (): boolean => {
-    const newErrors: {[key: string]: string} = {};
+    const newErrors: { [key: string]: string } = {};
 
     if (currentStep === 1 && selectedItems.length === 0) {
       newErrors.items = '📦 Please select at least one item to sell';
@@ -667,7 +762,7 @@ function SellScreenContent() {
           newErrors.savedAddress = '📍 Please select a saved address';
         }
       }
-      
+
       if (!contactForm.name.trim()) newErrors.name = '👤 Name is required';
       if (!contactForm.mobile.trim()) newErrors.mobile = '📱 Mobile number is required';
       else if (!validateMobileNumber(contactForm.mobile)) {
@@ -702,14 +797,65 @@ function SellScreenContent() {
     resetOrder();
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     setErrors({});
-    
-    setTimeout(() => {
+
+    setTimeout(async () => {
       if (!validateForm()) {
         return;
       }
-      
+
+      /**
+       * AUTH GATE: Step 2 → Step 3 Transition
+       * Guests can complete Steps 1-2 (item selection, scheduling),
+       * but must authenticate before proceeding to Step 3 (address/confirmation)
+       */
+      if (currentStep === 2 && isGuest) {
+        try {
+          // Prepare order state to save
+          const orderState: GuestOrderState = {
+            items: selectedItems.map(item => ({
+              id: item.id,
+              name: item.name,
+              rate: item.rate,
+              unit: item.unit,
+              quantity: item.quantity,
+              image: item.image,
+            })),
+            selectedDate,
+            selectedTime,
+            currentStep: 3, // They should return to step 3
+          };
+
+          // Save order state to AsyncStorage
+          await saveGuestOrderState(orderState);
+          console.log('📦 Guest order state saved, redirecting to auth');
+
+          // Show informative toast
+          Toast.show({
+            type: 'info',
+            text1: 'Sign in required',
+            text2: 'Please sign in to complete your order. Your cart has been saved!',
+            visibilityTime: 3000,
+          });
+
+          // Redirect to login with returnTo parameter
+          // The returnTo URL includes step=3 so we know to restore state
+          const returnTo = encodeURIComponent('/(tabs)/sell?step=3');
+          router.push(`/(auth)/login?returnTo=${returnTo}`);
+          return;
+        } catch (error) {
+          console.error('Error saving guest order state:', error);
+          Toast.show({
+            type: 'error',
+            text1: 'Error',
+            text2: 'Unable to save your order. Please try again.',
+          });
+          return;
+        }
+      }
+
+      // Normal step progression
       if (currentStep < 4) {
         setCurrentStep(currentStep + 1);
       } else {
@@ -734,7 +880,7 @@ function SellScreenContent() {
       }));
 
       let addressId = selectedAddressId;
-      
+
       if (useNewAddress) {
         const newAddr = await AuthService.createAddress({
           name: addressForm.title,
@@ -755,31 +901,31 @@ function SellScreenContent() {
       const orderEstimatedValue = estimatedValue;
 
       const result = await AuthService.createOrder(
-        itemsPayload, 
-        addressId || undefined, 
+        itemsPayload,
+        addressId || undefined,
         selectedImages,
         orderEstimatedValue
       );
 
       const orderId = result.order_id;
       const orderNumber = result.order_no;
-      
+
       const orderReferralBonus = useReferralBonus ? referralBonus : 0;
       const orderTotalPayout = useReferralBonus ? totalPayout : estimatedValue;
-      
 
-      
+
+
 
       // If using referral balance, redeem it via backend
       if (useReferralBonus && orderReferralBonus > 0) {
         try {
           // Call backend to redeem balance
           await AuthService.redeemReferralBalance(orderId, orderReferralBonus);
-          
+
           // Update local wallet balance and cache it
           const newBalance = Math.max(0, walletBalance - orderReferralBonus);
           await updateBalanceAndCache(newBalance);
-          
+
           Toast.show({
             type: 'success',
             text1: 'Referral Applied',
@@ -806,11 +952,11 @@ function SellScreenContent() {
       setLastOrderId(orderId);
 
       Alert.alert(
-        '✅ Booking Confirmed!', 
+        '✅ Booking Confirmed!',
         message,
         [
-          { 
-            text: '📦 View Order', 
+          {
+            text: '📦 View Order',
             onPress: () => {
               resetForm();
               router.push(`/profile/orders/${orderId}` as any);
@@ -889,22 +1035,22 @@ function SellScreenContent() {
     <View style={styles.stepContent}>
       <Text style={[styles.stepTitle, { color: colors.text }]}>Select Items to Sell</Text>
       <Text style={[styles.stepSubtitle, { color: colors.textSecondary }]}>Choose the scrap materials you want to sell</Text>
-      
+
       {loadingData ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading products...</Text>
         </View>
       ) : (
-        <ScrollView 
-          style={styles.categoriesContainer} 
+        <ScrollView
+          style={styles.categoriesContainer}
           showsVerticalScrollIndicator={false}
           nestedScrollEnabled={true}
           contentContainerStyle={{ paddingBottom: 16 }}
         >
           {Object.entries(groupedProducts).map(([categoryId, categoryProducts], index) => (
-            <View 
-              key={categoryId} 
+            <View
+              key={categoryId}
               ref={index === 0 ? itemSelectionRef : null}
               style={styles.categorySection}
             >
@@ -916,27 +1062,27 @@ function SellScreenContent() {
                   {getCategoryName(Number(categoryId))}
                 </Text>
               </LinearGradient>
-              
+
               <View style={styles.categoryItems}>
                 {categoryProducts.map((product) => {
                   const productImage = getImageForProduct(product);
                   const fallbackImage = getFallbackImageForProduct(product.name);
                   const selectedItem = selectedItems.find(item => item.id === product.id);
                   const isSelected = !!selectedItem;
-                  
+
                   return (
                     <View
                       key={product.id}
                       style={[
-                        styles.itemCard, 
+                        styles.itemCard,
                         { backgroundColor: colors.surface, borderColor: colors.border },
                         isSelected && { backgroundColor: isDark ? '#064e3b' : '#f0fdf4', borderColor: colors.primary, borderWidth: 2 }
                       ]}
                     >
                       <View style={styles.itemLeft}>
                         {productImage && (
-                          <RemoteImage 
-                            source={productImage} 
+                          <RemoteImage
+                            source={productImage}
                             fallback={fallbackImage}
                             style={styles.itemIconImage}
                             showLoadingIndicator={false}
@@ -944,11 +1090,11 @@ function SellScreenContent() {
                         )}
                         <View style={styles.itemInfo}>
                           <Text
-                        style={[styles.itemName, { color: colors.text }]}
-                        numberOfLines={1}
-                    ellipsizeMode="tail"
-                      >
-                      {product.name}
+                            style={[styles.itemName, { color: colors.text }]}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                          >
+                            {product.name}
                           </Text>
                           <Text style={[styles.itemRate, { color: colors.primary }]}>
                             ₹{product.min_rate}-{product.max_rate}/{product.unit}
@@ -958,7 +1104,7 @@ function SellScreenContent() {
                           </Text>
                         </View>
                       </View>
-                      
+
                       {isSelected ? (
                         <View style={styles.itemActions}>
                           <TouchableOpacity
@@ -1002,23 +1148,23 @@ function SellScreenContent() {
               <View key={item.id} style={[styles.selectedItemCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <View style={styles.selectedItemLeft}>
                   {item.image && (
-                    <RemoteImage 
-                      source={item.image} 
+                    <RemoteImage
+                      source={item.image}
                       fallback={fallbackImage}
                       style={styles.selectedItemIconImage}
                       showLoadingIndicator={false}
                     />
                   )}
                   <View>
-                    <Text style={[styles.selectedItemName, { color: colors.text } ]}
-                    numberOfLines={1}
-                    ellipsizeMode='tail'>{item.name}</Text>
+                    <Text style={[styles.selectedItemName, { color: colors.text }]}
+                      numberOfLines={1}
+                      ellipsizeMode='tail'>{item.name}</Text>
                     <Text style={styles.selectedItemRate}>
                       ₹{Math.round(item.rate)}/{item.unit}
                     </Text>
                   </View>
                 </View>
-                <View 
+                <View
                   ref={index === 0 ? quantityControlsRef : null}
                   style={styles.quantityControls}
                 >
@@ -1058,17 +1204,17 @@ function SellScreenContent() {
     <View style={styles.stepContent}>
       <Text style={[styles.stepTitle, { color: colors.text }]}>Schedule Pickup</Text>
       <Text style={[styles.stepSubtitle, { color: colors.textSecondary }]}>Choose your preferred date and time</Text>
-      
+
       <View ref={dateTimeRef} style={styles.dateSection}>
         <Text style={[styles.sectionLabel, { color: colors.text }]}>Select Date</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.datesScroll}>
           {Array.from({ length: 7 }, (_, i) => {
             const date = new Date();
             date.setDate(date.getDate() + i);
-            const dateStr = date.toLocaleDateString('en-US', { 
-              weekday: 'short', 
-              month: 'short', 
-              day: 'numeric' 
+            const dateStr = date.toLocaleDateString('en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric'
             });
             return (
               <TouchableOpacity
@@ -1126,9 +1272,9 @@ function SellScreenContent() {
     <View style={styles.stepContent}>
       <Text style={[styles.stepTitle, { color: colors.text }]}>Contact & Address</Text>
       <Text style={[styles.stepSubtitle, { color: colors.textSecondary }]}>Provide your contact details and pickup address</Text>
-      
+
       {/* Contact Information */}
-      <View 
+      <View
         ref={addressRef}
         style={[styles.contactCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
       >
@@ -1136,7 +1282,7 @@ function SellScreenContent() {
           <User size={20} color={colors.text} />
           <Text style={[styles.contactHeaderTitle, { color: colors.text }]}>Contact Information</Text>
         </View>
-        
+
         <View style={styles.contactForm}>
           <View style={styles.formGroup}>
             <Text style={[styles.formLabel, { color: colors.text }]}>Full Name <Text style={styles.required}>*</Text></Text>
@@ -1174,7 +1320,7 @@ function SellScreenContent() {
           </View>
         </View>
       </View>
-      
+
       <View style={[styles.addressCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View style={styles.addressHeader}>
           <MapPin size={20} color={colors.text} />
@@ -1184,8 +1330,8 @@ function SellScreenContent() {
         <View style={[styles.addressTabs, { backgroundColor: isDark ? '#1f2937' : '#f3f4f6' }]}>
           <TouchableOpacity
             style={[
-              styles.addressTab, 
-              useNewAddress && { 
+              styles.addressTab,
+              useNewAddress && {
                 backgroundColor: isDark ? '#374151' : 'white',
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 1 },
@@ -1202,8 +1348,8 @@ function SellScreenContent() {
             }}
           >
             <Text style={[
-              styles.addressTabText, 
-              { color: isDark ? '#9ca3af' : '#6b7280' }, 
+              styles.addressTabText,
+              { color: isDark ? '#9ca3af' : '#6b7280' },
               useNewAddress && { color: isDark ? '#f9fafb' : '#111827', fontWeight: '600' }
             ]}>
               Add New Address
@@ -1211,8 +1357,8 @@ function SellScreenContent() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[
-              styles.addressTab, 
-              !useNewAddress && { 
+              styles.addressTab,
+              !useNewAddress && {
                 backgroundColor: isDark ? '#374151' : 'white',
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 1 },
@@ -1232,8 +1378,8 @@ function SellScreenContent() {
             }}
           >
             <Text style={[
-              styles.addressTabText, 
-              { color: isDark ? '#9ca3af' : '#6b7280' }, 
+              styles.addressTabText,
+              { color: isDark ? '#9ca3af' : '#6b7280' },
               !useNewAddress && { color: isDark ? '#f9fafb' : '#111827', fontWeight: '600' }
             ]}>
               Use Saved Address
@@ -1321,7 +1467,7 @@ function SellScreenContent() {
           <View style={styles.savedAddresses}>
             {addresses.length > 0 ? (
               addresses.map((address) => (
-                <TouchableOpacity 
+                <TouchableOpacity
                   key={address.id}
                   style={[
                     styles.savedAddressCard,
@@ -1400,8 +1546,8 @@ function SellScreenContent() {
     <View style={styles.stepContent}>
       <Text style={[styles.stepTitle, { color: colors.text }]}>Order Summary</Text>
       <Text style={[styles.stepSubtitle, { color: colors.textSecondary }]}>Review your pickup details</Text>
-      
-      <View 
+
+      <View
         ref={summaryRef}
         style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
       >
@@ -1412,8 +1558,8 @@ function SellScreenContent() {
             <View key={item.id} style={styles.summaryItem}>
               <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 12 }}>
                 {item.image && (
-                  <RemoteImage 
-                    source={item.image} 
+                  <RemoteImage
+                    source={item.image}
                     fallback={fallbackImage}
                     style={styles.summaryItemIconImage}
                     showLoadingIndicator={false}
@@ -1472,7 +1618,7 @@ function SellScreenContent() {
               </View>
             )}
           </View>
-          
+
           {walletBalance >= 120 ? (
             useReferralBonus && (
               <View style={[styles.referralDiscountInfo, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#f0fdf4', borderColor: isDark ? colors.primary : '#bbf7d0' }]}>
@@ -1502,7 +1648,7 @@ function SellScreenContent() {
         </View>
       )}
 
-       {/* Final Amount Summary */}
+      {/* Final Amount Summary */}
       {useReferralBonus && referralBonus > 0 && (
         <View style={[styles.finalAmountCard, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#f0fdf4', borderColor: colors.primary }]}>
           <View style={styles.finalAmountRow}>
@@ -1532,7 +1678,7 @@ function SellScreenContent() {
           </View>
           <Text style={[styles.pickupDetailsTitle, { color: colors.text }]}>Pickup Details</Text>
         </View>
-        
+
         <View style={styles.pickupDetailsContent}>
           <View style={styles.pickupDetailRow}>
             <View style={styles.pickupDetailLabel}>
@@ -1674,109 +1820,109 @@ function SellScreenContent() {
 
       {/* Keep in Mind Section */}
       <View style={[styles.keepInMindCard, { backgroundColor: colors.surface }]}>
-  <Text style={[styles.keepInMindTitle, { color: colors.text }]}>
-    Please keep in mind that we do not accept{'\n'}the following items:
-  </Text>
-
-  <View style={styles.keepInMindGrid}>
-    {/* Wood & Glass */}
-    <View
-      style={[
-        styles.keepInMindItem,
-        { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
-      ]}
-    >
-      <View
-        style={[
-          styles.keepInMindIconContainer,
-          { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
-        ]}
-      >
-        <Text style={styles.keepInMindEmoji}>🪵🍾</Text>
-        <View style={styles.keepInMindCross}>
-          <X size={28} color="#dc2626" strokeWidth={3} />
-        </View>
-      </View>
-      <Text style={[styles.keepInMindText, { color: colors.text }]}>
-        We do not buy{'\n'}Wood & Glass
-      </Text>
-    </View>
-
-    {/* Clothes */}
-    <View
-      style={[
-        styles.keepInMindItem,
-        { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
-      ]}
-    >
-      <View
-        style={[
-          styles.keepInMindIconContainer,
-          { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
-        ]}
-      >
-        <Text style={styles.keepInMindEmoji}>👕👖</Text>
-        <View style={styles.keepInMindCross}>
-          <X size={28} color="#dc2626" strokeWidth={3} />
-        </View>
-      </View>
-      <Text style={[styles.keepInMindText, { color: colors.text }]}>
-        We do not buy{'\n'}Clothes
-      </Text>
-    </View>
-
-    {/* Scrap Rates */}
-    <View
-      style={[
-        styles.keepInMindItem,
-        { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
-      ]}
-    >
-      <View
-        style={[
-          styles.keepInMindIconContainer,
-          { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
-        ]}
-      >
-        <Text style={styles.keepInMindEmoji}>🪑💻</Text>
-        <View style={styles.keepInMindCross}>
-          <X size={28} color="#dc2626" strokeWidth={3} />
-        </View>
-      </View>
-      <Text style={[styles.keepInMindText, { color: colors.text }]}>
-        We buy only in{'\n'}scrap rates
-      </Text>
-    </View>
-
-    {/* 20kg */}
-    <View
-      style={[
-        styles.keepInMindItem,
-        { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
-      ]}
-    >
-      <View
-        style={[
-          styles.keepInMindIconContainer,
-          { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
-        ]}
-      >
-        <Text style={styles.keepInMindEmoji}>⚖️📦</Text>
-        <Text
-          style={[
-            styles.keepInMindWeight,
-            { backgroundColor: colors.surface, color: colors.text },
-          ]}
-        >
-          20 kg
+        <Text style={[styles.keepInMindTitle, { color: colors.text }]}>
+          Please keep in mind that we do not accept{'\n'}the following items:
         </Text>
+
+        <View style={styles.keepInMindGrid}>
+          {/* Wood & Glass */}
+          <View
+            style={[
+              styles.keepInMindItem,
+              { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
+            ]}
+          >
+            <View
+              style={[
+                styles.keepInMindIconContainer,
+                { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
+              ]}
+            >
+              <Text style={styles.keepInMindEmoji}>🪵🍾</Text>
+              <View style={styles.keepInMindCross}>
+                <X size={28} color="#dc2626" strokeWidth={3} />
+              </View>
+            </View>
+            <Text style={[styles.keepInMindText, { color: colors.text }]}>
+              We do not buy{'\n'}Wood & Glass
+            </Text>
+          </View>
+
+          {/* Clothes */}
+          <View
+            style={[
+              styles.keepInMindItem,
+              { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
+            ]}
+          >
+            <View
+              style={[
+                styles.keepInMindIconContainer,
+                { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
+              ]}
+            >
+              <Text style={styles.keepInMindEmoji}>👕👖</Text>
+              <View style={styles.keepInMindCross}>
+                <X size={28} color="#dc2626" strokeWidth={3} />
+              </View>
+            </View>
+            <Text style={[styles.keepInMindText, { color: colors.text }]}>
+              We do not buy{'\n'}Clothes
+            </Text>
+          </View>
+
+          {/* Scrap Rates */}
+          <View
+            style={[
+              styles.keepInMindItem,
+              { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
+            ]}
+          >
+            <View
+              style={[
+                styles.keepInMindIconContainer,
+                { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
+              ]}
+            >
+              <Text style={styles.keepInMindEmoji}>🪑💻</Text>
+              <View style={styles.keepInMindCross}>
+                <X size={28} color="#dc2626" strokeWidth={3} />
+              </View>
+            </View>
+            <Text style={[styles.keepInMindText, { color: colors.text }]}>
+              We buy only in{'\n'}scrap rates
+            </Text>
+          </View>
+
+          {/* 20kg */}
+          <View
+            style={[
+              styles.keepInMindItem,
+              { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
+            ]}
+          >
+            <View
+              style={[
+                styles.keepInMindIconContainer,
+                { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
+              ]}
+            >
+              <Text style={styles.keepInMindEmoji}>⚖️📦</Text>
+              <Text
+                style={[
+                  styles.keepInMindWeight,
+                  { backgroundColor: colors.surface, color: colors.text },
+                ]}
+              >
+                20 kg
+              </Text>
+            </View>
+            <Text style={[styles.keepInMindText, { color: colors.text }]}>
+              Free pickup only{'\n'}above 20 kg
+            </Text>
+          </View>
+        </View>
       </View>
-      <Text style={[styles.keepInMindText, { color: colors.text }]}>
-        Free pickup only{'\n'}above 20 kg
-      </Text>
-    </View>
-  </View>
-</View>
 
       {selectedImages.length > 0 && (
         <View style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -1800,8 +1946,8 @@ function SellScreenContent() {
         {renderStepIndicator()}
       </View>
 
-      <ScrollView 
-        style={styles.content} 
+      <ScrollView
+        style={styles.content}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollViewContent}
         keyboardShouldPersistTaps="handled"
@@ -1822,7 +1968,7 @@ function SellScreenContent() {
                 <Text style={[styles.previousButtonText, { color: colors.textSecondary }]}>Previous</Text>
               </TouchableOpacity>
             )}
-            
+
             <View style={styles.totalSection}>
               <Text style={[styles.totalLabel, { color: colors.textSecondary }]}>Estimated Total</Text>
               <View style={styles.totalAmount}>
@@ -1830,10 +1976,10 @@ function SellScreenContent() {
                 <Text style={[styles.totalValue, { color: colors.primary }]}>{Math.round(totalPayout)}</Text>
               </View>
             </View>
-            
-            <TouchableOpacity 
-              style={styles.nextButton} 
-              onPress={handleNext} 
+
+            <TouchableOpacity
+              style={styles.nextButton}
+              onPress={handleNext}
               activeOpacity={0.8}
               disabled={submittingOrder}
             >
@@ -1841,9 +1987,9 @@ function SellScreenContent() {
                 colors={isDark ? ['#22c55e', '#16a34a', '#15803d'] : ['#16a34a', '#15803d', '#166534']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={{ 
-                  flexDirection: 'row', 
-                  alignItems: 'center', 
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
                   gap: 6,
                   paddingHorizontal: 18,
                   paddingVertical: 10,
@@ -1878,7 +2024,7 @@ function SellScreenContent() {
             <TouchableWithoutFeedback onPress={closeQuantityModal}>
               <View style={styles.quantityModalOverlay} />
             </TouchableWithoutFeedback>
-            
+
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
               <View style={[styles.quantityModalContent, { backgroundColor: colors.surface }]}>
                 {/* Header */}
@@ -1899,8 +2045,8 @@ function SellScreenContent() {
                   <View style={styles.quantityModalProduct}>
                     <View style={styles.quantityModalProductInfo}>
                       {getImageForProduct(selectedProduct) && (
-                        <RemoteImage 
-                          source={getImageForProduct(selectedProduct)!} 
+                        <RemoteImage
+                          source={getImageForProduct(selectedProduct)!}
                           fallback={getFallbackImageForProduct(selectedProduct.name)}
                           style={styles.quantityModalProductImage}
                           showLoadingIndicator={false}
@@ -1923,7 +2069,7 @@ function SellScreenContent() {
                   <Text style={[styles.quantityModalLabel, { color: colors.textSecondary }]}>
                     Quantity ({selectedProduct?.unit})
                   </Text>
-                  
+
                   <View style={styles.quantityModalInputContainer}>
                     <TouchableOpacity
                       style={[styles.quantityModalButton, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -2028,7 +2174,7 @@ function SellScreenContent() {
         visible={showGuidelinesModal}
         onRequestClose={() => setShowGuidelinesModal(false)}
       >
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalOverlay}
         >
@@ -2037,8 +2183,8 @@ function SellScreenContent() {
               <Text style={[styles.modalTitle, { color: colors.text }]}>Please keep in mind</Text>
             </View>
 
-            <ScrollView 
-              style={styles.guidelinesScroll} 
+            <ScrollView
+              style={styles.guidelinesScroll}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.guidelinesScrollContent}
               bounces={false}
@@ -2084,7 +2230,7 @@ function SellScreenContent() {
               </View>
             </ScrollView>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.modalButton}
               onPress={() => setShowGuidelinesModal(false)}
               activeOpacity={0.8}
@@ -2099,7 +2245,7 @@ function SellScreenContent() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-      
+
       {/* Network Retry Overlay - handles network errors silently */}
       <NetworkRetryOverlay
         visible={showRetryOverlay}
@@ -2109,12 +2255,12 @@ function SellScreenContent() {
         errorMessage={errorMessage || undefined}
         onRetryNow={retryNow}
       />
-      
+
       <Toast />
-      
+
       {/* Tutorial Overlay */}
       <TutorialOverlay />
-      
+
       {/* Feedback Modal */}
       <FeedbackModal
         visible={showFeedbackModal}
@@ -2270,10 +2416,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemInfo: {
-  flex: 1,
-  flexShrink: 1,
-  marginRight: 8,
-},
+    flex: 1,
+    flexShrink: 1,
+    marginRight: 8,
+  },
 
   itemName: {
     fontSize: 14,
@@ -2340,12 +2486,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   selectedItemLeft: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  flex: 1,
-  flexShrink: 1,
-  marginRight: 8,
-},
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    flexShrink: 1,
+    marginRight: 8,
+  },
   selectedItemIconImage: {
     width: 36,
     height: 36,
@@ -2365,12 +2511,12 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   selectedItemName: {
-  fontSize: 14,
-  fontWeight: '500',
-  color: '#111827',
-  // helps on very small screens
-  flexShrink: 1,
-},
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#111827',
+    // helps on very small screens
+    flexShrink: 1,
+  },
   selectedItemRate: {
     fontSize: 12,
     color: '#16a34a',
@@ -2882,7 +3028,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-   referralCard: {
+  referralCard: {
     backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
@@ -2894,19 +3040,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 6,
     elevation: 3,
-  },  
+  },
   referralHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
-    referralHeaderLeft: {
+  referralHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-    referralIconContainer: {
+  referralIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -2914,18 +3060,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-    referralTitle: {
+  referralTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#111827',
     fontFamily: 'Inter-SemiBold',
   },
-    referralBalance: {
+  referralBalance: {
     fontSize: 14,
     color: '#16a34a',
     fontFamily: 'Inter-Medium',
     marginTop: 2,
-  },  referralToggle: {
+  }, referralToggle: {
     width: 52,
     height: 30,
     borderRadius: 15,
@@ -2945,7 +3091,7 @@ const styles = StyleSheet.create({
   referralToggleCircleActive: {
     alignSelf: 'flex-end',
   },
-    referralDiscountInfo: {
+  referralDiscountInfo: {
     marginTop: 16,
     padding: 12,
     backgroundColor: '#f0fdf4',
@@ -2953,14 +3099,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#bbf7d0',
   },
-    referralDiscountText: {
+  referralDiscountText: {
     fontSize: 15,
     fontWeight: '600',
     color: '#16a34a',
     fontFamily: 'Inter-SemiBold',
     marginBottom: 4,
   },
-    referralDiscountSubtext: {
+  referralDiscountSubtext: {
     fontSize: 13,
     color: '#15803d',
     fontFamily: 'Inter-Regular',
@@ -3010,7 +3156,7 @@ const styles = StyleSheet.create({
     color: '#b45309',
     lineHeight: 18,
   },
-    finalAmountCard: {
+  finalAmountCard: {
     backgroundColor: '#f0fdf4',
     borderRadius: 16,
     padding: 20,
@@ -3501,7 +3647,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   keepInMindItem: {
-    width: '48%', 
+    width: '48%',
     backgroundColor: '#fef9f0',
     borderRadius: 12,
     padding: 12,

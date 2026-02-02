@@ -186,6 +186,26 @@
     "genderPreferNotToSay": "नहीं बताना चाहते",
     "optional": "(वैकल्पिक)"
   },
+  "guestProfile": {
+    "welcome": "Scrapiz में आपका स्वागत है!",
+    "subtitle": "पुरस्कार अनलॉक करने, ऑर्डर ट्रैक करने और पर्यावरण पर सकारात्मक प्रभाव डालने के लिए खाता बनाएं",
+    "createAccount": "मुफ्त खाता बनाएं",
+    "signIn": "साइन इन करें",
+    "whyJoin": "Scrapiz से क्यों जुड़ें?",
+    "settings": "सेटिंग्स",
+    "alreadyHaveAccount": "पहले से खाता है?",
+    "signInLink": "साइन इन करें →",
+    "benefits": {
+      "trackOrders": "ऑर्डर ट्रैक करें",
+      "trackOrdersDesc": "ऑर्डर इतिहास देखें और रीयल-टाइम में पिकअप ट्रैक करें",
+      "earnRewards": "पुरस्कार अर्जित करें",
+      "earnRewardsDesc": "हर दोस्त को रेफर करने पर ₹20 पाएं!",
+      "saveAddresses": "पते सहेजें",
+      "saveAddressesDesc": "सहेजे गए पिकअप स्थानों के साथ त्वरित चेकआउट",
+      "trackImpact": "प्रभाव ट्रैक करें",
+      "trackImpactDesc": "देखें कि आप पर्यावरण की कितनी मदद कर रहे हैं"
+    }
+  },
   "auth": {
     "login": "लॉगिन",
     "signup": "साइन अप",

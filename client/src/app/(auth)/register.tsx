@@ -28,19 +28,24 @@ import {
   Phone,
   Gift,
 } from 'lucide-react-native';
-import { Link, useRouter } from 'expo-router';
+import { Link, useRouter, useLocalSearchParams } from 'expo-router';
 import ScrapizLogo from '../../components/ScrapizLogo';
 import { AuthService } from '../../api/apiService';
 import Toast from 'react-native-toast-message';
 import { useGoogleAuth } from '../../hooks/useGoogleAuth';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
+import { loadGuestOrderState, clearGuestOrderState } from '../../utils/guestOrderPersistence';
 
 const { width, height } = Dimensions.get('window');
 
 export default function RegisterScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
+
+  // Get returnTo parameter for post-auth navigation (guest flow support)
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+
   const [step, setStep] = useState<'register' | 'otp'>('register');
   const [formData, setFormData] = useState({
     fullName: '',
@@ -137,7 +142,7 @@ export default function RegisterScreen() {
     }
 
     setFormData(prev => ({ ...prev, [field]: value }));
-    
+
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
@@ -145,9 +150,9 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     if (!validateForm()) return;
-    
+
     setIsLoading(true);
-    
+
     try {
       // Call actual backend API with optional promo code
       const registerData: any = {
@@ -163,13 +168,13 @@ export default function RegisterScreen() {
       }
 
       await AuthService.register(registerData);
-      
+
       Toast.show({
         type: 'success',
         text1: 'Success',
         text2: 'OTP sent to your email!',
       });
-      
+
       // Move to OTP verification step
       setStep('otp');
     } catch (error: any) {
@@ -188,28 +193,33 @@ export default function RegisterScreen() {
       Toast.show({
         type: 'error',
         text1: 'Invalid OTP',
-        text2: 'Please enter a valid 4-digit OTP',
+        text2: 'Please enter a valid 6-digit OTP',
       });
       return;
     }
 
     setIsLoading(true);
-    
+
     try {
       // Call actual backend API for OTP verification
-      await AuthService.verifyOtp({ 
-        email: formData.email, 
-        otp 
+      await AuthService.verifyOtp({
+        email: formData.email,
+        otp
       });
-      
+
       Toast.show({
         type: 'success',
         text1: 'Success',
         text2: 'Account verified successfully!',
       });
-      
-      // Navigate to tabs/home after successful verification
-      router.replace('/(auth)/login');
+
+      // Navigate to login after successful verification
+      // Pass returnTo parameter so the flow continues after login
+      if (returnTo) {
+        router.replace(`/(auth)/login?returnTo=${encodeURIComponent(returnTo)}`);
+      } else {
+        router.replace('/(auth)/login');
+      }
     } catch (error: any) {
       Toast.show({
         type: 'error',
@@ -223,10 +233,10 @@ export default function RegisterScreen() {
 
   const handleResendOtp = async () => {
     setIsLoading(true);
-    
+
     try {
       await AuthService.resendOtp(formData.email);
-      
+
       Toast.show({
         type: 'success',
         text1: 'OTP Resent',
@@ -261,23 +271,34 @@ export default function RegisterScreen() {
           text1: 'Success',
           text2: 'Sign up successful!',
         });
-        
+
         // Check if we should show notification permission screen
         const { hasShownNotificationPermission } = await import('../../utils/notificationPermission');
         const hasShown = await hasShownNotificationPermission();
-        
+
+        // Small delay to ensure auth state is fully propagated
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Determine destination based on returnTo parameter
+        let destination = '/(tabs)/home';
+        if (returnTo) {
+          const decodedReturnTo = decodeURIComponent(returnTo);
+          console.log('🔄 Post-registration redirect to:', decodedReturnTo);
+          destination = decodedReturnTo;
+        }
+
         if (!hasShown) {
           // Navigate to notification permission screen first
           router.replace('/notification-permission');
         } else {
-          // Navigate directly to home
-          router.replace('/(tabs)/home');
+          // Navigate to destination (either returnTo path or home)
+          router.replace(destination as any);
         }
       }
     };
-    
+
     handleAuthSuccess();
-  }, [authSuccess]);
+  }, [authSuccess, returnTo]);
 
   // Show Google error toast
   useEffect(() => {
@@ -296,11 +317,11 @@ export default function RegisterScreen() {
   if (step === 'otp') {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <ScrollView 
+          <ScrollView
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -318,7 +339,7 @@ export default function RegisterScreen() {
                 <TextInput
                   style={[
                     styles.otpInput,
-                    { 
+                    {
                       backgroundColor: colors.inputBackground,
                       borderColor: errors.otp ? colors.error : colors.inputBorder,
                       color: colors.text
@@ -388,304 +409,304 @@ export default function RegisterScreen() {
 
   // Render registration form
   return (
-  <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-    <KeyboardAvoidingView 
-      style={[styles.container, { backgroundColor: colors.background }]} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <View style={styles.backButtonContainer}>
-        <TouchableOpacity 
-          style={[styles.backButton, { backgroundColor: colors.surface }]}
-          onPress={() => router.back()}
-          disabled={isLoading}
-        >
-          <ArrowLeft size={24} color={colors.text} />
-        </TouchableOpacity>
-      </View>
-      
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <KeyboardAvoidingView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <TouchableWithoutFeedback>
-          <View>
-            <Animated.View
-              style={[
-                styles.header,
-                {
-                  opacity: fadeAnim,
-                  transform: [{ translateY: slideAnim }]
-                }
-              ]}
-            >
-              <ScrapizLogo width={220} />
-              <Text style={[styles.welcomeText, { color: colors.text }]}>Create Account</Text>
-              <Text style={[styles.subtitleText, { color: colors.textSecondary }]}>
-                Join thousands of users earning money while helping the environment
-              </Text>
-            </Animated.View>
+        <View style={styles.backButtonContainer}>
+          <TouchableOpacity
+            style={[styles.backButton, { backgroundColor: colors.surface }]}
+            onPress={() => router.back()}
+            disabled={isLoading}
+          >
+            <ArrowLeft size={24} color={colors.text} />
+          </TouchableOpacity>
+        </View>
 
-            <Animated.View
-              style={[
-                styles.formContainer,
-                {
-                  opacity: fadeAnim,
-                  transform: [{ translateY: slideAnim }]
-                }
-              ]}
-            >
-              {/* Full Name Input */}
-              <View style={styles.inputContainer}>
-                <View style={[
-                  styles.inputWrapper,
-                  { 
-                    backgroundColor: colors.inputBackground,
-                    borderColor: errors.fullName ? colors.error : colors.inputBorder
-                  }
-                ]}>
-                  <View style={[styles.iconCircle, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
-                    <User size={20} color={colors.primary} />
-                  </View>
-                  <TextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="Full Name"
-                    placeholderTextColor={colors.inputPlaceholder}
-                    value={formData.fullName}
-                    onChangeText={(text) => handleInputChange('fullName', text)}
-                    autoCapitalize="words"
-                    autoComplete="name"
-                    editable={!isanyLoading}
-                  />
-                </View>
-                {errors.fullName && (
-                  <Text style={styles.errorText}>{errors.fullName}</Text>
-                )}
-              </View>
-
-              {/* Email Input */}
-              <View style={styles.inputContainer}>
-                <View style={[
-                  styles.inputWrapper,
-                  { 
-                    backgroundColor: colors.inputBackground,
-                    borderColor: errors.email ? colors.error : colors.inputBorder
-                  }
-                ]}>
-                  <View style={[styles.iconCircle, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
-                    <Mail size={20} color={colors.primary} />
-                  </View>
-                  <TextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="Email Address"
-                    placeholderTextColor={colors.inputPlaceholder}
-                    value={formData.email}
-                    onChangeText={(text) => handleInputChange('email', text)}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoComplete="email"
-                    editable={!isanyLoading}
-                  />
-                </View>
-                {errors.email && (
-                  <Text style={styles.errorText}>{errors.email}</Text>
-                )}
-              </View>
-
-              {/* Phone Input */}
-              <View style={styles.inputContainer}>
-                <View style={[
-                  styles.inputWrapper,
-                  { 
-                    backgroundColor: colors.inputBackground,
-                    borderColor: errors.phone ? colors.error : colors.inputBorder
-                  }
-                ]}>
-                  <View style={[styles.iconCircle, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
-                    <Phone size={20} color={colors.primary} />
-                  </View>
-                  <TextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="Phone Number"
-                    placeholderTextColor={colors.inputPlaceholder}
-                    value={formData.phone}
-                    onChangeText={(text) => handleInputChange('phone', text)}
-                    keyboardType="phone-pad"
-                    autoComplete="tel"
-                    editable={!isanyLoading}
-                  />
-                </View>
-                {errors.phone && (
-                  <Text style={styles.errorText}>{errors.phone}</Text>
-                )}
-              </View>
-
-              {/* Referral Code Input */}
-              <View style={styles.inputContainer}>
-                <View style={[
-                  styles.inputWrapper,
-                  { 
-                    backgroundColor: colors.inputBackground,
-                    borderColor: errors.referralCode ? colors.error : colors.inputBorder
-                  }
-                ]}>
-                  <View style={[styles.iconCircle, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
-                    <Gift size={20} color={colors.primary} />
-                  </View>
-                  <TextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="Referral Code (Optional)"
-                    placeholderTextColor={colors.inputPlaceholder}
-                    value={formData.referralCode}
-                    onChangeText={(text) => handleInputChange('referralCode', text)}
-                    autoCapitalize="characters"
-                    maxLength={9}
-                    editable={!isanyLoading}
-                  />
-                </View>
-                {errors.referralCode && (
-                  <Text style={styles.errorText}>{errors.referralCode}</Text>
-                )}
-                {!errors.referralCode && formData.referralCode.trim() && formData.referralCode.length === 9 && (
-                  <Text style={[styles.referralHintText, { color: colors.success }]}>
-                    🎁 You'll get ₹5 bonus on your first order over ₹500!
-                  </Text>
-                )}
-              </View>
-
-              {/* Password Input */}
-              <View style={styles.inputContainer}>
-                <View style={[
-                  styles.inputWrapper,
-                  { 
-                    backgroundColor: colors.inputBackground,
-                    borderColor: errors.password ? colors.error : colors.inputBorder
-                  }
-                ]}>
-                  <View style={[styles.iconCircle, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
-                    <Lock size={20} color={colors.primary} />
-                  </View>
-                  <TextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="Password"
-                    placeholderTextColor={colors.inputPlaceholder}
-                    value={formData.password}
-                    onChangeText={(text) => handleInputChange('password', text)}
-                    secureTextEntry={!showPassword}
-                    autoComplete="new-password"
-                    editable={!isanyLoading}
-                  />
-                  <TouchableOpacity
-                    style={{ padding: 4 }}
-                    onPress={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff size={20} color={colors.textSecondary} />
-                    ) : (
-                      <Eye size={20} color={colors.textSecondary} />
-                    )}
-                  </TouchableOpacity>
-                </View>
-                {errors.password && (
-                  <Text style={styles.errorText}>{errors.password}</Text>
-                )}
-              </View>
-
-              {/* Confirm Password Input */}
-              <View style={styles.inputContainer}>
-                <View style={[
-                  styles.inputWrapper,
-                  { 
-                    backgroundColor: colors.inputBackground,
-                    borderColor: errors.confirmPassword ? colors.error : colors.inputBorder
-                  }
-                ]}>
-                  <View style={[styles.iconCircle, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
-                    <Lock size={20} color={colors.primary} />
-                  </View>
-                  <TextInput
-                    style={[styles.input, { color: colors.text }]}
-                    placeholder="Confirm Password"
-                    placeholderTextColor={colors.inputPlaceholder}
-                    value={formData.confirmPassword}
-                    onChangeText={(text) => handleInputChange('confirmPassword', text)}
-                    secureTextEntry={!showConfirmPassword}
-                    autoComplete="new-password"
-                    editable={!isanyLoading}
-                  />
-                  <TouchableOpacity
-                    style={{ padding: 4 }}
-                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                  >
-                    {showConfirmPassword ? (
-                      <EyeOff size={20} color={colors.textSecondary} />
-                    ) : (
-                      <Eye size={20} color={colors.textSecondary} />
-                    )}
-                  </TouchableOpacity>
-                </View>
-                {errors.confirmPassword && (
-                  <Text style={styles.errorText}>{errors.confirmPassword}</Text>
-                )}
-              </View>
-
-              {/* Register Button */}
-              <TouchableOpacity
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <TouchableWithoutFeedback>
+            <View>
+              <Animated.View
                 style={[
-                  styles.registerButton,
-                  { backgroundColor: colors.primary },
-                  isLoading && styles.registerButtonDisabled
+                  styles.header,
+                  {
+                    opacity: fadeAnim,
+                    transform: [{ translateY: slideAnim }]
+                  }
                 ]}
-                onPress={handleRegister}
-                disabled={isLoading}
               >
-                {isLoading ? (
-                  <>
-                    <ActivityIndicator size="small" color="#ffffff" />
-                    <Text style={styles.registerButtonText}>Creating Account...</Text>
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.registerButtonText}>Create Account</Text>
-                    <ArrowRight size={20} color="white" />
-                  </>
-                )}
-              </TouchableOpacity>
-
-              {/* Terms and Privacy */}
-              <View style={{ paddingHorizontal: 8 }}>
-                <Text style={[styles.termsText, { color: colors.textSecondary }]}>
-                  By creating an account, you agree to our{' '}
-                  <Text style={[styles.termsLink, { color: colors.primary }]}>Terms of Service</Text>
-                  {' '}and{' '}
-                  <Text style={[styles.termsLink, { color: colors.primary }]}>Privacy Policy</Text>
+                <ScrapizLogo width={220} />
+                <Text style={[styles.welcomeText, { color: colors.text }]}>Create Account</Text>
+                <Text style={[styles.subtitleText, { color: colors.textSecondary }]}>
+                  Join thousands of users earning money while helping the environment
                 </Text>
-              </View>
-            </Animated.View>
+              </Animated.View>
 
-            {/* Footer */}
-            <Animated.View 
-              style={[
-                styles.footer,
-                { opacity: fadeAnim }
-              ]}
-            >
-              <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
-                <Text style={[styles.footerText, { color: colors.textSecondary }]}>Already have an account? </Text>
-                <Link href="/(auth)/login" asChild>
-                  <TouchableOpacity>
-                    <Text style={[styles.footerLink, { color: colors.primary }]}>Sign In</Text>
-                  </TouchableOpacity>
-                </Link>
-              </View>
-            </Animated.View>
-          </View>
-        </TouchableWithoutFeedback>
-      </ScrollView>
-      <Toast />
-    </KeyboardAvoidingView>
-  </SafeAreaView>
-);
+              <Animated.View
+                style={[
+                  styles.formContainer,
+                  {
+                    opacity: fadeAnim,
+                    transform: [{ translateY: slideAnim }]
+                  }
+                ]}
+              >
+                {/* Full Name Input */}
+                <View style={styles.inputContainer}>
+                  <View style={[
+                    styles.inputWrapper,
+                    {
+                      backgroundColor: colors.inputBackground,
+                      borderColor: errors.fullName ? colors.error : colors.inputBorder
+                    }
+                  ]}>
+                    <View style={[styles.iconCircle, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
+                      <User size={20} color={colors.primary} />
+                    </View>
+                    <TextInput
+                      style={[styles.input, { color: colors.text }]}
+                      placeholder="Full Name"
+                      placeholderTextColor={colors.inputPlaceholder}
+                      value={formData.fullName}
+                      onChangeText={(text) => handleInputChange('fullName', text)}
+                      autoCapitalize="words"
+                      autoComplete="name"
+                      editable={!isanyLoading}
+                    />
+                  </View>
+                  {errors.fullName && (
+                    <Text style={styles.errorText}>{errors.fullName}</Text>
+                  )}
+                </View>
+
+                {/* Email Input */}
+                <View style={styles.inputContainer}>
+                  <View style={[
+                    styles.inputWrapper,
+                    {
+                      backgroundColor: colors.inputBackground,
+                      borderColor: errors.email ? colors.error : colors.inputBorder
+                    }
+                  ]}>
+                    <View style={[styles.iconCircle, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
+                      <Mail size={20} color={colors.primary} />
+                    </View>
+                    <TextInput
+                      style={[styles.input, { color: colors.text }]}
+                      placeholder="Email Address"
+                      placeholderTextColor={colors.inputPlaceholder}
+                      value={formData.email}
+                      onChangeText={(text) => handleInputChange('email', text)}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoComplete="email"
+                      editable={!isanyLoading}
+                    />
+                  </View>
+                  {errors.email && (
+                    <Text style={styles.errorText}>{errors.email}</Text>
+                  )}
+                </View>
+
+                {/* Phone Input */}
+                <View style={styles.inputContainer}>
+                  <View style={[
+                    styles.inputWrapper,
+                    {
+                      backgroundColor: colors.inputBackground,
+                      borderColor: errors.phone ? colors.error : colors.inputBorder
+                    }
+                  ]}>
+                    <View style={[styles.iconCircle, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
+                      <Phone size={20} color={colors.primary} />
+                    </View>
+                    <TextInput
+                      style={[styles.input, { color: colors.text }]}
+                      placeholder="Phone Number"
+                      placeholderTextColor={colors.inputPlaceholder}
+                      value={formData.phone}
+                      onChangeText={(text) => handleInputChange('phone', text)}
+                      keyboardType="phone-pad"
+                      autoComplete="tel"
+                      editable={!isanyLoading}
+                    />
+                  </View>
+                  {errors.phone && (
+                    <Text style={styles.errorText}>{errors.phone}</Text>
+                  )}
+                </View>
+
+                {/* Referral Code Input */}
+                <View style={styles.inputContainer}>
+                  <View style={[
+                    styles.inputWrapper,
+                    {
+                      backgroundColor: colors.inputBackground,
+                      borderColor: errors.referralCode ? colors.error : colors.inputBorder
+                    }
+                  ]}>
+                    <View style={[styles.iconCircle, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
+                      <Gift size={20} color={colors.primary} />
+                    </View>
+                    <TextInput
+                      style={[styles.input, { color: colors.text }]}
+                      placeholder="Referral Code (Optional)"
+                      placeholderTextColor={colors.inputPlaceholder}
+                      value={formData.referralCode}
+                      onChangeText={(text) => handleInputChange('referralCode', text)}
+                      autoCapitalize="characters"
+                      maxLength={9}
+                      editable={!isanyLoading}
+                    />
+                  </View>
+                  {errors.referralCode && (
+                    <Text style={styles.errorText}>{errors.referralCode}</Text>
+                  )}
+                  {!errors.referralCode && formData.referralCode.trim() && formData.referralCode.length === 9 && (
+                    <Text style={[styles.referralHintText, { color: colors.success }]}>
+                      🎁 You'll get ₹5 bonus on your first order over ₹500!
+                    </Text>
+                  )}
+                </View>
+
+                {/* Password Input */}
+                <View style={styles.inputContainer}>
+                  <View style={[
+                    styles.inputWrapper,
+                    {
+                      backgroundColor: colors.inputBackground,
+                      borderColor: errors.password ? colors.error : colors.inputBorder
+                    }
+                  ]}>
+                    <View style={[styles.iconCircle, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
+                      <Lock size={20} color={colors.primary} />
+                    </View>
+                    <TextInput
+                      style={[styles.input, { color: colors.text }]}
+                      placeholder="Password"
+                      placeholderTextColor={colors.inputPlaceholder}
+                      value={formData.password}
+                      onChangeText={(text) => handleInputChange('password', text)}
+                      secureTextEntry={!showPassword}
+                      autoComplete="new-password"
+                      editable={!isanyLoading}
+                    />
+                    <TouchableOpacity
+                      style={{ padding: 4 }}
+                      onPress={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <EyeOff size={20} color={colors.textSecondary} />
+                      ) : (
+                        <Eye size={20} color={colors.textSecondary} />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                  {errors.password && (
+                    <Text style={styles.errorText}>{errors.password}</Text>
+                  )}
+                </View>
+
+                {/* Confirm Password Input */}
+                <View style={styles.inputContainer}>
+                  <View style={[
+                    styles.inputWrapper,
+                    {
+                      backgroundColor: colors.inputBackground,
+                      borderColor: errors.confirmPassword ? colors.error : colors.inputBorder
+                    }
+                  ]}>
+                    <View style={[styles.iconCircle, { backgroundColor: isDark ? '#064e3b' : '#dcfce7' }]}>
+                      <Lock size={20} color={colors.primary} />
+                    </View>
+                    <TextInput
+                      style={[styles.input, { color: colors.text }]}
+                      placeholder="Confirm Password"
+                      placeholderTextColor={colors.inputPlaceholder}
+                      value={formData.confirmPassword}
+                      onChangeText={(text) => handleInputChange('confirmPassword', text)}
+                      secureTextEntry={!showConfirmPassword}
+                      autoComplete="new-password"
+                      editable={!isanyLoading}
+                    />
+                    <TouchableOpacity
+                      style={{ padding: 4 }}
+                      onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff size={20} color={colors.textSecondary} />
+                      ) : (
+                        <Eye size={20} color={colors.textSecondary} />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                  {errors.confirmPassword && (
+                    <Text style={styles.errorText}>{errors.confirmPassword}</Text>
+                  )}
+                </View>
+
+                {/* Register Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.registerButton,
+                    { backgroundColor: colors.primary },
+                    isLoading && styles.registerButtonDisabled
+                  ]}
+                  onPress={handleRegister}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <ActivityIndicator size="small" color="#ffffff" />
+                      <Text style={styles.registerButtonText}>Creating Account...</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.registerButtonText}>Create Account</Text>
+                      <ArrowRight size={20} color="white" />
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                {/* Terms and Privacy */}
+                <View style={{ paddingHorizontal: 8 }}>
+                  <Text style={[styles.termsText, { color: colors.textSecondary }]}>
+                    By creating an account, you agree to our{' '}
+                    <Text style={[styles.termsLink, { color: colors.primary }]}>Terms of Service</Text>
+                    {' '}and{' '}
+                    <Text style={[styles.termsLink, { color: colors.primary }]}>Privacy Policy</Text>
+                  </Text>
+                </View>
+              </Animated.View>
+
+              {/* Footer */}
+              <Animated.View
+                style={[
+                  styles.footer,
+                  { opacity: fadeAnim }
+                ]}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
+                  <Text style={[styles.footerText, { color: colors.textSecondary }]}>Already have an account? </Text>
+                  <Link href="/(auth)/login" asChild>
+                    <TouchableOpacity>
+                      <Text style={[styles.footerLink, { color: colors.primary }]}>Sign In</Text>
+                    </TouchableOpacity>
+                  </Link>
+                </View>
+              </Animated.View>
+            </View>
+          </TouchableWithoutFeedback>
+        </ScrollView>
+        <Toast />
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
 }
 
 const styles = StyleSheet.create({
