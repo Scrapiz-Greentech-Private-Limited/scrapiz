@@ -274,7 +274,7 @@ function SellScreenContent() {
   const { colors, isDark } = useTheme();
 
   // Auth guard for guest flow - check if user is authenticated
-  const { isGuest, isAuthenticated } = useAuthGuard();
+  const { isGuest, isAuthenticated, isLoading: isAuthLoading } = useAuthGuard();
 
   // Get step parameter for restoring guest order flow after authentication
   const { step: stepParam } = useLocalSearchParams<{ step?: string }>();
@@ -346,26 +346,38 @@ function SellScreenContent() {
   const [useReferralBalance, setUseReferralBalance] = useState(false);
 
   // Data loading function wrapped in useCallback for network retry
+  // Products and categories are loaded for all users (including guests)
+  // Addresses are only loaded for authenticated users
   const loadDataFn = useCallback(async () => {
     setLoadingData(true);
     try {
-      const [prods, cats, addrs] = await Promise.all([
+      // Load products and categories first (no auth required)
+      const [prods, cats] = await Promise.all([
         AuthService.getProducts(),
         AuthService.getCategories(),
-        AuthService.getAddresses()
       ]);
       setProducts(prods);
       setCategories(cats);
-      setAddresses(addrs);
 
-      if (addrs.length > 0) {
-        setSelectedAddressId(addrs[0].id);
-        setUseNewAddress(false);
+      // Load addresses only for authenticated users
+      if (isAuthenticated) {
+        try {
+          const addrs = await AuthService.getAddresses();
+          setAddresses(addrs);
+
+          if (addrs.length > 0) {
+            setSelectedAddressId(addrs[0].id);
+            setUseNewAddress(false);
+          }
+        } catch (addressError) {
+          // Silently fail for address loading - user can still proceed
+          console.log('Could not load addresses (user may not be authenticated):', addressError);
+        }
       }
     } finally {
       setLoadingData(false);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   // Network retry hook for handling connection issues
   const {
@@ -389,10 +401,11 @@ function SellScreenContent() {
   }, [walletBalance, setAvailableReferralBalance])
 
   // Load products, addresses, and user data
+  // Re-run when isAuthenticated changes to fetch addresses after login
   useEffect(() => {
     loadData();
     loadUserData();
-  }, []);
+  }, [isAuthenticated]);
 
   /**
    * Guest Order Flow Restoration
@@ -809,8 +822,10 @@ function SellScreenContent() {
        * AUTH GATE: Step 2 → Step 3 Transition
        * Guests can complete Steps 1-2 (item selection, scheduling),
        * but must authenticate before proceeding to Step 3 (address/confirmation)
+       * 
+       * IMPORTANT: Only redirect if auth is NOT loading and user is confirmed guest
        */
-      if (currentStep === 2 && isGuest) {
+      if (currentStep === 2 && isGuest && !isAuthLoading) {
         try {
           // Prepare order state to save
           const orderState: GuestOrderState = {

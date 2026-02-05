@@ -148,13 +148,13 @@ export default function MapLocationPicker({
         console.log('🗺️ Setting map as mounted and ready');
         mapMountedRef.current = true;
         setIsMapReady(true);
-        
+
         // FIX: Wait for surface to stabilize before marking ready
         setTimeout(() => {
           setSurfaceReady(true);
           console.log('🗺️ Surface ready for interaction');
         }, 400);
-        
+
         // Get user location after map is ready
         setTimeout(() => {
           getCurrentUserLocation();
@@ -189,14 +189,14 @@ export default function MapLocationPicker({
   const getCurrentUserLocation = async () => {
     try {
       const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
-      
+
       let finalStatus = existingStatus;
-      
+
       if (existingStatus !== 'granted') {
         const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
         finalStatus = newStatus;
       }
-      
+
       if (finalStatus === 'granted') {
         const position = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.BestForNavigation, // Highest possible accuracy
@@ -219,7 +219,7 @@ export default function MapLocationPicker({
       setShowResults(false);
       return;
     }
-    
+
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
@@ -239,24 +239,24 @@ export default function MapLocationPicker({
   // IMPROVED: Throttled search function (prevents rapid successive calls)
   const searchLocation = async (query: string) => {
     if (!query.trim()) return;
-    
+
     setIsSearching(true);
-    
+
     try {
       const url = buildKrutrimAutocompleteUrl(query);
       const response = await fetch(url);
       const data = await response.json();
 
-     if (data.predictions && data.predictions.length > 0) {
-      setSearchResults(data.predictions.map((item: any) => ({
+      if (data.predictions && data.predictions.length > 0) {
+        setSearchResults(data.predictions.map((item: any) => ({
           place_id: item.place_id,
           description: item.description,
           structured_formatting: item.structured_formatting,
         })));
         setShowResults(true);
-     }else{
-      setSearchResults([]);
-     }
+      } else {
+        setSearchResults([]);
+      }
     } catch (error) {
       console.error('Geocoding search error:', error);
       setSearchResults([]);
@@ -293,45 +293,50 @@ export default function MapLocationPicker({
       // Use Google Geocoding API with result_type and location_type filters for rooftop precision
       const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&result_type=street_address|premise|subpremise&location_type=ROOFTOP|RANGE_INTERPOLATED&key=${GOOGLE_API_KEY}`;
       console.log('🏢 Requesting rooftop-level address for:', { latitude, longitude });
-      
+
       const response = await fetch(url);
       const data = await response.json();
-      
+
+      console.log('🏢 Google Geocode response status:', data.status);
+
       if (data.status === 'OK' && data.results && data.results.length > 0) {
         // Prioritize results by location_type accuracy
         const rooftopResult = data.results.find((r: any) => r.geometry?.location_type === 'ROOFTOP');
         const rangeResult = data.results.find((r: any) => r.geometry?.location_type === 'RANGE_INTERPOLATED');
         const result = rooftopResult || rangeResult || data.results[0];
-        
+
         console.log('🏢 Found address with location_type:', result.geometry?.location_type);
         console.log('🏢 Address:', result.formatted_address);
-        
+
         if (updateSearchBox) {
           setSelectedAddress(result.formatted_address);
         }
         setSelectedAddressDetails(result); // Store Google structure
-        
+
         return result;
-      } else if (data.status === 'ZERO_RESULTS') {
-        // Fallback: Try without filters to get any nearby address
-        console.log('🏢 No rooftop result, trying broader search...');
-        const fallbackUrl = buildGoogleReverseGeocodeUrl(latitude, longitude);
-        const fallbackResponse = await fetch(fallbackUrl);
-        const fallbackData = await fallbackResponse.json();
-        
-        if (fallbackData.status === 'OK' && fallbackData.results && fallbackData.results.length > 0) {
-          const result = fallbackData.results[0];
-          console.log('🏢 Fallback address found:', result.formatted_address);
-          
-          if (updateSearchBox) {
-            setSelectedAddress(result.formatted_address);
-          }
-          setSelectedAddressDetails(result);
-          return result;
-        }
       }
-      
-      console.warn('Google Reverse Geocode failed/empty');
+
+      // Fallback: Try without filters to get any nearby address
+      // This handles ZERO_RESULTS, and also any other non-OK status
+      console.log('🏢 No rooftop result (status:', data.status, '), trying broader search...');
+      const fallbackUrl = buildGoogleReverseGeocodeUrl(latitude, longitude);
+      const fallbackResponse = await fetch(fallbackUrl);
+      const fallbackData = await fallbackResponse.json();
+
+      console.log('🏢 Fallback geocode response status:', fallbackData.status);
+
+      if (fallbackData.status === 'OK' && fallbackData.results && fallbackData.results.length > 0) {
+        const result = fallbackData.results[0];
+        console.log('🏢 Fallback address found:', result.formatted_address);
+
+        if (updateSearchBox) {
+          setSelectedAddress(result.formatted_address);
+        }
+        setSelectedAddressDetails(result);
+        return result;
+      }
+
+      console.warn('🏢 Google Reverse Geocode failed/empty. Status:', fallbackData.status);
       if (updateSearchBox) setSelectedAddress("Pinned Location");
       return null;
     } catch (error) {
@@ -363,214 +368,214 @@ export default function MapLocationPicker({
   };
 
   const handleResultSelect = async (result: KrutrimAutocompleteResult) => {
-  // ✅ Search bar shows what the user tapped from suggestions
-  setSearchQuery(result.description);
-  setShowResults(false);
-  Keyboard.dismiss();
+    // ✅ Search bar shows what the user tapped from suggestions
+    setSearchQuery(result.description);
+    setShowResults(false);
+    Keyboard.dismiss();
 
-  isSelectingFromSearch.current = true;
-  setIsSearching(true);
-
-  try {
-    const url = buildKrutrimPlaceDetailsUrl(result.place_id);
-    console.log('🔍 Fetching place details from:', url);
-    
-    const response = await fetch(url);
-    const data = await response.json();
-    console.log('📍 Place details response:', data);
-    
-    const locationData = data.result?.geometry?.location;
-    const formattedAddress = data.result?.formatted_address || result.description;
-
-    if (locationData) {
-      const coords: Coordinates = [locationData.lng, locationData.lat];
-      console.log('🗺️ Moving map to coordinates:', coords);
-
-      setSelectedCoords(coords);
-      setMarkerCoords(coords);
-      previousCenterRef.current = coords;
-
-      // ✅ Pickup field gets the detailed address
-      setSelectedAddress(formattedAddress);
-      setSelectedAddressDetails(data.result);
-      
-      if (!mapMountedRef.current) {
-        console.warn('🗺️ Map not mounted, skipping camera update');
-        return;
-      }
-      
-      // Wait for map to be ready
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Move to location with default zoom (only when searching)
-      cameraRef.current?.setCamera({
-        centerCoordinate: coords,
-        zoomLevel: MAP_SETTINGS.defaultZoom,
-        animationDuration: MAP_SETTINGS.animationDuration,
-      });
-
-      setTimeout(() => {
-        isSelectingFromSearch.current = false;
-        setIsSearching(false);
-      }, MAP_SETTINGS.animationDuration + 800);
-    } else {
-      console.error('❌ No location data in place details response');
-      Toast.show({
-        type: 'error',
-        text1: 'Location Error',
-        text2: 'Could not find coordinates for this location',
-      });
-    }
-  } catch (error) {
-    console.error('❌ Error resolving Krutrim place:', error);
-    Toast.show({
-      type: 'error',
-      text1: 'Search Error',
-      text2: 'Failed to load location details',
-    });
-    isSelectingFromSearch.current = false;
-  } finally {
-    setIsSearching(false);
-  }
-};
-
- const handleUseCurrentLocation = async () => {
-  // FIX: Don't proceed if surface isn't stable yet
-  if (!isMapReady || !mapMountedRef.current || !surfaceReady) {
-    console.warn('🗺️ Map not ready yet, waiting...');
-    Toast.show({
-      type: 'info',
-      text1: 'Please wait',
-      text2: 'Map is still loading...',
-      visibilityTime: 2000,
-    });
-    return;
-  }
-
-  setIsLoadingLocation(true);
-  setShowActionMenu(false);
-
-  // mark as selecting so other handlers don't step on us
-  isSelectingFromSearch.current = true;
-
-  try {
-    const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
-    let finalStatus = existingStatus;
-    if (existingStatus !== 'granted') {
-      const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
-      finalStatus = newStatus;
-    }
-
-    if (finalStatus !== 'granted') {
-      console.error('GPS permission denied by user');
-      Toast.show({
-        type: 'error',
-        text1: 'Permission Required',
-        text2: 'Location permission is needed to use this feature.',
-        visibilityTime: 5000,
-      });
-      isSelectingFromSearch.current = false;
-      setIsLoadingLocation(false);
-      return;
-    }
-    if (finalStatus === 'granted') {
-          setPermissionSettled(true);
-          
-          // FIX: Give Android time to stabilize after permission grant
-          await new Promise(resolve => setTimeout(resolve, 500));
-    }
+    isSelectingFromSearch.current = true;
+    setIsSearching(true);
 
     try {
-      const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.BestForNavigation, // Highest possible accuracy
-        timeInterval: 1000,
-        distanceInterval: 0,
+      const url = buildKrutrimPlaceDetailsUrl(result.place_id);
+      console.log('🔍 Fetching place details from:', url);
+
+      const response = await fetch(url);
+      const data = await response.json();
+      console.log('📍 Place details response:', data);
+
+      const locationData = data.result?.geometry?.location;
+      const formattedAddress = data.result?.formatted_address || result.description;
+
+      if (locationData) {
+        const coords: Coordinates = [locationData.lng, locationData.lat];
+        console.log('🗺️ Moving map to coordinates:', coords);
+
+        setSelectedCoords(coords);
+        setMarkerCoords(coords);
+        previousCenterRef.current = coords;
+
+        // ✅ Pickup field gets the detailed address
+        setSelectedAddress(formattedAddress);
+        setSelectedAddressDetails(data.result);
+
+        if (!mapMountedRef.current) {
+          console.warn('🗺️ Map not mounted, skipping camera update');
+          return;
+        }
+
+        // Wait for map to be ready
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Move to location with default zoom (only when searching)
+        cameraRef.current?.setCamera({
+          centerCoordinate: coords,
+          zoomLevel: MAP_SETTINGS.defaultZoom,
+          animationDuration: MAP_SETTINGS.animationDuration,
+        });
+
+        setTimeout(() => {
+          isSelectingFromSearch.current = false;
+          setIsSearching(false);
+        }, MAP_SETTINGS.animationDuration + 800);
+      } else {
+        console.error('❌ No location data in place details response');
+        Toast.show({
+          type: 'error',
+          text1: 'Location Error',
+          text2: 'Could not find coordinates for this location',
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error resolving Krutrim place:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Search Error',
+        text2: 'Failed to load location details',
       });
+      isSelectingFromSearch.current = false;
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
-      const coords: Coordinates = [
-        position.coords.longitude,
-        position.coords.latitude,
-      ];
+  const handleUseCurrentLocation = async () => {
+    // FIX: Don't proceed if surface isn't stable yet
+    if (!isMapReady || !mapMountedRef.current || !surfaceReady) {
+      console.warn('🗺️ Map not ready yet, waiting...');
+      Toast.show({
+        type: 'info',
+        text1: 'Please wait',
+        text2: 'Map is still loading...',
+        visibilityTime: 2000,
+      });
+      return;
+    }
 
-      console.log('🗺️ Got GPS location:', coords);
-      console.log('🗺️ GPS accuracy:', position.coords.accuracy, 'meters');
-      console.log('🗺️ GPS altitude:', position.coords.altitude, 'meters');
+    setIsLoadingLocation(true);
+    setShowActionMenu(false);
 
-      setSelectedCoords(coords);
-      setMarkerCoords(coords);
-      setCurrentUserLocation(coords);
-      previousCenterRef.current = coords;
-      
-      // Double-check map is mounted before camera update
-      if (!mapMountedRef.current) {
-        console.warn('🗺️ Map not mounted after GPS, skipping camera update');
+    // mark as selecting so other handlers don't step on us
+    isSelectingFromSearch.current = true;
+
+    try {
+      const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
+        finalStatus = newStatus;
+      }
+
+      if (finalStatus !== 'granted') {
+        console.error('GPS permission denied by user');
+        Toast.show({
+          type: 'error',
+          text1: 'Permission Required',
+          text2: 'Location permission is needed to use this feature.',
+          visibilityTime: 5000,
+        });
         isSelectingFromSearch.current = false;
         setIsLoadingLocation(false);
         return;
       }
+      if (finalStatus === 'granted') {
+        setPermissionSettled(true);
 
-      // FIX: Longer delay before camera movement after permission
-      await new Promise(resolve => setTimeout(resolve, 600));
+        // FIX: Give Android time to stabilize after permission grant
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
 
-      // Use setCamera for consistent programmatic movement (with default zoom for GPS)
-      cameraRef.current?.setCamera({
-        centerCoordinate: coords,
-        zoomLevel: MAP_SETTINGS.defaultZoom, // Set zoom for GPS location
-        animationDuration: MAP_SETTINGS.animationDuration,
-      });
+      try {
+        const position = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.BestForNavigation, // Highest possible accuracy
+          timeInterval: 1000,
+          distanceInterval: 0,
+        });
 
-      // Force reverse geocode even though isSelectingFromSearch is true
-      await reverseGeocode(coords[1], coords[0], true, true);
+        const coords: Coordinates = [
+          position.coords.longitude,
+          position.coords.latitude,
+        ];
 
-      // small delay then allow other handlers again
-      setTimeout(() => {
+        console.log('🗺️ Got GPS location:', coords);
+        console.log('🗺️ GPS accuracy:', position.coords.accuracy, 'meters');
+        console.log('🗺️ GPS altitude:', position.coords.altitude, 'meters');
+
+        setSelectedCoords(coords);
+        setMarkerCoords(coords);
+        setCurrentUserLocation(coords);
+        previousCenterRef.current = coords;
+
+        // Double-check map is mounted before camera update
+        if (!mapMountedRef.current) {
+          console.warn('🗺️ Map not mounted after GPS, skipping camera update');
+          isSelectingFromSearch.current = false;
+          setIsLoadingLocation(false);
+          return;
+        }
+
+        // FIX: Longer delay before camera movement after permission
+        await new Promise(resolve => setTimeout(resolve, 600));
+
+        // Use setCamera for consistent programmatic movement (with default zoom for GPS)
+        cameraRef.current?.setCamera({
+          centerCoordinate: coords,
+          zoomLevel: MAP_SETTINGS.defaultZoom, // Set zoom for GPS location
+          animationDuration: MAP_SETTINGS.animationDuration,
+        });
+
+        // Force reverse geocode even though isSelectingFromSearch is true
+        await reverseGeocode(coords[1], coords[0], true, true);
+
+        // small delay then allow other handlers again
+        setTimeout(() => {
+          isSelectingFromSearch.current = false;
+        }, MAP_SETTINGS.animationDuration + 500);
+      } catch (gpsError: any) {
+        console.error('GPS location acquisition error:', gpsError);
+        Toast.show({
+          type: 'error',
+          text1: 'Location Error',
+          text2: 'Failed to get your current location.',
+          visibilityTime: 6000,
+        });
         isSelectingFromSearch.current = false;
-      }, MAP_SETTINGS.animationDuration + 500);
-    } catch (gpsError: any) {
-      console.error('GPS location acquisition error:', gpsError);
+        setIsLoadingLocation(false);
+        return;
+      }
+    } catch (error: any) {
+      console.error('GPS permission error:', error);
       Toast.show({
         type: 'error',
-        text1: 'Location Error',
-        text2: 'Failed to get your current location.',
-        visibilityTime: 6000,
+        text1: 'Permission Error',
+        text2: 'Failed to request location permission.',
+        visibilityTime: 5000,
       });
       isSelectingFromSearch.current = false;
+    } finally {
       setIsLoadingLocation(false);
-      return;
     }
-  } catch (error: any) {
-    console.error('GPS permission error:', error);
-    Toast.show({
-      type: 'error',
-      text1: 'Permission Error',
-      text2: 'Failed to request location permission.',
-      visibilityTime: 5000,
-    });
-    isSelectingFromSearch.current = false;
-  } finally {
-    setIsLoadingLocation(false);
-  }
-};
+  };
   const handleMapPress = async (coords: Coordinates) => {
     if (!isMapReady) return;
-    
+
     isSelectingFromSearch.current = true;
-    
+
     setSelectedCoords(coords);
     setMarkerCoords(coords);
     previousCenterRef.current = coords;
-    
+
     if (!mapMountedRef.current) return;
-    
+
     // Move camera to pressed location WITHOUT forcing zoom
     cameraRef.current?.setCamera({
       centerCoordinate: coords,
       animationDuration: 300,
       // No zoomLevel - keep current zoom
     });
-    
+
     await reverseGeocode(coords[1], coords[0]);
-    
+
     setTimeout(() => {
       isSelectingFromSearch.current = false;
     }, 800);
@@ -581,14 +586,14 @@ export default function MapLocationPicker({
     if (isSelectingFromSearch.current) {
       return;
     }
-    
+
     // Very aggressive throttle: Only update every 300ms for ultra-smooth performance
     const now = Date.now();
     if (now - lastCameraUpdate < 300) {
       return;
     }
     setLastCameraUpdate(now);
-    
+
     // Update marker position only (no API calls here)
     setMarkerCoords(coords);
     setSelectedCoords(coords);
@@ -597,26 +602,26 @@ export default function MapLocationPicker({
   // Trigger reverse geocode ONLY when user stops moving the map
   const handleMapIdle = async (coords: Coordinates) => {
     if (isSelectingFromSearch.current || isUserTyping) return;
-    
+
     console.log('🗺️ Map idle - final position:', coords);
-    
+
     // Update marker position to match final map center
     setMarkerCoords(coords);
     setSelectedCoords(coords);
-    
+
     // Check if center has significantly changed (not just zoom)
     // Threshold: ~50 meters to avoid unnecessary API calls
-    const hasSignificantMove = !previousCenterRef.current || 
+    const hasSignificantMove = !previousCenterRef.current ||
       Math.abs(coords[0] - previousCenterRef.current[0]) > 0.0005 || // ~50 meters
       Math.abs(coords[1] - previousCenterRef.current[1]) > 0.0005;
-    
+
     // Only reverse geocode if the map actually moved significantly
     if (hasSignificantMove) {
       // Clear existing timeout
       if (regionChangeTimeoutRef.current) {
         clearTimeout(regionChangeTimeoutRef.current);
       }
-      
+
       // Debounce: Wait 800ms after user stops moving map
       regionChangeTimeoutRef.current = setTimeout(async () => {
         console.log('📍 Reverse geocoding for:', coords);
@@ -638,7 +643,7 @@ export default function MapLocationPicker({
 
     // Always fetch fresh location data on confirm
     let result = selectedAddressDetails
-    if(!result) result = await reverseGeocode(latitude, longitude, false);
+    if (!result) result = await reverseGeocode(latitude, longitude, false);
 
     let locationResult: LocationResult = {
       latitude,
@@ -707,7 +712,7 @@ export default function MapLocationPicker({
                 cameraRef={cameraRef}
                 style={styles.map}
               />
-              
+
               {/* Tooltip above map center - positioned absolutely */}
               <View style={styles.tooltipContainer} pointerEvents="none">
                 <View style={styles.pinTooltip}>
@@ -729,11 +734,11 @@ export default function MapLocationPicker({
                     onChangeText={(text) => {
                       setSearchQuery(text);
                       setIsUserTyping(true);
-                      
+
                       if (typingTimeoutRef.current) {
                         clearTimeout(typingTimeoutRef.current);
                       }
-                      
+
                       // Mark as "not typing" after 2 seconds of inactivity
                       typingTimeoutRef.current = setTimeout(() => {
                         setIsUserTyping(false);
@@ -814,7 +819,7 @@ export default function MapLocationPicker({
               </TouchableOpacity>
             )}
           </View>
-          
+
           <TouchableOpacity
             style={[
               styles.confirmButton,

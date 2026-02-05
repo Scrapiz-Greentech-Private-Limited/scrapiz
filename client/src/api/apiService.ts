@@ -154,7 +154,7 @@ export const setCurrentRouteGetter = (getter: () => string | null) => {
 // Check if current route should show session expired dialog
 const shouldShowSessionExpired = (currentRoute: string | null): boolean => {
   if (!currentRoute) return false;
-  
+
   // Don't show on auth pages, splash screen, or initial loading
   const excludedRoutes = [
     '/(auth)',
@@ -166,9 +166,9 @@ const shouldShowSessionExpired = (currentRoute: string | null): boolean => {
     '/service-unavailable',
     '/oauthredirect',
     '/',
-    
+
   ];
-  
+
   // Check if current route matches any excluded route
   return !excludedRoutes.some(route => currentRoute.includes(route));
 };
@@ -183,19 +183,19 @@ apiClient.interceptors.response.use(
 
     if (status === 401 || status === 403) {
       // Clear token on auth errors using SecureStore
-      try { await SecureStorageService.removeAuthToken(); } catch {}
-      
+      try { await SecureStorageService.removeAuthToken(); } catch { }
+
       // Debounce to prevent multiple rapid triggers
       const now = Date.now();
       if (now - lastSessionExpiredTrigger < SESSION_EXPIRED_DEBOUNCE) {
         return Promise.reject(error);
       }
       lastSessionExpiredTrigger = now;
-      
+
       // Get current route and check if we should show dialog
       const currentRoute = currentRouteGetter ? currentRouteGetter() : null;
       const shouldShow = shouldShowSessionExpired(currentRoute);
-      
+
       // Trigger session expired dialog only on protected routes
       if (globalSessionExpiredHandler && shouldShow) {
         globalSessionExpiredHandler(shouldShow);
@@ -254,6 +254,12 @@ export class AuthService {
   static async verifyOtp(data: VerifyOtpRequest): Promise<ApiResponse> {
     try {
       const response = await apiClient.put(API_CONFIG.ENDPOINTS.VERIFY_OTP, data);
+
+      // Store JWT token if provided - enables automatic login after verification
+      if (response.data.jwt) {
+        await SecureStorageService.setAuthToken(response.data.jwt);
+      }
+
       return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'OTP verification failed');
@@ -529,8 +535,8 @@ export class AuthService {
   }
 
   // Update user profile (name, phone, gender, profile image, and/or avatar settings)
-  static async updateUserProfile(data: { 
-    name?: string; 
+  static async updateUserProfile(data: {
+    name?: string;
     phone_number?: string;
     gender?: 'male' | 'female' | 'prefer_not_to_say' | null;
     profile_image?: string | null;
@@ -540,17 +546,17 @@ export class AuthService {
   }): Promise<UserProfile> {
     try {
       const formData = new FormData();
-      
+
       // Add name if provided
       if (data.name !== undefined) {
         formData.append('name', data.name);
       }
-      
+
       // Add phone_number if provided
       if (data.phone_number !== undefined) {
         formData.append('phone_number', data.phone_number);
       }
-      
+
       // Add gender if provided
       if (data.gender !== undefined) {
         if (data.gender === null || data.gender === '') {
@@ -559,7 +565,7 @@ export class AuthService {
           formData.append('gender', data.gender);
         }
       }
-      
+
       // Handle profile_image
       if (data.profile_image !== undefined) {
         if (data.profile_image === null || data.profile_image === '') {
@@ -570,7 +576,7 @@ export class AuthService {
           const filename = data.profile_image.split('/').pop() || 'profile.jpg';
           const match = /\.(\w+)$/.exec(filename);
           const type = match ? `image/${match[1]}` : 'image/jpeg';
-          
+
           formData.append('profile_image', {
             uri: data.profile_image,
             name: filename,
@@ -609,7 +615,7 @@ export class AuthService {
           },
         }
       );
-      
+
       return response.data as UserProfile;
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Failed to update profile');
@@ -643,12 +649,12 @@ export class AuthService {
           comments: feedback.comments || ''
         }
       });
-      
+
       console.log('✅ Account deletion response:', response.data);
-      
+
       // Clear local auth token on successful deletion using SecureStore
       await SecureStorageService.removeAuthToken();
-      
+
       return response.data as ApiResponse;
     } catch (error: any) {
       console.error('❌ Account deletion error:', {
@@ -679,7 +685,7 @@ export class AuthService {
         try {
           const user = await AuthService.getUser();
           body.user = user.id;
-        } catch {}
+        } catch { }
       }
       const response = await apiClient.post(API_CONFIG.ENDPOINTS.USER_ADDRESSES, body);
       return response.data as AddressSummary;
@@ -695,7 +701,7 @@ export class AuthService {
         try {
           const user = await AuthService.getUser();
           body.user = user.id;
-        } catch {}
+        } catch { }
       }
       const response = await apiClient.put(`${API_CONFIG.ENDPOINTS.USER_ADDRESSES}${id}/`, body);
       return response.data as AddressSummary;
@@ -707,13 +713,13 @@ export class AuthService {
   static async deleteAddress(id: number): Promise<ApiResponse> {
     try {
       const response = await apiClient.delete(`${API_CONFIG.ENDPOINTS.USER_ADDRESSES}${id}/`);
-      
+
       // 204 No Content is the standard response for successful DELETE
       // It may not have a response body
       if (response.status === 204) {
         return { message: 'Address deleted successfully' };
       }
-      
+
       // 200 OK with a message body
       return response.data as ApiResponse;
     } catch (error: any) {
@@ -772,12 +778,12 @@ export class AuthService {
       console.log('- address_id:', address_id);
       console.log('- imageUris:', imageUris);
       console.log('- estimatedOrderValue:', estimatedOrderValue);
-      
+
       const formData = new FormData();
-      
+
       // Add items as JSON string
       formData.append('items', JSON.stringify(items));
-      
+
       // Add address_id if provided
       if (address_id) {
         formData.append('address_id', address_id.toString());
@@ -798,7 +804,7 @@ export class AuthService {
           const type = match ? `image/${match[1]}` : 'image/jpeg';
 
           console.log(`Image ${i}: uri=${uri}, filename=${filename}, type=${type}`);
-          
+
           formData.append('images', {
             uri,
             name: filename,
@@ -871,7 +877,7 @@ export class AuthService {
         preferred_datetime: payload.preferredDateTime,
         notes: payload.notes,
       });
-      
+
       const response = await apiClient.post(API_CONFIG.ENDPOINTS.SERVICE_BOOKINGS, {
         service: payload.service,
         name: payload.name,
@@ -880,7 +886,7 @@ export class AuthService {
         preferred_datetime: payload.preferredDateTime,
         notes: payload.notes,
       });
-      
+
       console.log('📡 API Response:', response.data);
       return response.data?.booking as ServiceBooking;
     } catch (error: any) {
@@ -1053,7 +1059,7 @@ export class ServiceabilityAPI {
 
       // Retry on network errors or server errors (5xx)
       if (retries > 0) {
-        await new Promise(resolve => 
+        await new Promise(resolve =>
           setTimeout(resolve, ServiceabilityAPI.RETRY_DELAY_MS * (ServiceabilityAPI.MAX_RETRIES - retries + 1))
         );
         return ServiceabilityAPI.retryWithBackoff(fn, retries - 1);
@@ -1085,8 +1091,8 @@ export class ServiceabilityAPI {
     } catch (error: any) {
       console.error('ServiceabilityAPI.checkPincode error:', error);
       throw new Error(
-        error.response?.data?.error || 
-        error.message || 
+        error.response?.data?.error ||
+        error.message ||
         'Failed to check pincode serviceability'
       );
     }
@@ -1122,8 +1128,8 @@ export class ServiceabilityAPI {
     } catch (error: any) {
       console.error('ServiceabilityAPI.checkCoordinates error:', error);
       throw new Error(
-        error.response?.data?.error || 
-        error.message || 
+        error.response?.data?.error ||
+        error.message ||
         'Failed to check coordinate serviceability'
       );
     }
@@ -1143,8 +1149,8 @@ export class ServiceabilityAPI {
     } catch (error: any) {
       console.error('ServiceabilityAPI.getCities error:', error);
       throw new Error(
-        error.response?.data?.error || 
-        error.message || 
+        error.response?.data?.error ||
+        error.message ||
         'Failed to fetch serviceable cities'
       );
     }
@@ -1170,8 +1176,8 @@ export class ServiceabilityAPI {
     } catch (error: any) {
       console.error('ServiceabilityAPI.getPincodes error:', error);
       throw new Error(
-        error.response?.data?.error || 
-        error.message || 
+        error.response?.data?.error ||
+        error.message ||
         'Failed to fetch serviceable pincodes'
       );
     }
@@ -1253,19 +1259,19 @@ export class FeedbackService {
 }
 
 // Rating types (re-exported from types/rating.ts)
-export type { 
-  RatingTag, 
-  PendingOrder, 
-  RatingCheck, 
+export type {
+  RatingTag,
+  PendingOrder,
+  RatingCheck,
   RatingSubmission,
   RatingResponse,
   PendingRatingsResponse,
   RatingCheckResponse
 } from '../types/rating';
 
-import type { 
-  PendingOrder, 
-  RatingCheck, 
+import type {
+  PendingOrder,
+  RatingCheck,
   RatingSubmission,
   RatingResponse
 } from '../types/rating';

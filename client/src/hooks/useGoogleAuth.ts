@@ -49,11 +49,11 @@ export const useGoogleAuth = () => {
           if (serverResponse.jwt) {
             console.log('Login successful, JWT received');
             console.log('User:', serverResponse.user);
-            
+
             // Wait for AsyncStorage to fully persist the token
             // This prevents race conditions on iOS where the token might not be ready
             await new Promise(resolve => setTimeout(resolve, 150));
-            
+
             // Verify the token was actually stored
             const isStored = await AuthService.isAuthenticated();
             if (!isStored) {
@@ -61,15 +61,19 @@ export const useGoogleAuth = () => {
               // Token wasn't stored, this shouldn't happen but handle gracefully
               throw new Error('Failed to store authentication token');
             }
-            
+
             console.log('JWT verified in storage');
-            
+
             // Update authentication state
             setAuthenticatedState(true);
-            
+
+            // Additional delay to ensure auth state propagates through React
+            // This prevents the scenario where components still see isGuest=true
+            await new Promise(resolve => setTimeout(resolve, 100));
+
             // Note: Removed refreshAuthStatus() call to prevent race condition
             // that was causing app crash on iOS after redirect to home
-            
+
             setError(null);
             setAuthSuccess(true);
             setIsLoading(false);

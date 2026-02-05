@@ -143,12 +143,15 @@
     "failedToLoad": "प्रोफाइल लोड करण्यात अयशस्वी",
     "retry": "पुन्हा प्रयत्न करा",
     "sections": {
+      "quickActions": "द्रुत क्रिया",
       "account": "खाते",
+      "manageAccount": "तुमचे खाते व्यवस्थापित करा",
       "preferences": "प्राधान्ये",
       "ordersServices": "ऑर्डर आणि सेवा",
       "supportFeedback": "समर्थन आणि अभिप्राय",
       "environmentalImpact": "पर्यावरणीय प्रभाव"
     },
+    "manageAccountSubtitle": "प्रोफाइल आणि सुरक्षा",
     "editProfile": "प्रोफाइल संपादित करा",
     "editProfileSubtitle": "तुमची वैयक्तिक माहिती अपडेट करा",
     "addresses": "पत्ते",
@@ -163,6 +166,7 @@
     "referFriends": "मित्रांना रेफर करा",
     "referFriendsSubtitle": "रेफरलसाठी बक्षिसे मिळवा",
     "logout": "लॉग आउट",
+    "logoutSubtitle": "तुमच्या खात्यातून साइन आउट करा",
     "logoutConfirmTitle": "लॉग आउट",
     "logoutConfirmMessage": "तुम्हाला खात्री आहे की तुम्ही लॉग आउट करू इच्छिता?",
     "deleteAccount": "खाते हटवा",

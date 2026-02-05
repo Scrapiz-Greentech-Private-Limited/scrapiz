@@ -13,7 +13,7 @@ import {
   Image,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
-import { User, MapPin, Bell, Sun, Moon, CircleHelp as HelpCircle, Gift, ChevronRight, LogOut, Package, Trash2, Globe, WifiOff } from 'lucide-react-native';
+import { User, MapPin, Bell, Sun, Moon, CircleHelp as HelpCircle, Gift, ChevronRight, LogOut, Package, Trash2, Globe, WifiOff, Settings } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import NetInfo from '@react-native-community/netinfo';
@@ -26,6 +26,7 @@ import DeleteAccountFeedbackModal from '../../components/DeleteAccountFeedbackMo
 import AvatarSelectorModal from '../../components/AvatarSelectorModal';
 import AvatarOptionsBottomSheet from '../../components/AvatarOptionsBottomSheet';
 import NetworkRetryOverlay from '../../components/NetworkRetryOverlay';
+import ManageAccountModal from '../../components/ManageAccountModal';
 import { useAuth } from '../../context/AuthContext';
 import { useLocalization } from '../../context/LocalizationContext';
 import LanguageChangeModal from '../../components/LanguageChangeModal';
@@ -69,6 +70,7 @@ export default function Profile() {
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [avatarModalVisible, setAvatarModalVisible] = useState(false);
   const [avatarOptionsVisible, setAvatarOptionsVisible] = useState(false);
+  const [manageAccountModalVisible, setManageAccountModalVisible] = useState(false);
 
   // Auth guard for guest flow - check if user is authenticated
   const { isGuest, isAuthenticated: isAuthGuardAuthenticated, isLoading: isAuthLoading } = useAuthGuard();
@@ -502,7 +504,21 @@ export default function Profile() {
     router.push(`/profile/orders/${orderId}`);
   };
 
-  if (loading) {
+  /**
+   * Guest View: Show GuestProfileView for unauthenticated users
+   * This check must come FIRST before loading/error states
+   * 
+   * Shows GuestProfileView when:
+   * 1. User is not authenticated (guest)
+   * 2. User data failed to load (no user but also no auth)
+   * 3. Network/API errors occurred for unauthenticated users
+   */
+  if (!isAuthLoading && (isGuest || (!user && !loading))) {
+    return <GuestProfileView />;
+  }
+
+  // Show loading only for authenticated users loading their profile data
+  if (loading || isAuthLoading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
@@ -512,6 +528,7 @@ export default function Profile() {
     );
   }
 
+  // Error state for authenticated users who have issues loading their profile
   if (errors || !user) {
     return (
       <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
@@ -540,45 +557,7 @@ export default function Profile() {
     router.push('/notification-permission');
   };
 
-  const menuItems: MenuSection[] = [
-    {
-      section: t('profile.sections.account'),
-      items: [
-        { icon: User, title: t('profile.editProfile'), subtitle: t('profile.editProfileSubtitle'), action: handleEditProfile },
-        { icon: MapPin, title: t('profile.addresses'), subtitle: `${user.addresses.length} ${t('profile.addressesSubtitle')}`, action: handleAddresses },
-        { icon: Trash2, title: t('profile.deleteAccount'), subtitle: t('profile.deleteAccountSubtitle'), action: handleDeleteAccount },
-      ]
-    },
-    {
-      section: t('profile.sections.preferences'),
-      items: [
-        { icon: Bell, title: t('profile.notifications'), subtitle: t('profile.notificationsSubtitle'), action: handleNotificationPermission },
-        { icon: Globe, title: t('profile.languageSupport'), subtitle: currentLanguageDisplay, action: handleLanguageSettings },
-      ]
-    },
-    {
-      section: t('profile.sections.ordersServices'),
-      items: [
-        { icon: Package, title: t('profile.myOrders'), subtitle: `${user.orders.length} ${t('profile.myOrdersSubtitle')}`, action: handleViewOrders },
-      ]
-    },
-    {
-      section: t('profile.sections.supportFeedback'),
-      items: [
-        { icon: HelpCircle, title: t('profile.helpSupport'), subtitle: t('profile.helpSupportSubtitle'), action: handleHelpSupport },
-        { icon: Gift, title: t('profile.referFriends'), subtitle: t('profile.referFriendsSubtitle'), action: handleReferFriends },
-      ]
-    }
-  ]
-
-  /**
-   * Guest View: Show GuestProfileView for unauthenticated users
-   * This provides a premium-looking welcome screen with sign-in/sign-up CTAs
-   * instead of redirecting guests away from the profile tab
-   */
-  if (isGuest && !isAuthLoading) {
-    return <GuestProfileView />;
-  }
+  // Note: Menu structure converted to grid-based layout directly in JSX
 
   return (
     <ScrollView
@@ -656,88 +635,194 @@ export default function Profile() {
               })()}
             </View>
           </TouchableOpacity>
-          <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{user.name}</Text>
-            <Text style={styles.profileEmail}>{user.email}</Text>
-          </View>
+          <Text style={styles.profileNameCentered}>{user.name}</Text>
         </View>
       </LinearGradient>
 
-      {menuItems.map((section, sectionIndex) => (
-        <View key={sectionIndex} style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{section.section}</Text>
-          {section.items.map((item, itemIndex) => (
-            <TouchableOpacity
-              key={itemIndex}
-              style={[
-                styles.menuItem,
-                { backgroundColor: colors.surface },
-                item.title === t('profile.deleteAccount') && styles.deleteAccountMenuItem
-              ]}
-              onPress={item.action}
-              disabled={item.title === t('profile.deleteAccount') && deletingAccount}
-            >
-              <View style={styles.menuItemLeft}>
-                <View style={[
-                  styles.menuItemIcon,
-                  item.title === t('profile.deleteAccount') && styles.deleteAccountIcon
-                ]}>
-                  <item.icon size={20} color={item.title === t('profile.deleteAccount') ? '#dc2626' : '#6b7280'} />
-                </View>
-                <View style={styles.menuItemInfo}>
-                  <Text style={[
-                    styles.menuItemTitle,
-                    { color: colors.text },
-                    item.title === t('profile.deleteAccount') && styles.deleteAccountTitle
-                  ]}>{item.title}</Text>
-                  <Text style={[styles.menuItemSubtitle, { color: colors.textSecondary }]}>{item.subtitle}</Text>
-                </View>
-              </View>
-              <View style={styles.menuItemRight}>
-                {item.hasSwitch ? (
-                  <Switch
-                    value={item.switchValue}
-                    onValueChange={item.onSwitchChange}
-                    trackColor={{ false: '#e5e7eb', true: '#bbf7d0' }}
-                    thumbColor={item.switchValue ? '#16a34a' : '#f3f4f6'}
-                  />
-                ) : item.title === t('profile.deleteAccount') && deletingAccount ? (
-                  <ActivityIndicator size="small" color="#dc2626" />
-                ) : (
-                  <ChevronRight size={16} color="#d1d5db" />
-                )}
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-      ))}
+      {/* Quick Actions Grid */}
+      <View style={styles.quickActionsSection}>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+          {t('profile.sections.quickActions') || 'Quick Actions'}
+        </Text>
+        <View style={styles.quickActionsGrid}>
+          {/* My Orders */}
+          <TouchableOpacity
+            style={[styles.quickActionCard, { backgroundColor: isDark ? colors.card : '#f8fafc' }]}
+            onPress={handleViewOrders}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.quickActionIcon, { backgroundColor: isDark ? '#1a472a' : '#dcfce7' }]}>
+              <Package size={24} color="#16a34a" strokeWidth={2} />
+            </View>
+            <Text style={[styles.quickActionTitle, { color: colors.text }]}>
+              {t('profile.myOrders')}
+            </Text>
+            <Text style={[styles.quickActionSubtitle, { color: colors.textSecondary }]}>
+              {user.orders.length} {t('profile.myOrdersSubtitle')}
+            </Text>
+          </TouchableOpacity>
 
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{t('profile.sections.environmentalImpact')}</Text>
-        <View style={[styles.impactCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={styles.impactEmoji}>🌱</Text>
-          <View style={styles.impactContent}>
-            <Text style={[styles.impactTitle, { color: colors.text }]}>{t('profile.impactGreatJob')}</Text>
-            <Text style={[styles.impactDescription, { color: colors.textSecondary }]}>
+          {/* Addresses */}
+          <TouchableOpacity
+            style={[styles.quickActionCard, { backgroundColor: isDark ? colors.card : '#f8fafc' }]}
+            onPress={handleAddresses}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.quickActionIcon, { backgroundColor: isDark ? '#1a472a' : '#dcfce7' }]}>
+              <MapPin size={24} color="#16a34a" strokeWidth={2} />
+            </View>
+            <Text style={[styles.quickActionTitle, { color: colors.text }]}>
+              {t('profile.addresses')}
+            </Text>
+            <Text style={[styles.quickActionSubtitle, { color: colors.textSecondary }]}>
+              {user.addresses.length} {t('profile.addressesSubtitle')}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Refer Friends */}
+          <TouchableOpacity
+            style={[styles.quickActionCard, { backgroundColor: isDark ? colors.card : '#f8fafc' }]}
+            onPress={handleReferFriends}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.quickActionIcon, { backgroundColor: isDark ? '#1a472a' : '#fef3c7' }]}>
+              <Gift size={24} color="#f59e0b" strokeWidth={2} />
+            </View>
+            <Text style={[styles.quickActionTitle, { color: colors.text }]}>
+              {t('profile.referFriends')}
+            </Text>
+            <Text style={[styles.quickActionSubtitle, { color: colors.textSecondary }]}>
+              {t('profile.referFriendsSubtitle')}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Manage Account */}
+          <TouchableOpacity
+            style={[styles.quickActionCard, { backgroundColor: isDark ? colors.card : '#f8fafc' }]}
+            onPress={() => setManageAccountModalVisible(true)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.quickActionIcon, { backgroundColor: isDark ? '#1f2937' : '#f3f4f6' }]}>
+              <Settings size={24} color={colors.text} strokeWidth={2} />
+            </View>
+            <Text style={[styles.quickActionTitle, { color: colors.text }]}>
+              {t('profile.sections.manageAccount') || 'Manage Account'}
+            </Text>
+            <Text style={[styles.quickActionSubtitle, { color: colors.textSecondary }]}>
+              {t('profile.manageAccountSubtitle') || 'Profile & Security'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Settings Section */}
+      <View style={styles.settingsSection}>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+          {t('profile.sections.preferences')}
+        </Text>
+        <View style={[styles.settingsCard, { backgroundColor: isDark ? colors.card : 'white' }]}>
+          {/* Notifications */}
+          <TouchableOpacity
+            style={styles.settingsItem}
+            onPress={handleNotificationPermission}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.settingsItemIcon, { backgroundColor: isDark ? '#1f2937' : '#f3f4f6' }]}>
+              <Bell size={20} color={colors.text} strokeWidth={2} />
+            </View>
+            <View style={styles.settingsItemText}>
+              <Text style={[styles.settingsItemTitle, { color: colors.text }]}>
+                {t('profile.notifications')}
+              </Text>
+              <Text style={[styles.settingsItemSubtitle, { color: colors.textSecondary }]}>
+                {t('profile.notificationsSubtitle')}
+              </Text>
+            </View>
+            <ChevronRight color={colors.textSecondary} size={20} />
+          </TouchableOpacity>
+
+          <View style={[styles.settingsDivider, { backgroundColor: colors.border }]} />
+
+          {/* Language */}
+          <TouchableOpacity
+            style={styles.settingsItem}
+            onPress={handleLanguageSettings}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.settingsItemIcon, { backgroundColor: isDark ? '#1f2937' : '#f3f4f6' }]}>
+              <Globe size={20} color={colors.text} strokeWidth={2} />
+            </View>
+            <View style={styles.settingsItemText}>
+              <Text style={[styles.settingsItemTitle, { color: colors.text }]}>
+                {t('profile.languageSupport')}
+              </Text>
+              <Text style={[styles.settingsItemSubtitle, { color: colors.textSecondary }]}>
+                {currentLanguageDisplay}
+              </Text>
+            </View>
+            <ChevronRight color={colors.textSecondary} size={20} />
+          </TouchableOpacity>
+
+          <View style={[styles.settingsDivider, { backgroundColor: colors.border }]} />
+
+          {/* Help & Support */}
+          <TouchableOpacity
+            style={styles.settingsItem}
+            onPress={handleHelpSupport}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.settingsItemIcon, { backgroundColor: isDark ? '#1f2937' : '#f3f4f6' }]}>
+              <HelpCircle size={20} color={colors.text} strokeWidth={2} />
+            </View>
+            <View style={styles.settingsItemText}>
+              <Text style={[styles.settingsItemTitle, { color: colors.text }]}>
+                {t('profile.helpSupport')}
+              </Text>
+              <Text style={[styles.settingsItemSubtitle, { color: colors.textSecondary }]}>
+                {t('profile.helpSupportSubtitle')}
+              </Text>
+            </View>
+            <ChevronRight color={colors.textSecondary} size={20} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Environmental Impact Card */}
+      <View style={styles.impactSection}>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+          {t('profile.sections.environmentalImpact')}
+        </Text>
+        <LinearGradient
+          colors={isDark ? ['#065f46', '#047857'] : ['#ecfdf5', '#d1fae5']}
+          style={styles.impactCardNew}
+        >
+          <View style={styles.impactIconWrapper}>
+            <Text style={styles.impactEmoji}>🌱</Text>
+          </View>
+          <View style={styles.impactContentNew}>
+            <Text style={[styles.impactTitleNew, { color: isDark ? '#f0fdf4' : '#064e3b' }]}>
+              {t('profile.impactGreatJob')}
+            </Text>
+            <Text style={[styles.impactDescriptionNew, { color: isDark ? '#d1fae5' : '#065f46' }]}>
               {t('profile.impactDescription', { weight: Math.round(environmentalImpact.totalWeight) })}
             </Text>
-            <View style={styles.impactStats}>
-              <Text style={[styles.impactStat, { color: colors.text }]}>{t('profile.impactTreesSaved', { count: environmentalImpact.treesSaved })}</Text>
-              <Text style={[styles.impactStat, { color: colors.text }]}>{t('profile.impactCO2Reduced', { amount: environmentalImpact.co2Reduced })}</Text>
+            <View style={styles.impactStatsRow}>
+              <View style={[styles.impactStatBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(22,163,74,0.15)' }]}>
+                <Text style={[styles.impactStatText, { color: isDark ? '#6ee7b7' : '#16a34a' }]}>
+                  🌳 {environmentalImpact.treesSaved} {t('profile.trees') || 'trees'}
+                </Text>
+              </View>
+              <View style={[styles.impactStatBadge, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(22,163,74,0.15)' }]}>
+                <Text style={[styles.impactStatText, { color: isDark ? '#6ee7b7' : '#16a34a' }]}>
+                  ♻️ {environmentalImpact.co2Reduced}kg CO₂
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
+        </LinearGradient>
       </View>
 
-      <View style={styles.section}>
-        <TouchableOpacity
-          style={[styles.logoutButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          onPress={handleLogout}
-        >
-          <LogOut size={fs(20)} color="#dc2626" />
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
-      </View>
+
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>{t('profile.version')}</Text>
@@ -772,6 +857,15 @@ export default function Profile() {
         onChooseFromGallery={handlePickImage}
         onPickCustomAvatar={handleOpenAvatarSelector}
         onRemovePhoto={handleRemoveImage}
+      />
+
+      <ManageAccountModal
+        visible={manageAccountModalVisible}
+        onClose={() => setManageAccountModalVisible(false)}
+        onEditProfile={handleEditProfile}
+        onDeleteAccount={handleDeleteAccount}
+        onLogout={handleLogout}
+        deletingAccount={deletingAccount}
       />
 
       {/* Network Retry Overlay - Shows when network issues occur */}
@@ -919,16 +1013,17 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   profileContainer: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   avatarWrapper: {
-    marginRight: spacing(14),
+    marginBottom: spacing(12),
   },
   avatar: {
-    width: wp(24), // ~90px on standard screens (88-96px per design guidelines)
-    height: wp(24),
-    borderRadius: wp(12),
+    width: wp(26), // Slightly larger for centered layout
+    height: wp(26),
+    borderRadius: wp(13),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -948,7 +1043,7 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   avatarText: {
-    fontSize: fs(32),
+    fontSize: fs(36),
     fontWeight: '700',
     color: '#ffffff',
     letterSpacing: 1,
@@ -963,6 +1058,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontFamily: 'Inter-Bold',
     color: 'white',
+  },
+  profileNameCentered: {
+    fontSize: fs(22),
+    fontWeight: 'bold',
+    fontFamily: 'Inter-Bold',
+    color: 'white',
+    textAlign: 'center',
   },
   profileEmail: {
     fontSize: fs(13), // Reduced from 14
@@ -1094,10 +1196,183 @@ const styles = StyleSheet.create({
   footer: {
     alignItems: 'center',
     paddingVertical: spacing(20),
+    paddingBottom: spacing(100), // Extra space for tab bar
   },
   footerText: {
     fontSize: fs(12),
     color: '#9ca3af',
+    fontFamily: 'Inter-Regular',
+  },
+  // New Grid Layout Styles
+  quickActionsSection: {
+    paddingHorizontal: spacing(16),
+    paddingTop: spacing(20),
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing(12),
+  },
+  quickActionCard: {
+    width: '48%',
+    padding: spacing(16),
+    borderRadius: spacing(16),
+    gap: spacing(10),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  quickActionIcon: {
+    width: spacing(48),
+    height: spacing(48),
+    borderRadius: spacing(24),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quickActionTitle: {
+    fontSize: fs(15),
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+  },
+  quickActionSubtitle: {
+    fontSize: fs(13),
+    lineHeight: fs(18),
+    fontFamily: 'Inter-Regular',
+  },
+  settingsSection: {
+    paddingHorizontal: spacing(16),
+    paddingTop: spacing(24),
+  },
+  settingsCard: {
+    borderRadius: spacing(16),
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  settingsItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing(16),
+    paddingHorizontal: spacing(16),
+    gap: spacing(14),
+  },
+  settingsItemIcon: {
+    width: spacing(40),
+    height: spacing(40),
+    borderRadius: spacing(12),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  settingsItemText: {
+    flex: 1,
+  },
+  settingsItemTitle: {
+    fontSize: fs(16),
+    fontWeight: '500',
+    fontFamily: 'Inter-Medium',
+    marginBottom: spacing(2),
+  },
+  settingsItemSubtitle: {
+    fontSize: fs(13),
+    fontFamily: 'Inter-Regular',
+  },
+  settingsDivider: {
+    height: 1,
+    marginLeft: spacing(70),
+  },
+  impactSection: {
+    paddingHorizontal: spacing(16),
+    paddingTop: spacing(24),
+  },
+  impactCardNew: {
+    borderRadius: spacing(16),
+    padding: spacing(20),
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing(16),
+  },
+  impactIconWrapper: {
+    width: spacing(56),
+    height: spacing(56),
+    borderRadius: spacing(28),
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  impactContentNew: {
+    flex: 1,
+    gap: spacing(8),
+  },
+  impactTitleNew: {
+    fontSize: fs(18),
+    fontWeight: '700',
+    fontFamily: 'Inter-Bold',
+  },
+  impactDescriptionNew: {
+    fontSize: fs(14),
+    lineHeight: fs(20),
+    fontFamily: 'Inter-Regular',
+  },
+  impactStatsRow: {
+    flexDirection: 'row',
+    gap: spacing(8),
+    flexWrap: 'wrap',
+    marginTop: spacing(4),
+  },
+  impactStatBadge: {
+    paddingHorizontal: spacing(12),
+    paddingVertical: spacing(6),
+    borderRadius: spacing(20),
+  },
+  impactStatText: {
+    fontSize: fs(13),
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+  },
+  dangerSection: {
+    paddingHorizontal: spacing(16),
+    paddingTop: spacing(24),
+  },
+  dangerCard: {
+    borderRadius: spacing(16),
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  dangerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing(16),
+    paddingHorizontal: spacing(16),
+    gap: spacing(14),
+  },
+  dangerItemIcon: {
+    width: spacing(40),
+    height: spacing(40),
+    borderRadius: spacing(12),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dangerItemText: {
+    flex: 1,
+  },
+  dangerItemTitle: {
+    fontSize: fs(16),
+    fontWeight: '500',
+    fontFamily: 'Inter-Medium',
+    color: '#dc2626',
+    marginBottom: spacing(2),
+  },
+  dangerItemSubtitle: {
+    fontSize: fs(13),
     fontFamily: 'Inter-Regular',
   },
 });

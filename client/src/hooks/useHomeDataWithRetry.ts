@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { 
-  AuthService, 
-  ProductSummary, 
+import {
+  AuthService,
+  ProductSummary,
   CategorySummary,
-  OrderSummary 
+  OrderSummary
 } from '../api/apiService';
 import { useNetworkRetry } from './useNetworkRetry';
 
@@ -52,21 +52,10 @@ export const useHomeDataWithRetry = (): UseHomeDataWithRetryReturn => {
 
       if (!isMountedRef.current) return;
 
-      // Verify we have an auth token before making API calls
+      // Check if user is authenticated
       const isAuthenticated = await AuthService.isAuthenticated();
-      if (!isAuthenticated) {
-        console.log('useHomeDataWithRetry: No auth token found, skipping data load');
-        if (isMountedRef.current) {
-          setLoading(false);
-        }
-        return;
-      }
 
-      // Load data sequentially with mount checks
-      const userData = await AuthService.getUser();
-      if (!isMountedRef.current) return;
-      setUser(userData);
-
+      // Always load public data (products and categories) - available to all users
       const productsData = await AuthService.getProducts();
       if (!isMountedRef.current) return;
       setProducts(productsData);
@@ -75,9 +64,23 @@ export const useHomeDataWithRetry = (): UseHomeDataWithRetryReturn => {
       if (!isMountedRef.current) return;
       setCategories(categoriesData);
 
-      const ordersData = await AuthService.getOrderNos();
-      if (!isMountedRef.current) return;
-      setOrders(ordersData);
+      // Only load user-specific data if authenticated
+      if (isAuthenticated) {
+        try {
+          const userData = await AuthService.getUser();
+          if (!isMountedRef.current) return;
+          setUser(userData);
+
+          const ordersData = await AuthService.getOrderNos();
+          if (!isMountedRef.current) return;
+          setOrders(ordersData);
+        } catch (userErr: any) {
+          // If user data fails but public data succeeded, don't block the UI
+          console.warn('Failed to load user-specific data:', userErr.message);
+        }
+      } else {
+        console.log('useHomeDataWithRetry: Guest user - showing public data only');
+      }
 
       // Reset retry state on success
       resetRetryState();
@@ -86,16 +89,16 @@ export const useHomeDataWithRetry = (): UseHomeDataWithRetryReturn => {
       if (isMountedRef.current) {
         const errorMsg = err.message || 'Failed to load data';
         setError(errorMsg);
-        
+
         // Check if it's a network-related error
-        const isNetworkError = 
+        const isNetworkError =
           errorMsg.toLowerCase().includes('network') ||
           errorMsg.toLowerCase().includes('internet') ||
           errorMsg.toLowerCase().includes('connection') ||
           errorMsg.toLowerCase().includes('timeout') ||
           err.code === 'ECONNABORTED' ||
           err.code === 'ERR_NETWORK';
-        
+
         if (isNetworkError) {
           startRetryFlow(errorMsg);
         }
@@ -125,14 +128,14 @@ export const useHomeDataWithRetry = (): UseHomeDataWithRetryReturn => {
 
   useEffect(() => {
     isMountedRef.current = true;
-    
+
     const initLoad = async () => {
       const isConnected = await checkNetworkAndLoad();
       if (isConnected) {
         loadData();
       }
     };
-    
+
     initLoad();
 
     return () => {

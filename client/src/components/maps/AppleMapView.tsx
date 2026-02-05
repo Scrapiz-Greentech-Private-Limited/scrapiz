@@ -45,7 +45,7 @@ export function AppleMapView({
         centerCoordinate,
         zoomLevel || zoom
       );
-      
+
       mapRef.current?.animateToRegion(region, animationDuration || 1000);
     },
 
@@ -53,7 +53,7 @@ export function AppleMapView({
       // Convert [lng, lat] to Apple Maps Region format
       // Requirement: 15.2
       const region = coordinatesToRegion(coords, zoom);
-      
+
       mapRef.current?.animateToRegion(region, duration);
     },
 
@@ -85,6 +85,14 @@ export function AppleMapView({
     }
   };
 
+  // Handle region change during pan/zoom (fires continuously)
+  // Requirement: 15.2, 20.6
+  const handleRegionChange = (region: Region) => {
+    // Convert {latitude, longitude} to [lng, lat]
+    const coords: Coordinates = [region.longitude, region.latitude];
+    onRegionChange(coords);
+  };
+
   // Handle region change complete (after pan/zoom completes)
   // Requirement: 15.2, 20.6
   const handleRegionChangeComplete = (region: Region) => {
@@ -111,6 +119,7 @@ export function AppleMapView({
       style={style}
       initialRegion={getInitialRegion()}
       onPress={handlePress}
+      onRegionChange={handleRegionChange}
       onRegionChangeComplete={handleRegionChangeComplete}
       showsUserLocation={false}
       showsMyLocationButton={false}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     View,
     Text,
@@ -10,9 +10,11 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { User, LogIn, UserPlus, ShoppingBag, Gift, HelpCircle, Globe, ChevronRight, Heart, Leaf } from 'lucide-react-native';
+import { User, LogIn, UserPlus, ShoppingBag, Gift, HelpCircle, Globe, ChevronRight, Heart, Leaf, Sun, Moon } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useLocalization } from '../context/LocalizationContext';
+import LanguageChangeModal from './LanguageChangeModal';
+import { SUPPORTED_LANGUAGES } from '../localization/languages';
 
 const { width } = Dimensions.get('window');
 
@@ -30,8 +32,9 @@ const { width } = Dimensions.get('window');
  */
 export default function GuestProfileView() {
     const router = useRouter();
-    const { colors, isDark } = useTheme();
-    const { t, currentLanguage } = useLocalization();
+    const { colors, isDark, setThemeMode } = useTheme();
+    const { t, currentLanguage, changeLanguage } = useLocalization();
+    const [languageModalVisible, setLanguageModalVisible] = useState(false);
 
     const handleLogin = () => {
         router.push('/(auth)/login');
@@ -42,12 +45,31 @@ export default function GuestProfileView() {
     };
 
     const handleLanguageSettings = () => {
-        router.push('/language-settings');
+        // Open modal instead of navigating to non-existent route
+        setLanguageModalVisible(true);
+    };
+
+    const handleLanguageChange = async (language: string) => {
+        try {
+            // This persists to AsyncStorage via LocalizationContext
+            await changeLanguage(language as any);
+        } catch (error) {
+            console.error('Failed to change language:', error);
+        }
     };
 
     const handleHelpSupport = () => {
-        router.push('/help-support');
+        // Navigate to the correct help-support route
+        router.push('/profile/help-support');
     };
+
+    const toggleTheme = async () => {
+        const newTheme = isDark ? 'light' : 'dark';
+        await setThemeMode(newTheme);
+    };
+
+    // Get current language display name
+    const currentLanguageDisplay = SUPPORTED_LANGUAGES.find(lang => lang.code === currentLanguage)?.nativeName || 'English';
 
     const benefits = [
         {
@@ -87,6 +109,19 @@ export default function GuestProfileView() {
                     end={{ x: 1, y: 1 }}
                     style={styles.heroSection}
                 >
+                    {/* Theme Toggle */}
+                    <TouchableOpacity
+                        style={styles.themeToggleButton}
+                        onPress={toggleTheme}
+                        activeOpacity={0.7}
+                    >
+                        {isDark ? (
+                            <Sun size={20} color="#ffffff" strokeWidth={2.5} />
+                        ) : (
+                            <Moon size={20} color="#ffffff" strokeWidth={2.5} />
+                        )}
+                    </TouchableOpacity>
+
                     {/* Guest Avatar */}
                     <View style={styles.avatarContainer}>
                         <View style={[styles.avatar, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
@@ -172,7 +207,7 @@ export default function GuestProfileView() {
                                     {t('profile.languageSupport')}
                                 </Text>
                                 <Text style={[styles.menuItemSubtitle, { color: colors.textSecondary }]}>
-                                    {currentLanguage.toUpperCase()}
+                                    {currentLanguageDisplay}
                                 </Text>
                             </View>
                             <ChevronRight color={colors.textSecondary} size={20} />
@@ -212,6 +247,14 @@ export default function GuestProfileView() {
                     </TouchableOpacity>
                 </View>
             </ScrollView>
+
+            {/* Language Change Modal */}
+            <LanguageChangeModal
+                visible={languageModalVisible}
+                currentLanguage={currentLanguage}
+                onClose={() => setLanguageModalVisible(false)}
+                onLanguageChange={handleLanguageChange}
+            />
         </View>
     );
 }
@@ -231,6 +274,17 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         borderBottomLeftRadius: 32,
         borderBottomRightRadius: 32,
+    },
+    themeToggleButton: {
+        position: 'absolute',
+        top: 50,
+        right: 20,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     avatarContainer: {
         marginBottom: 16,

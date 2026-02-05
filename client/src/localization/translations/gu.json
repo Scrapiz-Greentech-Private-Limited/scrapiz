@@ -143,12 +143,15 @@
     "failedToLoad": "પ્રોફાઇલ લોડ કરવામાં નિષ્ફળ",
     "retry": "ફરી પ્રયાસ કરો",
     "sections": {
+      "quickActions": "ઝડપી ક્રિયાઓ",
       "account": "એકાઉન્ટ",
+      "manageAccount": "તમારું એકાઉન્ટ મેનેજ કરો",
       "preferences": "પસંદગીઓ",
       "ordersServices": "ઓર્ડર અને સેવાઓ",
       "supportFeedback": "સપોર્ટ અને પ્રતિસાદ",
       "environmentalImpact": "પર્યાવરણીય અસર"
     },
+    "manageAccountSubtitle": "પ્રોફાઇલ અને સુરક્ષા",
     "editProfile": "પ્રોફાઇલ સંપાદિત કરો",
     "editProfileSubtitle": "તમારી વ્યક્તિગત માહિતી અપડેટ કરો",
     "addresses": "સરનામાં",
@@ -163,6 +166,7 @@
     "referFriends": "મિત્રોને રેફર કરો",
     "referFriendsSubtitle": "રેફરલ માટે પુરસ્કારો મેળવો",
     "logout": "લૉગ આઉટ",
+    "logoutSubtitle": "તમારા એકાઉન્ટમાંથી સાઇન આઉટ કરો",
     "logoutConfirmTitle": "લૉગ આઉટ",
     "logoutConfirmMessage": "શું તમે ખરેખર લૉગ આઉટ કરવા માંગો છો?",
     "deleteAccount": "એકાઉન્ટ કાઢી નાખો",
