@@ -55,7 +55,7 @@
       ],
       "package": "com.scrapiz.app",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 57
+      "versionCode": 60
     },
     "notification": {
       "icon": "./assets/images/foreground5.png",
