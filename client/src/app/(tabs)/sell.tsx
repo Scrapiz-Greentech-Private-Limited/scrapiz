@@ -341,6 +341,9 @@ function SellScreenContent() {
   const [selectedProduct, setSelectedProduct] = useState<ProductSummary | null>(null);
   const [tempQuantity, setTempQuantity] = useState('1');
 
+  // Keep in Mind modal state
+  const [showKeepInMindModal, setShowKeepInMindModal] = useState(false);
+
   // Referral wallet - use context
   const { walletBalance, setWalletBalance, updateBalanceAndCache, applyReferralDiscount } = useReferral();
   const [useReferralBalance, setUseReferralBalance] = useState(false);
@@ -1833,111 +1836,23 @@ function SellScreenContent() {
         </View>
       </View>
 
-      {/* Keep in Mind Section */}
-      <View style={[styles.keepInMindCard, { backgroundColor: colors.surface }]}>
-        <Text style={[styles.keepInMindTitle, { color: colors.text }]}>
-          Please keep in mind that we do not accept{'\n'}the following items:
-        </Text>
-
-        <View style={styles.keepInMindGrid}>
-          {/* Wood & Glass */}
-          <View
-            style={[
-              styles.keepInMindItem,
-              { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
-            ]}
-          >
-            <View
-              style={[
-                styles.keepInMindIconContainer,
-                { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
-              ]}
-            >
-              <Text style={styles.keepInMindEmoji}>🪵🍾</Text>
-              <View style={styles.keepInMindCross}>
-                <X size={28} color="#dc2626" strokeWidth={3} />
-              </View>
-            </View>
-            <Text style={[styles.keepInMindText, { color: colors.text }]}>
-              We do not buy{'\n'}Wood & Glass
-            </Text>
-          </View>
-
-          {/* Clothes */}
-          <View
-            style={[
-              styles.keepInMindItem,
-              { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
-            ]}
-          >
-            <View
-              style={[
-                styles.keepInMindIconContainer,
-                { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
-              ]}
-            >
-              <Text style={styles.keepInMindEmoji}>👕👖</Text>
-              <View style={styles.keepInMindCross}>
-                <X size={28} color="#dc2626" strokeWidth={3} />
-              </View>
-            </View>
-            <Text style={[styles.keepInMindText, { color: colors.text }]}>
-              We do not buy{'\n'}Clothes
-            </Text>
-          </View>
-
-          {/* Scrap Rates */}
-          <View
-            style={[
-              styles.keepInMindItem,
-              { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
-            ]}
-          >
-            <View
-              style={[
-                styles.keepInMindIconContainer,
-                { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
-              ]}
-            >
-              <Text style={styles.keepInMindEmoji}>🪑💻</Text>
-              <View style={styles.keepInMindCross}>
-                <X size={28} color="#dc2626" strokeWidth={3} />
-              </View>
-            </View>
-            <Text style={[styles.keepInMindText, { color: colors.text }]}>
-              We buy only in{'\n'}scrap rates
-            </Text>
-          </View>
-
-          {/* 20kg */}
-          <View
-            style={[
-              styles.keepInMindItem,
-              { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
-            ]}
-          >
-            <View
-              style={[
-                styles.keepInMindIconContainer,
-                { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
-              ]}
-            >
-              <Text style={styles.keepInMindEmoji}>⚖️📦</Text>
-              <Text
-                style={[
-                  styles.keepInMindWeight,
-                  { backgroundColor: colors.surface, color: colors.text },
-                ]}
-              >
-                20 kg
-              </Text>
-            </View>
-            <Text style={[styles.keepInMindText, { color: colors.text }]}>
-              Free pickup only{'\n'}above 20 kg
-            </Text>
-          </View>
+      {/* Keep in Mind Section - Button to open draggable modal */}
+      <TouchableOpacity
+        style={[styles.keepInMindButton, { backgroundColor: colors.surface, borderColor: isDark ? 'rgba(245, 158, 11, 0.3)' : '#fef3c7' }]}
+        onPress={() => setShowKeepInMindModal(true)}
+        activeOpacity={0.8}
+      >
+        <View style={[styles.keepInMindButtonIcon, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
+          <AlertCircle size={24} color="#f59e0b" />
         </View>
-      </View>
+        <View style={styles.keepInMindButtonContent}>
+          <Text style={[styles.keepInMindButtonTitle, { color: colors.text }]}>Please Keep in Mind</Text>
+          <Text style={[styles.keepInMindButtonSubtitle, { color: colors.textSecondary }]}>
+            Tap to see items we don't accept
+          </Text>
+        </View>
+        <ArrowRight size={20} color={colors.textSecondary} />
+      </TouchableOpacity>
 
       {selectedImages.length > 0 && (
         <View style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -2180,6 +2095,145 @@ function SellScreenContent() {
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Keep in Mind Bottom Sheet Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showKeepInMindModal}
+        onRequestClose={() => setShowKeepInMindModal(false)}
+      >
+        <View style={styles.bottomSheetContainer}>
+          <TouchableWithoutFeedback onPress={() => setShowKeepInMindModal(false)}>
+            <View style={styles.bottomSheetOverlay} />
+          </TouchableWithoutFeedback>
+
+          <View style={[styles.bottomSheetContent, { backgroundColor: colors.surface }]}>
+            {/* Drag Handle */}
+            <View style={styles.bottomSheetHandleContainer}>
+              <View style={[styles.bottomSheetHandle, { backgroundColor: colors.border }]} />
+            </View>
+
+            <Text style={[styles.bottomSheetTitle, { color: colors.text }]}>
+              Please keep in mind
+            </Text>
+
+            <View style={styles.bottomSheetGrid}>
+              {/* Row 1 */}
+              <View style={styles.keepInMindRow}>
+                <View
+                  style={[
+                    styles.keepInMindItem,
+                    { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.keepInMindIconContainer,
+                      { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
+                    ]}
+                  >
+                    <Text style={styles.keepInMindEmoji}>🪵🍾</Text>
+                    <View style={styles.keepInMindCross}>
+                      <X size={28} color="#dc2626" strokeWidth={3} />
+                    </View>
+                  </View>
+                  <Text style={[styles.keepInMindText, { color: colors.text }]}>
+                    We do not buy{'\n'}Wood & Glass
+                  </Text>
+                </View>
+
+                <View
+                  style={[
+                    styles.keepInMindItem,
+                    { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.keepInMindIconContainer,
+                      { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
+                    ]}
+                  >
+                    <Text style={styles.keepInMindEmoji}>👕👖</Text>
+                    <View style={styles.keepInMindCross}>
+                      <X size={28} color="#dc2626" strokeWidth={3} />
+                    </View>
+                  </View>
+                  <Text style={[styles.keepInMindText, { color: colors.text }]}>
+                    We do not buy{'\n'}Clothes
+                  </Text>
+                </View>
+              </View>
+
+              {/* Row 2 */}
+              <View style={styles.keepInMindRow}>
+                <View
+                  style={[
+                    styles.keepInMindItem,
+                    { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.keepInMindIconContainer,
+                      { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
+                    ]}
+                  >
+                    <Text style={styles.keepInMindEmoji}>🪑💻</Text>
+                    <View style={styles.keepInMindCross}>
+                      <X size={28} color="#dc2626" strokeWidth={3} />
+                    </View>
+                  </View>
+                  <Text style={[styles.keepInMindText, { color: colors.text }]}>
+                    We buy only in{'\n'}scrap rates
+                  </Text>
+                </View>
+
+                <View
+                  style={[
+                    styles.keepInMindItem,
+                    { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.keepInMindIconContainer,
+                      { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
+                    ]}
+                  >
+                    <Text style={styles.keepInMindEmoji}>⚖️📦</Text>
+                    <Text
+                      style={[
+                        styles.keepInMindWeight,
+                        { backgroundColor: colors.surface, color: colors.text },
+                      ]}
+                    >
+                      20kg
+                    </Text>
+                  </View>
+                  <Text style={[styles.keepInMindText, { color: colors.text }]}>
+                    Free pickup only{'\n'}above 20 kg
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.bottomSheetButton}
+              onPress={() => setShowKeepInMindModal(false)}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={['#22c55e', '#16a34a']}
+                style={styles.bottomSheetButtonGradient}
+              >
+                <Text style={styles.bottomSheetButtonText}>Okay, I understand</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
 
       {/* Guidelines Modal */}
@@ -3642,7 +3696,7 @@ const styles = StyleSheet.create({
   keepInMindCard: {
     backgroundColor: 'white',
     borderRadius: 16,
-    padding: 20,
+    padding: 16,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -3655,20 +3709,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#111827',
     marginBottom: 16,
+    textAlign: 'center',
   },
-  keepInMindGrid: {
+  keepInMindRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 12,
   },
   keepInMindItem: {
-    width: '48%',
+    flex: 1,
     backgroundColor: '#fef9f0',
     borderRadius: 12,
     padding: 12,
     alignItems: 'center',
     minHeight: 140,
-    marginHorizontal: 6,
   },
   keepInMindIconContainer: {
     width: '100%',
@@ -3872,6 +3926,87 @@ const styles = StyleSheet.create({
   quantityModalConfirmText: {
     fontSize: 16,
     fontWeight: '600',
+    color: 'white',
+  },
+  // Keep in Mind Button Trigger Styles
+  keepInMindButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    shadowColor: '#f59e0b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  keepInMindButtonIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  keepInMindButtonContent: {
+    flex: 1,
+  },
+  keepInMindButtonTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  keepInMindButtonSubtitle: {
+    fontSize: 13,
+  },
+  // Bottom Sheet Styles
+  bottomSheetContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  bottomSheetOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  bottomSheetContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    maxHeight: '90%',
+  },
+  bottomSheetHandleContainer: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  bottomSheetHandle: {
+    width: 48,
+    height: 5,
+    borderRadius: 2.5,
+  },
+  bottomSheetTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  bottomSheetGrid: {
+    marginBottom: 24,
+  },
+  bottomSheetButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  bottomSheetButtonGradient: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  bottomSheetButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
     color: 'white',
   },
 });

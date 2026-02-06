@@ -361,11 +361,16 @@ export default function LoginScreen() {
                     {isGoogleLoading ? (
                       <ActivityIndicator color="#1f2937" size="small" />
                     ) : (
-                      <Image
-                        source={require('../../../assets/images/GoogleFavicon.png')}
-                        style={styles.socialIcon}
-                        resizeMode="contain"
-                      />
+                      <>
+                        <Image
+                          source={require('../../../assets/images/GoogleFavicon.png')}
+                          style={styles.socialIcon}
+                          resizeMode="contain"
+                        />
+                        {Platform.OS === 'android' && (
+                          <Text style={styles.socialButtonText}>Continue with Google</Text>
+                        )}
+                      </>
                     )}
                   </TouchableOpacity>
 
@@ -565,7 +570,7 @@ const styles = StyleSheet.create({
     borderColor: '#e5e7eb',
     gap: spacing(8),
   },
-  socialIcon: { width: wp(10), height: wp(10) },
+  socialIcon: { width: Platform.OS === 'android' ? wp(6) : wp(10), height: Platform.OS === 'android' ? wp(6) : wp(10) },
   socialButtonText: {
     fontSize: fs(15),
     fontWeight: '600',

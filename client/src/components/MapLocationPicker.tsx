@@ -139,6 +139,14 @@ export default function MapLocationPicker({
   const cameraUpdateThrottleRef = useRef<NodeJS.Timeout>();
   const lastReverseGeocodeRef = useRef<number>(0);
 
+  // FIX for Android: Track where we want the camera to go
+  const targetCoordsRef = useRef<Coordinates | null>(null);
+  const targetSetTimeRef = useRef<number>(0);
+
+  // FIX for Android: Block geocoding for a period after GPS geocoding is done
+  // This prevents subsequent idle events from overwriting the correct address
+  const geocodingBlockedUntilRef = useRef<number>(0);
+
   // Set map as mounted when component mounts
   useEffect(() => {
     if (visible) {
@@ -407,6 +415,15 @@ export default function MapLocationPicker({
         // Wait for map to be ready
         await new Promise(resolve => setTimeout(resolve, 100));
 
+        // FIX for Android: Set target coordinates and geocoding block
+        if (Platform.OS === 'android') {
+          geocodingBlockedUntilRef.current = Date.now() + 30000; // 30 second block
+          targetCoordsRef.current = coords;
+          targetSetTimeRef.current = Date.now();
+          console.log('🔒 Geocoding blocked for 30 seconds - search result selected');
+          console.log('🎯 Set target coords for search result:', coords);
+        }
+
         // Move to location with default zoom (only when searching)
         cameraRef.current?.setCamera({
           centerCoordinate: coords,
@@ -417,7 +434,7 @@ export default function MapLocationPicker({
         setTimeout(() => {
           isSelectingFromSearch.current = false;
           setIsSearching(false);
-        }, MAP_SETTINGS.animationDuration + 800);
+        }, MAP_SETTINGS.animationDuration + (Platform.OS === 'android' ? 1200 : 800));
       } else {
         console.error('❌ No location data in place details response');
         Toast.show({
@@ -506,6 +523,16 @@ export default function MapLocationPicker({
         setCurrentUserLocation(coords);
         previousCenterRef.current = coords;
 
+        // FIX for Android: Set geocoding block IMMEDIATELY - before any async operations
+        // This ensures map idle events can't overwrite the address while we're geocoding
+        if (Platform.OS === 'android') {
+          geocodingBlockedUntilRef.current = Date.now() + 30000; // 30 second block
+          targetCoordsRef.current = coords;
+          targetSetTimeRef.current = Date.now();
+          console.log('🔒 Geocoding blocked for 30 seconds - GPS location received');
+          console.log('🎯 Set target coords for Android:', coords);
+        }
+
         // Double-check map is mounted before camera update
         if (!mapMountedRef.current) {
           console.warn('🗺️ Map not mounted after GPS, skipping camera update');
@@ -514,8 +541,11 @@ export default function MapLocationPicker({
           return;
         }
 
-        // FIX: Longer delay before camera movement after permission
-        await new Promise(resolve => setTimeout(resolve, 600));
+        // FIX for Android: Longer delay before camera movement after permission
+        const cameraDelay = Platform.OS === 'android' ? 800 : 600;
+        await new Promise(resolve => setTimeout(resolve, cameraDelay));
+
+        console.log('🗺️ Setting camera to GPS coords:', coords);
 
         // Use setCamera for consistent programmatic movement (with default zoom for GPS)
         cameraRef.current?.setCamera({
@@ -524,13 +554,27 @@ export default function MapLocationPicker({
           animationDuration: MAP_SETTINGS.animationDuration,
         });
 
+        // FIX for Android: Retry camera movement to ensure it takes effect
+        if (Platform.OS === 'android') {
+          setTimeout(() => {
+            console.log('🗺️ Android: Retrying camera movement to GPS coords:', coords);
+            cameraRef.current?.setCamera({
+              centerCoordinate: coords,
+              zoomLevel: MAP_SETTINGS.defaultZoom,
+              animationDuration: 500,
+            });
+          }, MAP_SETTINGS.animationDuration + 200);
+        }
+
         // Force reverse geocode even though isSelectingFromSearch is true
         await reverseGeocode(coords[1], coords[0], true, true);
+
+        console.log('✅ GPS address set successfully');
 
         // small delay then allow other handlers again
         setTimeout(() => {
           isSelectingFromSearch.current = false;
-        }, MAP_SETTINGS.animationDuration + 500);
+        }, MAP_SETTINGS.animationDuration + (Platform.OS === 'android' ? 1500 : 500));
       } catch (gpsError: any) {
         console.error('GPS location acquisition error:', gpsError);
         Toast.show({
@@ -567,6 +611,15 @@ export default function MapLocationPicker({
 
     if (!mapMountedRef.current) return;
 
+    // FIX for Android: Set target coordinates so handleMapIdle knows where we want to end up
+    if (Platform.OS === 'android') {
+      targetCoordsRef.current = coords;
+      targetSetTimeRef.current = Date.now();
+      // Clear geocoding block - user intentionally chose a new location
+      geocodingBlockedUntilRef.current = 0;
+      console.log('🔓 Geocoding unblocked - user tapped on map');
+    }
+
     // Move camera to pressed location WITHOUT forcing zoom
     cameraRef.current?.setCamera({
       centerCoordinate: coords,
@@ -578,7 +631,11 @@ export default function MapLocationPicker({
 
     setTimeout(() => {
       isSelectingFromSearch.current = false;
-    }, 800);
+      // Clear target on Android after timeout
+      if (Platform.OS === 'android') {
+        targetCoordsRef.current = null;
+      }
+    }, Platform.OS === 'android' ? 1000 : 800);
   };
 
   // Update marker to follow map center - OPTIMIZED with minimal updates
@@ -587,23 +644,74 @@ export default function MapLocationPicker({
       return;
     }
 
-    // Very aggressive throttle: Only update every 300ms for ultra-smooth performance
-    const now = Date.now();
-    if (now - lastCameraUpdate < 300) {
-      return;
+    // Clear any active blocks immediately when user interacts
+    // This allows smooth panning and zooming
+    if (targetCoordsRef.current || geocodingBlockedUntilRef.current > 0) {
+      targetCoordsRef.current = null;
+      geocodingBlockedUntilRef.current = 0;
     }
-    setLastCameraUpdate(now);
 
-    // Update marker position only (no API calls here)
+    // Update marker position (no throttle for smooth following)
     setMarkerCoords(coords);
     setSelectedCoords(coords);
   };
 
   // Trigger reverse geocode ONLY when user stops moving the map
   const handleMapIdle = async (coords: Coordinates) => {
-    if (isSelectingFromSearch.current || isUserTyping) return;
+    if (isSelectingFromSearch.current || isUserTyping) {
+      return; // Silent return for performance
+    }
 
-    console.log('🗺️ Map idle - final position:', coords);
+    // FIX for Android: Check if geocoding is blocked (after GPS location was set)
+    if (Platform.OS === 'android' && geocodingBlockedUntilRef.current > Date.now()) {
+      return; // Silent return for performance
+    }
+
+    // FIX for Android: If we have an active target, check if we reached it
+    if (targetCoordsRef.current) {
+      const target = targetCoordsRef.current;
+      const distanceToTarget = Math.sqrt(
+        Math.pow(coords[0] - target[0], 2) +
+        Math.pow(coords[1] - target[1], 2)
+      );
+
+      // ~200 meters threshold - if idle position is far from target, retry camera movement
+      if (distanceToTarget > 0.002) {
+        const timeSinceTarget = Date.now() - targetSetTimeRef.current;
+
+        // Only retry if we set target recently (within 10 seconds)
+        if (timeSinceTarget < 10000) {
+          // Map idle at wrong position - retry camera movement
+
+          // Don't update marker to wrong position - keep it at target
+          setMarkerCoords(target);
+          setSelectedCoords(target);
+
+          // Retry camera movement with more force
+          setTimeout(() => {
+            cameraRef.current?.setCamera({
+              centerCoordinate: target,
+              zoomLevel: MAP_SETTINGS.defaultZoom,
+              animationDuration: 800,
+            });
+          }, 200);
+
+          return; // Don't process this idle event - the address is already set correctly
+        } else {
+          // Target expired, clear it but use the target coords as final position
+          // Keep the target position instead of accepting wrong position
+          setMarkerCoords(target);
+          setSelectedCoords(target);
+          previousCenterRef.current = target;
+          targetCoordsRef.current = null;
+          // Don't trigger reverse geocode - we already have the right address from GPS
+          return;
+        }
+      } else {
+        // We reached the target!
+        targetCoordsRef.current = null; // Clear target
+      }
+    }
 
     // Update marker position to match final map center
     setMarkerCoords(coords);
@@ -622,15 +730,12 @@ export default function MapLocationPicker({
         clearTimeout(regionChangeTimeoutRef.current);
       }
 
-      // Debounce: Wait 800ms after user stops moving map
+      // Debounce: Wait 600ms after user stops moving map (reduced from 800ms)
       regionChangeTimeoutRef.current = setTimeout(async () => {
-        console.log('📍 Reverse geocoding for:', coords);
         await reverseGeocode(coords[1], coords[0], true);
         previousCenterRef.current = coords; // Update tracked position
-      }, 800);
-    } else {
-      console.log('🔄 Skipping reverse geocode - zoom only or small movement');
-    }
+      }, 600);
+    } // Else: zoom only or small movement - skip geocoding
   };
 
   const handleRecenterToMarker = () => {
@@ -804,7 +909,9 @@ export default function MapLocationPicker({
         {/* Footer */}
         <View style={styles.footer}>
           <View style={styles.addressContainer}>
-            <MapPin size={20} color="#111827" />
+            <View style={styles.addressIconContainer}>
+              <MapPin size={20} color="#ffffff" />
+            </View>
             <View style={styles.addressTextContainer}>
               <Text style={styles.addressTitle} numberOfLines={1}>
                 {selectedAddress ? "Pickup Location" : "Select Location"}
@@ -829,10 +936,10 @@ export default function MapLocationPicker({
             disabled={saving}
           >
             {saving ? (
-              <ActivityIndicator size="small" color="#ffffff" />
+              <ActivityIndicator size="small" color="#16a34a" />
             ) : (
               <Text style={styles.confirmButtonText}>
-                Confirm location
+                Set Pickup Location
               </Text>
             )}
           </TouchableOpacity>
@@ -1080,53 +1187,79 @@ const styles = StyleSheet.create({
     color: '#16a34a',
   },
   footer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#1f2937', // Dark grey background
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: Platform.OS === 'ios' ? 32 : 20,
+    borderTopColor: '#374151',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 12,
   },
   addressContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
-    paddingVertical: 12,
+    gap: 14,
+    backgroundColor: '#374151', // Slightly lighter dark grey for the container
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 4,
+  },
+  addressIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#16a34a',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   addressTextContainer: {
     flex: 1,
   },
   addressTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#ffffff', // Bold white
     marginBottom: 4,
+    letterSpacing: -0.3,
   },
   addressSubtitle: {
     fontSize: 13,
-    color: '#6b7280',
+    color: '#9ca3af',
     lineHeight: 18,
   },
   changeButton: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#16a34a',
+    color: '#4ade80',
     paddingTop: 2,
+    letterSpacing: 0.5,
   },
   confirmButton: {
-    backgroundColor: '#16a34a',
-    borderRadius: 8,
-    paddingVertical: 14,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    paddingVertical: 16,
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
   },
   confirmButtonDisabled: {
-    backgroundColor: '#e5e7eb',
+    backgroundColor: '#4b5563',
   },
   confirmButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#ffffff',
+    fontSize: 17,
+    fontWeight: '800', // Bold white
+    color: '#1f2937', // Dark text on white button
+    letterSpacing: -0.3,
   },
   confirmButtonTextDisabled: {
     color: '#9ca3af',

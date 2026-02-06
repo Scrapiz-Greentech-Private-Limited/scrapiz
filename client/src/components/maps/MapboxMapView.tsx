@@ -8,7 +8,7 @@
  * Requirements: 1.2, 2.4, 2.5, 12.1, 20.3, 20.5
  */
 
-import React, { useRef, useImperativeHandle, useEffect, useState, useMemo } from 'react';
+import React, { useRef, useImperativeHandle, useEffect, useState, useMemo, useCallback } from 'react';
 import { Platform, ActivityIndicator, View, StyleSheet } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import { MapProviderProps, CameraController, Coordinates } from './types';
@@ -18,8 +18,8 @@ import { DEFAULT_MAP_STYLE, MAP_SETTINGS } from '../../config/mapConfig';
 // Memoized marker component to prevent unnecessary re-renders
 const MapMarker = React.memo(({ coordinate }: { coordinate: Coordinates }) => {
   return (
-    <MapboxGL.PointAnnotation 
-      id="center-marker" 
+    <MapboxGL.PointAnnotation
+      id="center-marker"
       coordinate={coordinate}
       anchor={{ x: 0.5, y: 0.5 }}
     >
@@ -31,7 +31,7 @@ const MapMarker = React.memo(({ coordinate }: { coordinate: Coordinates }) => {
 }, (prevProps, nextProps) => {
   // Only re-render if coordinates changed significantly (>5 meters)
   const changed = Math.abs(prevProps.coordinate[0] - nextProps.coordinate[0]) > 0.00005 ||
-                  Math.abs(prevProps.coordinate[1] - nextProps.coordinate[1]) > 0.00005;
+    Math.abs(prevProps.coordinate[1] - nextProps.coordinate[1]) > 0.00005;
   return !changed; // Return true to skip re-render
 });
 
@@ -52,13 +52,22 @@ export function MapboxMapView({
   const [currentZoom, setCurrentZoom] = useState<number>(zoom);
   const [currentMarker, setCurrentMarker] = useState<Coordinates>(marker);
   const [surfaceReady, setSurfaceReady] = useState(false); // Track surface lifecycle
-  
+
+  // FIX for Android: Camera key to force remount when coordinates change programmatically
+  // Changing the key forces React to unmount/remount the Camera component
+  const [cameraKey, setCameraKey] = useState(0);
+
   // Throttle refs to prevent excessive updates
   const lastCameraChangeRef = useRef<number>(0);
-  const cameraChangeThrottleMs = 300; // Increased to 300ms for ultra-smooth performance
+  const cameraChangeThrottleMs = 150; // Reduced for smoother panning (was 300ms)
   const isUserInteractingRef = useRef<boolean>(false);
   const userInteractionTimeoutRef = useRef<NodeJS.Timeout>();
   const surfaceRecreationTimeoutRef = useRef<NodeJS.Timeout>();
+
+  // FIX for Android: Lock camera updates from map idle events when programmatically moving
+  const lockCameraUntilRef = useRef<number>(0);
+  // FIX for Android: Store locked coordinates in a ref (updates synchronously, unlike state)
+  const lockedCoordsRef = useRef<Coordinates | null>(null);
 
   // Log initial coordinates
   useEffect(() => {
@@ -85,7 +94,7 @@ export function MapboxMapView({
       console.log('🗺️ Mapbox: Current center after load:', currentCenter);
       console.log('🗺️ Mapbox: Current marker after load:', currentMarker);
     }
-    
+
     // Cleanup on unmount
     return () => {
       if (userInteractionTimeoutRef.current) {
@@ -103,10 +112,10 @@ export function MapboxMapView({
       console.log('🗺️ Mapbox: Center prop changed to:', center);
       // Don't update if coordinates are very close (user is just panning)
       const distance = Math.sqrt(
-        Math.pow(center[0] - currentCenter[0], 2) + 
+        Math.pow(center[0] - currentCenter[0], 2) +
         Math.pow(center[1] - currentCenter[1], 2)
       );
-      
+
       // Only update if it's a significant change (>0.001 degrees ~100m)
       if (distance > 0.001) {
         console.log('🗺️ Mapbox: Significant center change, updating');
@@ -121,10 +130,10 @@ export function MapboxMapView({
       console.log('🗺️ Mapbox: Marker prop changed to:', marker);
       // Don't update if coordinates are very close
       const distance = Math.sqrt(
-        Math.pow(marker[0] - currentMarker[0], 2) + 
+        Math.pow(marker[0] - currentMarker[0], 2) +
         Math.pow(marker[1] - currentMarker[1], 2)
       );
-      
+
       // Only update if it's a significant change (>0.001 degrees ~100m)
       if (distance > 0.001) {
         console.log('🗺️ Mapbox: Significant marker change, updating');
@@ -140,26 +149,40 @@ export function MapboxMapView({
         console.warn('🗺️ Mapbox: Attempted to set camera before map loaded');
         return;
       }
-      
-      console.log('🗺️ Mapbox: setCamera called with:', centerCoordinate, 'zoom:', zoomLevel);
+
+      // FIX for Android: Lock camera updates from map idle events for 5 seconds
+      // This prevents handleMapIdle from overwriting our target coordinates during animation
+      if (Platform.OS === 'android') {
+        lockCameraUntilRef.current = Date.now() + 5000; // Reduced to 5s
+        lockedCoordsRef.current = centerCoordinate;
+      }
+
+      // Update state to sync marker
       setCurrentCenter(centerCoordinate);
-      
-      // Build camera config - only include zoom if explicitly provided
+      setCurrentMarker(centerCoordinate);
+
+      // Build camera config
       const cameraConfig: any = {
         centerCoordinate,
-        animationDuration: animationDuration || 1000,
+        animationDuration: animationDuration || 500,
       };
-      
+
       // Only set zoom if explicitly provided
       if (zoomLevel !== undefined) {
-        console.log('🗺️ Mapbox: Setting zoom to:', zoomLevel);
         cameraConfig.zoomLevel = zoomLevel;
         setCurrentZoom(zoomLevel);
       } else {
-        console.log('🗺️ Mapbox: No zoom specified, keeping current zoom');
+        cameraConfig.zoomLevel = currentZoom;
       }
-      
-      internalCameraRef.current?.setCamera(cameraConfig);
+
+      // Use flyTo for smoother animation
+      if (Platform.OS === 'android') {
+        setTimeout(() => {
+          internalCameraRef.current?.setCamera(cameraConfig);
+        }, 50);
+      } else {
+        internalCameraRef.current?.setCamera(cameraConfig);
+      }
     },
 
     flyTo: (coords: Coordinates, duration = 1000) => {
@@ -167,7 +190,7 @@ export function MapboxMapView({
         console.warn('🗺️ Mapbox: Attempted to flyTo before map loaded');
         return;
       }
-      
+
       console.log('🗺️ Mapbox: flyTo called with:', coords, '(no zoom change)');
       setCurrentCenter(coords);
       // flyTo only changes position, not zoom
@@ -178,7 +201,7 @@ export function MapboxMapView({
       if (!isMapLoaded || !mapRef.current) {
         return currentCenter;
       }
-      
+
       try {
         const center = await mapRef.current.getCenter();
         console.log('🗺️ Mapbox: getCenter returned:', center);
@@ -193,11 +216,19 @@ export function MapboxMapView({
   // Handle map press events
   const handlePress = (feature: GeoJSON.Feature<GeoJSON.Point>) => {
     if (!isMapLoaded) return;
-    
+
     const { geometry } = feature;
     if (geometry && geometry.coordinates) {
       const coords = geometry.coordinates as Coordinates;
       console.log('🗺️ Mapbox: Map pressed at:', coords);
+
+      // FIX for Android: Unlock camera when user intentionally taps
+      if (Platform.OS === 'android' && lockCameraUntilRef.current > 0) {
+        lockCameraUntilRef.current = 0;
+        lockedCoordsRef.current = null;
+        console.log('🔓 Mapbox: Camera unlocked - user tapped on map');
+      }
+
       onMapPress(coords);
     }
   };
@@ -211,12 +242,18 @@ export function MapboxMapView({
     if (userInteractionTimeoutRef.current) {
       clearTimeout(userInteractionTimeoutRef.current);
     }
-    
-    // Clear interaction flag after 2 seconds of no camera changes
+
+    // Clear camera lock immediately when user starts interacting
+    // This allows smooth panning and zooming
+    if (Platform.OS === 'android' && lockCameraUntilRef.current > 0) {
+      lockCameraUntilRef.current = 0;
+      lockedCoordsRef.current = null;
+    }
+
+    // Clear interaction flag after 500ms of no camera changes
     userInteractionTimeoutRef.current = setTimeout(() => {
       isUserInteractingRef.current = false;
-      console.log('🗺️ Mapbox: User interaction ended');
-    }, 2000);
+    }, 500);
 
     // Aggressive throttle to prevent performance issues
     const now = Date.now();
@@ -229,7 +266,7 @@ export function MapboxMapView({
       const center = await mapRef.current.getCenter();
       if (center && center.length === 2) {
         const coords = center as Coordinates;
-        
+
         // Always update center and marker - no zoom detection needed
         setCurrentCenter(coords);
         setCurrentMarker(coords);
@@ -248,13 +285,23 @@ export function MapboxMapView({
       const center = await mapRef.current.getCenter();
       if (center && center.length === 2) {
         const coords = center as Coordinates;
-        console.log('🗺️ Mapbox: Map idle at center:', coords);
+
+        // FIX for Android: Don't update internal state if camera is locked
+        // Use lockedCoordsRef (ref, not state) because it updates synchronously
+        if (Platform.OS === 'android' && lockCameraUntilRef.current > Date.now() && lockedCoordsRef.current) {
+          // Notify parent with our LOCKED coordinates (from ref, guaranteed correct)
+          onRegionChangeEnd(lockedCoordsRef.current);
+          // Also update marker state to locked coords for visual consistency
+          setCurrentMarker(lockedCoordsRef.current);
+          return;
+        }
+
         setCurrentCenter(coords);
         setCurrentMarker(coords); // Ensure marker is exactly at center
         onRegionChangeEnd(coords);
       }
     } catch (error) {
-      console.error('🗺️ Mapbox: Error getting map center on idle:', error);
+      // Silently fail to prevent console spam
     }
   };
 
@@ -262,30 +309,40 @@ export function MapboxMapView({
   const handleMapReady = () => {
     console.log('🗺️ Mapbox: Map is ready and loaded');
     setIsMapLoaded(true);
-    
+
     // FIX #2: Delay initial camera setup to ensure surface is stable
+    // FIX for Android: Longer delay and sync marker with center
+    const initDelay = Platform.OS === 'android' ? 300 : 150;
+
     setTimeout(() => {
       if (internalCameraRef.current) {
         console.log('🗺️ Mapbox: Setting initial zoom to:', zoom);
+        console.log('🗺️ Mapbox: Setting initial center to:', center);
+
+        // Sync marker with current center on Android
+        if (Platform.OS === 'android') {
+          setCurrentMarker(center);
+        }
+
         internalCameraRef.current.setCamera({
           centerCoordinate: center,
           zoomLevel: zoom,
           animationDuration: 0, // Instant, no animation
         });
       }
-    }, 150); // Increased delay for surface stability
+    }, initDelay);
   };
 
   // Handle map loading error
   const handleMapLoadingError = (error: any) => {
     console.error('🗺️ Mapbox: Map loading error:', error?.message ?? error);
     setIsMapLoaded(false);
-    
+
     // FIX #3: Attempt surface recreation on error
     if (surfaceRecreationTimeoutRef.current) {
       clearTimeout(surfaceRecreationTimeoutRef.current);
     }
-    
+
     surfaceRecreationTimeoutRef.current = setTimeout(() => {
       console.log('🗺️ Mapbox: Attempting surface recreation...');
       setSurfaceReady(false);
@@ -335,13 +392,20 @@ export function MapboxMapView({
         regionWillChangeDebounceTime={0}
         regionDidChangeDebounceTime={0}
       >
-        {/* Camera control - FIX #6: Use default animationMode for better lifecycle */}
+        {/* Camera control - simplified for smooth user interaction */}
+        {/* On Android: Don't bind centerCoordinate to allow free user gestures */}
         <MapboxGL.Camera
           ref={internalCameraRef}
-          centerCoordinate={currentCenter}
+          centerCoordinate={Platform.OS === 'android' ? undefined : currentCenter}
+          zoomLevel={currentZoom}
           animationMode="flyTo"
+          animationDuration={500}
           minZoomLevel={MAP_SETTINGS.minZoom}
           maxZoomLevel={MAP_SETTINGS.maxZoom}
+          defaultSettings={{
+            centerCoordinate: currentCenter,
+            zoomLevel: currentZoom,
+          }}
         />
 
         {/* Native marker that moves with map - ALWAYS visible and synced */}
