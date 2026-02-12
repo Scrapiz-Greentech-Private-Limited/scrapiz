@@ -23,6 +23,15 @@
         "credentialsSource": "remote"
       }
     },
+    "production":{
+      "distribution": "store",
+      "channel": "production",
+      "autoIncrement": true,
+      "environment": "production",
+      "android": {
+        "credentialsSource": "local"
+      }
+    },
     "production-ios": {
       "distribution": "store",
       "channel": "production-ios",
@@ -34,7 +43,6 @@
     },
     "production-android": {
       "distribution": "store",
-
       "channel": "production-android",
       "autoIncrement": true,
       "environment": "production",
@@ -45,6 +53,7 @@
   },
   "submit": {
     "production-ios": {},
-    "production-android": {}
+    "production-android": {},
+    "production": {}
   }
 }
