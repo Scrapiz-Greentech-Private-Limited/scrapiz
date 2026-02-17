@@ -25,7 +25,8 @@ import {
   getSessionToken,
   buildKrutrimAutocompleteUrl,
   buildGoogleReverseGeocodeUrl,
-  buildKrutrimPlaceDetailsUrl
+  buildKrutrimPlaceDetailsUrl,
+  buildReverseGeocodingUrl,
 } from '../config/mapConfig';
 import { MapViewWrapper } from './maps/MapViewWrapper';
 import { CameraController, Coordinates } from './maps/types';
@@ -355,11 +356,128 @@ export default function MapLocationPicker({
       }
 
       console.warn('🏢 Google Reverse Geocode failed/empty. Status:', fallbackData.status);
-      if (updateSearchBox) setSelectedAddress("Pinned Location");
+
+      // ────── Fallback 2: Krutrim / OlaMaps reverse geocode ──────
+      try {
+        console.log('🔄 Trying Krutrim reverse geocode fallback...');
+        const krutrimUrl = buildReverseGeocodingUrl(longitude, latitude);
+        const krutrimRes = await fetch(krutrimUrl);
+        const krutrimData = await krutrimRes.json();
+
+        if (
+          krutrimData.status === 'ok' &&
+          krutrimData.results &&
+          krutrimData.results.length > 0
+        ) {
+          const kResult = krutrimData.results[0];
+          console.log('✅ Krutrim fallback address:', kResult.formatted_address);
+
+          // Normalize Krutrim response to match Google's address_components shape
+          const normalized = {
+            formatted_address: kResult.formatted_address,
+            address_components: (kResult.address_components || []).map((c: any) => ({
+              long_name: c.long_name || c.short_name || '',
+              short_name: c.short_name || c.long_name || '',
+              types: c.types || [],
+            })),
+            place_id: kResult.place_id || '',
+            geometry: kResult.geometry,
+          };
+
+          if (updateSearchBox) setSelectedAddress(normalized.formatted_address);
+          setSelectedAddressDetails(normalized);
+          return normalized;
+        }
+        console.warn('🏢 Krutrim reverse geocode also failed:', krutrimData.status);
+      } catch (kErr) {
+        console.warn('🏢 Krutrim reverse geocode error:', kErr);
+      }
+
+      // ────── Fallback 3: expo-location built-in reverse geocode ──────
+      try {
+        console.log('🔄 Trying expo-location reverseGeocodeAsync fallback...');
+        const [geo] = await Location.reverseGeocodeAsync({ latitude, longitude });
+        if (geo) {
+          const parts = [geo.name, geo.street, geo.district, geo.city, geo.region, geo.postalCode].filter(Boolean);
+          const addr = parts.join(', ') || 'Selected Location';
+          console.log('✅ expo-location fallback address:', addr);
+
+          const normalized = {
+            formatted_address: addr,
+            address_components: [
+              geo.city        ? { long_name: geo.city,       short_name: geo.city,       types: ['locality'] } : null,
+              geo.region      ? { long_name: geo.region,     short_name: geo.region,     types: ['administrative_area_level_1'] } : null,
+              geo.postalCode  ? { long_name: geo.postalCode, short_name: geo.postalCode, types: ['postal_code'] } : null,
+              geo.district    ? { long_name: geo.district,   short_name: geo.district,   types: ['sublocality_level_1'] } : null,
+              geo.subregion   ? { long_name: geo.subregion,  short_name: geo.subregion,  types: ['administrative_area_level_3'] } : null,
+            ].filter(Boolean),
+            place_id: '',
+          };
+
+          if (updateSearchBox) setSelectedAddress(normalized.formatted_address);
+          setSelectedAddressDetails(normalized);
+          return normalized as any;
+        }
+      } catch (expoErr) {
+        console.warn('🏢 expo-location reverse geocode error:', expoErr);
+      }
+
+      if (updateSearchBox) setSelectedAddress('Pinned Location');
       return null;
     } catch (error) {
       console.error('Reverse geocoding error:', error);
-      if (updateSearchBox) setSelectedAddress("Pinned Location");
+
+      // ────── Error path fallbacks: Krutrim → expo-location ──────
+      try {
+        console.log('🔄 Primary geocode threw — trying Krutrim fallback...');
+        const krutrimUrl = buildReverseGeocodingUrl(longitude, latitude);
+        const krutrimRes = await fetch(krutrimUrl);
+        const krutrimData = await krutrimRes.json();
+
+        if (
+          krutrimData.status === 'ok' &&
+          krutrimData.results &&
+          krutrimData.results.length > 0
+        ) {
+          const kResult = krutrimData.results[0];
+          const normalized = {
+            formatted_address: kResult.formatted_address,
+            address_components: (kResult.address_components || []).map((c: any) => ({
+              long_name: c.long_name || c.short_name || '',
+              short_name: c.short_name || c.long_name || '',
+              types: c.types || [],
+            })),
+            place_id: kResult.place_id || '',
+            geometry: kResult.geometry,
+          };
+          if (updateSearchBox) setSelectedAddress(normalized.formatted_address);
+          setSelectedAddressDetails(normalized);
+          return normalized;
+        }
+      } catch (_) { /* swallow */ }
+
+      try {
+        const [geo] = await Location.reverseGeocodeAsync({ latitude, longitude });
+        if (geo) {
+          const parts = [geo.name, geo.street, geo.district, geo.city, geo.region, geo.postalCode].filter(Boolean);
+          const addr = parts.join(', ') || 'Selected Location';
+          const normalized = {
+            formatted_address: addr,
+            address_components: [
+              geo.city        ? { long_name: geo.city,       short_name: geo.city,       types: ['locality'] } : null,
+              geo.region      ? { long_name: geo.region,     short_name: geo.region,     types: ['administrative_area_level_1'] } : null,
+              geo.postalCode  ? { long_name: geo.postalCode, short_name: geo.postalCode, types: ['postal_code'] } : null,
+              geo.district    ? { long_name: geo.district,   short_name: geo.district,   types: ['sublocality_level_1'] } : null,
+            ].filter(Boolean),
+            place_id: '',
+          };
+          if (updateSearchBox) setSelectedAddress(normalized.formatted_address);
+          setSelectedAddressDetails(normalized);
+          return normalized as any;
+        }
+      } catch (_) { /* swallow */ }
+
+      if (updateSearchBox) setSelectedAddress('Pinned Location');
       return null;
     } finally {
       setIsReverseGeocoding(false);
