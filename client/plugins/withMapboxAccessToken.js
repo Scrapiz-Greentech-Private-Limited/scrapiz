@@ -54,41 +54,52 @@ function withMapboxAccessToken(config, { accessToken }) {
   // This is CRITICAL for Fabric/New Architecture — MapboxOptions.accessToken
   // must be set before loadReactNative() is called, otherwise native MapView
   // components mount with no token and render blank tiles.
+  //
+  // We use REFLECTION because com.mapbox.common.MapboxOptions is a transitive
+  // dependency of @rnmapbox/maps — it's available at runtime but the :app module
+  // cannot resolve it at compile time. Reflection avoids adding a direct Gradle
+  // dependency and works across Mapbox SDK versions.
   config = withMainApplication(config, (modConfig) => {
     let contents = modConfig.modResults.contents;
 
-    // Add MapboxOptions import if not already present
-    if (!contents.includes('com.mapbox.common.MapboxOptions')) {
-      contents = contents.replace(
-        'import android.app.Application',
-        'import android.app.Application\nimport com.mapbox.common.MapboxOptions'
-      );
-      console.log('✅ withMapboxAccessToken: Added MapboxOptions import to MainApplication.kt');
+    // Remove old direct import if present from previous plugin version
+    if (contents.includes('import com.mapbox.common.MapboxOptions')) {
+      contents = contents.replace('import com.mapbox.common.MapboxOptions\n', '');
+      console.log('✅ withMapboxAccessToken: Removed stale direct MapboxOptions import');
     }
 
     // Inject token initialization in onCreate(), right after super.onCreate()
-    // This runs before loadReactNative() and before any Fabric views are created
-    if (!contents.includes('MapboxOptions.accessToken')) {
+    // Uses reflection to call MapboxOptions.setAccessToken() without a compile-time dep
+    if (!contents.includes('@generated begin mapbox-token-init')) {
       contents = contents.replace(
         'super.onCreate()',
         [
           'super.onCreate()',
           '',
           '    // @generated begin mapbox-token-init',
-          '    // Mapbox: Set access token before React Native loads.',
-          '    // Required for Fabric/New Architecture where native MapView mounts before JS runs.',
+          '    // Mapbox: Set access token via reflection before React Native loads.',
+          '    // Required for Fabric/New Architecture where native MapView mounts before JS.',
+          '    // Uses reflection because com.mapbox.common is a transitive dep, not',
+          '    // a compile-time dep of the :app module.',
           '    try {',
           '      val mapboxToken = getString(R.string.mapbox_access_token)',
           '      if (mapboxToken.isNotEmpty()) {',
-          '        MapboxOptions.accessToken = mapboxToken',
+          '        val clazz = Class.forName("com.mapbox.common.MapboxOptions")',
+          '        val setter = clazz.getDeclaredMethod("setAccessToken", String::class.java)',
+          '        try {',
+          '          setter.invoke(null, mapboxToken)',
+          '        } catch (_: Exception) {',
+          '          val instance = clazz.getDeclaredField("INSTANCE").get(null)',
+          '          setter.invoke(instance, mapboxToken)',
+          '        }',
           '      }',
           '    } catch (_: Exception) {',
-          '      // Token not in resources — will be set from JS later',
+          '      // Mapbox SDK not yet loaded — token will be set from JS later',
           '    }',
           '    // @generated end mapbox-token-init',
         ].join('\n')
       );
-      console.log('✅ withMapboxAccessToken: Injected MapboxOptions.accessToken init into MainApplication.kt');
+      console.log('✅ withMapboxAccessToken: Injected MapboxOptions.accessToken init (via reflection) into MainApplication.kt');
     }
 
     modConfig.modResults.contents = contents;
