@@ -7,6 +7,9 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "env": {
+        "RNMAPBOX_MAPS_DOWNLOAD_TOKEN": "sk.eyJ1IjoiYXlhYW5hbWphZCIsImEiOiJjbWlzaGJ0NXEwazhuM2xxeXNjcjZ4NGtkIn0.mhw6fNlquXpyFAOelt4a8w"
+      },
       "android": {
         "credentialsSource": "local"
       },
@@ -16,6 +19,9 @@
     },
     "preview": {
       "distribution": "internal",
+      "env": {
+        "RNMAPBOX_MAPS_DOWNLOAD_TOKEN": "sk.eyJ1IjoiYXlhYW5hbWphZCIsImEiOiJjbWlzaGJ0NXEwazhuM2xxeXNjcjZ4NGtkIn0.mhw6fNlquXpyFAOelt4a8w"
+      },
       "android": {
         "credentialsSource": "local"
       },
@@ -28,6 +34,9 @@
       "channel": "production",
       "autoIncrement": true,
       "environment": "production",
+      "env": {
+        "RNMAPBOX_MAPS_DOWNLOAD_TOKEN": "sk.eyJ1IjoiYXlhYW5hbWphZCIsImEiOiJjbWlzaGJ0NXEwazhuM2xxeXNjcjZ4NGtkIn0.mhw6fNlquXpyFAOelt4a8w"
+      },
       "android": {
         "credentialsSource": "local"
       }
@@ -46,6 +55,9 @@
       "channel": "production-android",
       "autoIncrement": true,
       "environment": "production",
+      "env": {
+        "RNMAPBOX_MAPS_DOWNLOAD_TOKEN": "sk.eyJ1IjoiYXlhYW5hbWphZCIsImEiOiJjbWlzaGJ0NXEwazhuM2xxeXNjcjZ4NGtkIn0.mhw6fNlquXpyFAOelt4a8w"
+      },
       "android": {
         "credentialsSource": "local"
       }

@@ -123,8 +123,14 @@
   [
     "@rnmapbox/maps",
     {
-      "RNMapboxMapsImpl": "mapbox",
-      "MBXAccessToken": "pk.eyJ1IjoiYXlhYW5hbWphZCIsImEiOiJjbWhxbW1veHcwdnB2MmpzNDA2emo1aWp3In0.Mc5kN89_lqGeagn5jWvvzA"
+      "RNMapboxMapsImpl": "mapbox"
+    }
+  ],
+
+  [
+    "./plugins/withMapboxAccessToken",
+    {
+      "accessToken": "pk.eyJ1IjoiYXlhYW5hbWphZCIsImEiOiJjbWhxbW1veHcwdnB2MmpzNDA2emo1aWp3In0.Mc5kN89_lqGeagn5jWvvzA"
     }
   ]
 ],
@@ -139,6 +145,7 @@
         "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_V2": "515246444918-vcupmtbkchia1qrqtp4sr6ge1qkkvlur.apps.googleusercontent.com",
         "EXPO_PUBLIC_MAP_TILER_API_KEY": "oEldgWNaTPZsPFgr6fab",
         "EXPO_PUBLIC_GOOGLE_MAPS_KEY": "AIzaSyCXv6HR4agCc7eHo02CjVgN4yMVxbvQRqg",
+        "EXPO_PUBLIC_MAPBOX_TOKEN": "pk.eyJ1IjoiYXlhYW5hbWphZCIsImEiOiJjbWhxbW1veHcwdnB2MmpzNDA2emo1aWp3In0.Mc5kN89_lqGeagn5jWvvzA",
         "EXPO_PUBLIC_ENABLE_LOCATION_SKIP": "true"
       },
       "router": {},

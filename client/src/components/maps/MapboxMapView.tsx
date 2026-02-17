@@ -368,7 +368,7 @@ export function MapboxMapView({
     <View style={style}>
       <MapboxGL.MapView
         ref={mapRef}
-        surfaceView={true} // FIX #5: Use TextureView instead of SurfaceView for better lifecycle
+        surfaceView={false} // Use TextureView instead of SurfaceView for better Fabric lifecycle
         style={StyleSheet.absoluteFillObject}
         styleURL={DEFAULT_MAP_STYLE}
         onPress={handlePress}

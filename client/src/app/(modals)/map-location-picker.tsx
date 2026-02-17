@@ -36,7 +36,14 @@ import {
 
 // Debug: Log Mapbox token (first 20 chars only for security)
 console.log('Mapbox Token:', MAPBOX_API_KEY ? `${MAPBOX_API_KEY.substring(0, 20)}...` : 'MISSING');
-MapboxGL.setAccessToken(MAPBOX_API_KEY);
+// Only set access token if we have a valid one — the native plugin
+// already injects the token via MBXAccessToken in app.json.
+// Setting an empty string CLEARS the native token and causes crashes.
+if (MAPBOX_API_KEY) {
+  MapboxGL.setAccessToken(MAPBOX_API_KEY);
+} else {
+  console.warn('⚠️ Mapbox: No runtime token found — relying on native MBXAccessToken from plugin config');
+}
 
 interface KrutrimAutocompleteResult {
   place_id: string;
@@ -133,12 +140,16 @@ export default function MapLocationPicker({
 
     useEffect(() => {
         if (visible && !isMapReady) {
+        mapMountedRef.current = true;
         const timer = setTimeout(() => {
         setIsMapReady(true);
         getCurrentUserLocation();
     }, 300);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      mapMountedRef.current = false;
+    };
   }
 }, [visible]);
 
@@ -151,19 +162,25 @@ export default function MapLocationPicker({
 
   const getCurrentUserLocation = async () => {
     try {
+      // Guard: don't update state if component has unmounted
+      if (!mapMountedRef.current) return;
+
       const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
       
       let finalStatus = existingStatus;
       
       if (existingStatus !== 'granted') {
+        if (!mapMountedRef.current) return;
         const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
         finalStatus = newStatus;
       }
       
       if (finalStatus === 'granted') {
+        if (!mapMountedRef.current) return;
         const position = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Highest,
         });
+        if (!mapMountedRef.current) return;
         setCurrentUserLocation([position.coords.longitude, position.coords.latitude]);
       }
     } catch (error) {

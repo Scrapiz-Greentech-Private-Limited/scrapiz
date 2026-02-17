@@ -196,27 +196,37 @@ export default function MapLocationPicker({
 
   const getCurrentUserLocation = async () => {
     try {
+      // Guard: don't update state if component has unmounted
+      if (!mapMountedRef.current) return;
+
       const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
 
       let finalStatus = existingStatus;
 
       if (existingStatus !== 'granted') {
+        if (!mapMountedRef.current) return; // Re-check after async gap
         const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
         finalStatus = newStatus;
       }
 
       if (finalStatus === 'granted') {
+        if (!mapMountedRef.current) return; // Re-check after async gap
         const position = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.BestForNavigation, // Highest possible accuracy
           timeInterval: 1000,
           distanceInterval: 0,
         });
+        // Final guard before setting state
+        if (!mapMountedRef.current) return;
         const coords: Coordinates = [position.coords.longitude, position.coords.latitude];
         console.log('🗺️ User location for search bias:', coords, 'accuracy:', position.coords.accuracy, 'm');
         setCurrentUserLocation(coords);
       }
     } catch (error) {
-      console.error('Could not get user location for search bias:', error);
+      // Only log if component is still mounted (avoids NPE on destroyed context)
+      if (mapMountedRef.current) {
+        console.error('Could not get user location for search bias:', error);
+      }
     }
   };
 

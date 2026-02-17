@@ -2,7 +2,10 @@ import MapboxGL from '@rnmapbox/maps';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 
-export const MAPBOX_API_KEY = process.env.EXPO_PUBLIC_MAPBOX_TOKEN || '';
+// Hardcoded fallback: .env is gitignored and NOT available in EAS production builds.
+// This is a PUBLIC token (pk.*) safe for client-side embedding.
+const MAPBOX_FALLBACK_TOKEN = 'pk.eyJ1IjoiYXlhYW5hbWphZCIsImEiOiJjbWhxbW1veHcwdnB2MmpzNDA2emo1aWp3In0.Mc5kN89_lqGeagn5jWvvzA';
+export const MAPBOX_API_KEY = process.env.EXPO_PUBLIC_MAPBOX_TOKEN || MAPBOX_FALLBACK_TOKEN;
 export const KRUTRIM_API_KEY = process.env.EXPO_PUBLIC_KRUTRIM_API_KEY || '';
 export const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY || '';
 
