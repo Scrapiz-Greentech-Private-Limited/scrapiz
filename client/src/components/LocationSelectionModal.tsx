@@ -33,6 +33,7 @@ import { useLocation, SavedLocation } from '../context/LocationContext';
 import MapLocationPicker from './MapLocationPicker';
 import { AuthService, CreateAddressRequest } from '../api/apiService';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 
 interface LocationSelectionModalProps {
   visible: boolean;
@@ -46,6 +47,7 @@ export default function LocationSelectionModal({
   const router = useRouter();
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const { isGuest } = useAuth();
   const {
     currentLocation,
     savedLocations,
@@ -187,7 +189,33 @@ export default function LocationSelectionModal({
     }, 150);
   };
 
+  const redirectGuestToLogin = () => {
+    // Close all modals
+    setShowMapPickerForGPS(false);
+    setShowMapPicker(false);
+    setParentModalVisible(false);
+    onClose();
+
+    Toast.show({
+      type: 'info',
+      text1: 'Login Required',
+      text2: 'You need to be logged in to save an address.',
+      visibilityTime: 4000,
+    });
+
+    // Delay navigation so the toast is clearly visible
+    setTimeout(() => {
+      router.push('/(auth)/login');
+    }, 1200);
+  };
+
   const handleMapLocationConfirm = async (location: any) => {
+    // Auth gate: guests cannot save addresses
+    if (isGuest) {
+      redirectGuestToLogin();
+      return;
+    }
+
     try {
       console.log('🗺️ Map location confirmed:', location);
       console.log('🗺️ Navigating to addresses screen');
@@ -275,6 +303,12 @@ export default function LocationSelectionModal({
   };
 
   const handleAddNewAddress = () => {
+    // Auth gate: guests cannot add addresses
+    if (isGuest) {
+      redirectGuestToLogin();
+      return;
+    }
+
     // Clean up modal state before navigation
     setSearchQuery('');
     setSearchResults([]);
@@ -569,6 +603,10 @@ export default function LocationSelectionModal({
           visible={showMapPicker}
           onClose={handleSearchMapPickerClose}
           onLocationSelect={(location) => {
+            if (isGuest) {
+              redirectGuestToLogin();
+              return;
+            }
             selectLocation(location);
             setShowMapPicker(false);
             // Don't reopen parent - user completed the action

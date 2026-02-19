@@ -285,7 +285,6 @@ function SellScreenContent() {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
-  const [showGuidelinesModal, setShowGuidelinesModal] = useState(true);
   const [useNewAddress, setUseNewAddress] = useState(true);
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
   const [loadingData, setLoadingData] = useState(false);
@@ -340,9 +339,6 @@ function SellScreenContent() {
   const [showQuantityModal, setShowQuantityModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductSummary | null>(null);
   const [tempQuantity, setTempQuantity] = useState('1');
-
-  // Keep in Mind modal state
-  const [showKeepInMindModal, setShowKeepInMindModal] = useState(false);
 
   // Referral wallet - use context
   const { walletBalance, setWalletBalance, updateBalanceAndCache, applyReferralDiscount } = useReferral();
@@ -469,9 +465,7 @@ function SellScreenContent() {
         const targetStep = parseInt(stepParam, 10);
         if (targetStep >= 1 && targetStep <= 4) {
           setCurrentStep(targetStep);
-          // Skip guidelines modal when returning from auth
-          setShowGuidelinesModal(false);
-        }
+          }
 
         // Clear the saved state after restoration
         await clearGuestOrderState();
@@ -1836,24 +1830,6 @@ function SellScreenContent() {
         </View>
       </View>
 
-      {/* Keep in Mind Section - Button to open draggable modal */}
-      <TouchableOpacity
-        style={[styles.keepInMindButton, { backgroundColor: colors.surface, borderColor: isDark ? 'rgba(245, 158, 11, 0.3)' : '#fef3c7' }]}
-        onPress={() => setShowKeepInMindModal(true)}
-        activeOpacity={0.8}
-      >
-        <View style={[styles.keepInMindButtonIcon, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
-          <AlertCircle size={24} color="#f59e0b" />
-        </View>
-        <View style={styles.keepInMindButtonContent}>
-          <Text style={[styles.keepInMindButtonTitle, { color: colors.text }]}>Please Keep in Mind</Text>
-          <Text style={[styles.keepInMindButtonSubtitle, { color: colors.textSecondary }]}>
-            Tap to see items we don't accept
-          </Text>
-        </View>
-        <ArrowRight size={20} color={colors.textSecondary} />
-      </TouchableOpacity>
-
       {selectedImages.length > 0 && (
         <View style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.summaryTitle, { color: colors.text }]}>Attached Photos</Text>
@@ -2095,224 +2071,6 @@ function SellScreenContent() {
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
-      </Modal>
-
-      {/* Keep in Mind Bottom Sheet Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={showKeepInMindModal}
-        onRequestClose={() => setShowKeepInMindModal(false)}
-      >
-        <View style={styles.bottomSheetContainer}>
-          <TouchableWithoutFeedback onPress={() => setShowKeepInMindModal(false)}>
-            <View style={styles.bottomSheetOverlay} />
-          </TouchableWithoutFeedback>
-
-          <View style={[styles.bottomSheetContent, { backgroundColor: colors.surface }]}>
-            {/* Drag Handle */}
-            <View style={styles.bottomSheetHandleContainer}>
-              <View style={[styles.bottomSheetHandle, { backgroundColor: colors.border }]} />
-            </View>
-
-            <Text style={[styles.bottomSheetTitle, { color: colors.text }]}>
-              Please keep in mind
-            </Text>
-
-            <View style={styles.bottomSheetGrid}>
-              {/* Row 1 */}
-              <View style={styles.keepInMindRow}>
-                <View
-                  style={[
-                    styles.keepInMindItem,
-                    { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.keepInMindIconContainer,
-                      { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
-                    ]}
-                  >
-                    <Text style={styles.keepInMindEmoji}>🪵🍾</Text>
-                    <View style={styles.keepInMindCross}>
-                      <X size={28} color="#dc2626" strokeWidth={3} />
-                    </View>
-                  </View>
-                  <Text style={[styles.keepInMindText, { color: colors.text }]}>
-                    We do not buy{'\n'}Wood & Glass
-                  </Text>
-                </View>
-
-                <View
-                  style={[
-                    styles.keepInMindItem,
-                    { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.keepInMindIconContainer,
-                      { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
-                    ]}
-                  >
-                    <Text style={styles.keepInMindEmoji}>👕👖</Text>
-                    <View style={styles.keepInMindCross}>
-                      <X size={28} color="#dc2626" strokeWidth={3} />
-                    </View>
-                  </View>
-                  <Text style={[styles.keepInMindText, { color: colors.text }]}>
-                    We do not buy{'\n'}Clothes
-                  </Text>
-                </View>
-              </View>
-
-              {/* Row 2 */}
-              <View style={styles.keepInMindRow}>
-                <View
-                  style={[
-                    styles.keepInMindItem,
-                    { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.keepInMindIconContainer,
-                      { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
-                    ]}
-                  >
-                    <Text style={styles.keepInMindEmoji}>🪑💻</Text>
-                    <View style={styles.keepInMindCross}>
-                      <X size={28} color="#dc2626" strokeWidth={3} />
-                    </View>
-                  </View>
-                  <Text style={[styles.keepInMindText, { color: colors.text }]}>
-                    We buy only in{'\n'}scrap rates
-                  </Text>
-                </View>
-
-                <View
-                  style={[
-                    styles.keepInMindItem,
-                    { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' },
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.keepInMindIconContainer,
-                      { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' },
-                    ]}
-                  >
-                    <Text style={styles.keepInMindEmoji}>⚖️📦</Text>
-                    <Text
-                      style={[
-                        styles.keepInMindWeight,
-                        { backgroundColor: colors.surface, color: colors.text },
-                      ]}
-                    >
-                      20kg
-                    </Text>
-                  </View>
-                  <Text style={[styles.keepInMindText, { color: colors.text }]}>
-                    Free pickup only{'\n'}above 20 kg
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.bottomSheetButton}
-              onPress={() => setShowKeepInMindModal(false)}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={['#22c55e', '#16a34a']}
-                style={styles.bottomSheetButtonGradient}
-              >
-                <Text style={styles.bottomSheetButtonText}>Okay, I understand</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Guidelines Modal */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={showGuidelinesModal}
-        onRequestClose={() => setShowGuidelinesModal(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
-        >
-          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Please keep in mind</Text>
-            </View>
-
-            <ScrollView
-              style={styles.guidelinesScroll}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.guidelinesScrollContent}
-              bounces={false}
-            >
-              <View style={styles.guidelinesGrid}>
-                <View style={[styles.guidelineCard, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' }]}>
-                  <View style={[styles.guidelineImageContainer, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
-                    <Text style={styles.guidelineEmoji}>🪵🍾</Text>
-                    <View style={styles.crossMark}>
-                      <X size={40} color="#dc2626" strokeWidth={4} />
-                    </View>
-                  </View>
-                  <Text style={[styles.guidelineText, { color: colors.text }]}>We do not buy Wood & Glass</Text>
-                </View>
-
-                <View style={[styles.guidelineCard, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' }]}>
-                  <View style={[styles.guidelineImageContainer, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
-                    <Text style={styles.guidelineEmoji}>👕👖</Text>
-                    <View style={styles.crossMark}>
-                      <X size={40} color="#dc2626" strokeWidth={4} />
-                    </View>
-                  </View>
-                  <Text style={[styles.guidelineText, { color: colors.text }]}>We do not buy Clothes</Text>
-                </View>
-
-                <View style={[styles.guidelineCard, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' }]}>
-                  <View style={[styles.guidelineImageContainer, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
-                    <Text style={styles.guidelineEmoji}>🪑💻</Text>
-                    <View style={styles.crossMark}>
-                      <X size={40} color="#dc2626" strokeWidth={4} />
-                    </View>
-                  </View>
-                  <Text style={[styles.guidelineText, { color: colors.text }]}>We buy only in scrap rates</Text>
-                </View>
-
-                <View style={[styles.guidelineCard, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#fef9f0' }]}>
-                  <View style={[styles.guidelineImageContainer, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fef3c7' }]}>
-                    <Text style={styles.guidelineEmoji}>⚖️📦</Text>
-                    <Text style={[styles.weightBadge, { backgroundColor: colors.surface, color: colors.text }]}>20 kg</Text>
-                  </View>
-                  <Text style={[styles.guidelineText, { color: colors.text }]}>Free pickup only above 20 kg</Text>
-                </View>
-              </View>
-            </ScrollView>
-
-            <TouchableOpacity
-              style={styles.modalButton}
-              onPress={() => setShowGuidelinesModal(false)}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={isDark ? ['#22c55e', '#16a34a'] : ['#16a34a', '#15803d']}
-                style={styles.modalButtonGradient}
-              >
-                <Text style={styles.modalButtonText}>Okay, I understand</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
       </Modal>
 
       {/* Network Retry Overlay - handles network errors silently */}
@@ -3324,79 +3082,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
   },
-  guidelinesScroll: {
-    flexGrow: 0,
-    flexShrink: 1,
-  },
-  guidelinesScrollContent: {
-    paddingBottom: 16,
-  },
-  guidelinesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    gap: 12,
-  },
-  guidelineCard: {
-    width: '48%',
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    minHeight: 160,
-  },
-  guidelineImageContainer: {
-    width: '100%',
-    height: 100,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-    position: 'relative',
-  },
-  guidelineEmoji: {
-    fontSize: 48,
-  },
-  crossMark: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    marginTop: -20,
-    marginLeft: -20,
-  },
-  weightBadge: {
-    position: 'absolute',
-    bottom: 10,
-    right: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  guidelineText: {
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  modalButton: {
-    margin: 20,
-    marginTop: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  modalButtonGradient: {
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white',
-  },
   pickupDetailsCard: {
     backgroundColor: 'white',
     borderRadius: 16,
@@ -3693,76 +3378,6 @@ const styles = StyleSheet.create({
     color: '#f59e0b',
     paddingHorizontal: 8,
   },
-  keepInMindCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  keepInMindTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  keepInMindRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
-  },
-  keepInMindItem: {
-    flex: 1,
-    backgroundColor: '#fef9f0',
-    borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
-    minHeight: 140,
-  },
-  keepInMindIconContainer: {
-    width: '100%',
-    height: 80,
-    backgroundColor: '#fef3c7',
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-    position: 'relative',
-  },
-  keepInMindEmoji: {
-    fontSize: 36,
-  },
-  keepInMindCross: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    marginTop: -16,
-    marginLeft: -16,
-  },
-  keepInMindWeight: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    backgroundColor: 'white',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  keepInMindText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#111827',
-    textAlign: 'center',
-    lineHeight: 16,
-  },
   // Quantity Modal Styles
   quantityModalOverlay: {
     flex: 1,
@@ -3926,87 +3541,6 @@ const styles = StyleSheet.create({
   quantityModalConfirmText: {
     fontSize: 16,
     fontWeight: '600',
-    color: 'white',
-  },
-  // Keep in Mind Button Trigger Styles
-  keepInMindButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    shadowColor: '#f59e0b',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  keepInMindButtonIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  keepInMindButtonContent: {
-    flex: 1,
-  },
-  keepInMindButtonTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  keepInMindButtonSubtitle: {
-    fontSize: 13,
-  },
-  // Bottom Sheet Styles
-  bottomSheetContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  bottomSheetOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-  },
-  bottomSheetContent: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
-    maxHeight: '90%',
-  },
-  bottomSheetHandleContainer: {
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  bottomSheetHandle: {
-    width: 48,
-    height: 5,
-    borderRadius: 2.5,
-  },
-  bottomSheetTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  bottomSheetGrid: {
-    marginBottom: 24,
-  },
-  bottomSheetButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginTop: 8,
-  },
-  bottomSheetButtonGradient: {
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  bottomSheetButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
     color: 'white',
   },
 });
