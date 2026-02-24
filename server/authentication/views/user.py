@@ -4,8 +4,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed
-from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.parsers import MultiPartParser, FormParser , JSONParser
 import jwt
+from django.conf import settings
 import datetime
 from django.utils import timezone
 from ..models import User, AuditLog
@@ -103,7 +104,7 @@ class RegisterView(APIView):
         send_mail(
             'Your OTP Code',
             f'Your OTP code is {otp}',
-            'teamscrapiz@gmail.com',
+            settings.EMAIL_SUPPORT,
             [email],
             fail_silently=False,
             html_message=html_message,
@@ -129,7 +130,7 @@ class RegisterView(APIView):
             send_mail(
                 'Welcome to Scrapiz',
                 'Thank you for verifying your email.',
-                'teamscrapiz@gmail.com',  # Replace with your email
+                settings.EMAIL_SUPPORT,  # Replace with your email
                 [email],
                 fail_silently=False,
                 html_message=html_message,
@@ -159,7 +160,7 @@ class ResendotpView(APIView):
             send_mail(
                 'Your OTP Code',
                 f'Your OTP code is {otp}',
-                'teamscrapiz@gmail.com',  # Replace with your email
+                settings.EMAIL_SUPPORT,  # Replace with your email
                 [email],
                 fail_silently=False,
                 html_message=html_message,
@@ -208,7 +209,6 @@ class LoginView(APIView):
             'iat': datetime.datetime.utcnow()
         }
 
-        # Use settings.SECRET_KEY for consistency with usercheck.py
         from django.conf import settings
         jwt_secret = getattr(settings, "SECRET_KEY", "your-secret-key")
         token = jwt.encode(payload, jwt_secret, algorithm='HS256')
@@ -260,7 +260,7 @@ class PasswordResetRequestView(APIView):
         send_mail(
             'Password Reset OTP',
             f'Your OTP for password reset is {otp}.',
-            'teamscrapiz@gmail.com',
+            settings.EMAIL_SUPPORT,
             [email],
             fail_silently=False,
             html_message=html_message,
@@ -308,7 +308,7 @@ class PasswordResetView(APIView):
         send_mail(
             'Password Reset Successful',
             'Your password has been reset successfully.',
-            'teamscrapiz@gmail.com',
+            settings.EMAIL_SUPPORT,
             [email],
             fail_silently=False,
             html_message=html_message,
@@ -317,20 +317,13 @@ class PasswordResetView(APIView):
         return Response({"message": "Password reset successful."}, status=status.HTTP_200_OK)
 # ----------------- Get User Details -----------------
 class UserView(APIView):
-    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, FormParser,JSONParser]
     @csrf_exempt
     def get(self, request):
 
         user = authenticate_request(request, need_user=True)
-        
-        # If admin/staff user, return all users list
-        if user.is_staff or user.is_superuser:
-            all_users = User.objects.all().order_by('-date_joined')
-            serializer = UserSerializer(all_users, many=True)
-            return Response(serializer.data)
-        
-        # Regular users get their own profile
         serializer = UserSerializer(user)
+
         return Response(serializer.data)
 
     @csrf_exempt
@@ -369,10 +362,7 @@ class UserView(APIView):
             delete_s3_file(user.profile_image)
             user.profile_image = None
             updated_fields.append("profile_image")
-        
-        # Handle avatar fields
         VALID_AVATAR_STYLES = ['avataaars', 'pixel-art', 'bottts', 'lorelei', 'adventurer', 'fun-emoji']
-        
         if "avatar_provider" in data:
           avatar_provider = data["avatar_provider"]
           if avatar_provider == "":
@@ -380,7 +370,7 @@ class UserView(APIView):
           else:
             user.avatar_provider = avatar_provider
           updated_fields.append("avatar_provider")
-        
+          
         if "avatar_style" in data:
           avatar_style = data["avatar_style"]
           if avatar_style == "":
@@ -393,7 +383,6 @@ class UserView(APIView):
           else:
             user.avatar_style = avatar_style
           updated_fields.append("avatar_style")
-        
         if "avatar_seed" in data:
           avatar_seed = data["avatar_seed"]
           if avatar_seed == "":
@@ -401,7 +390,13 @@ class UserView(APIView):
           else:
             user.avatar_seed = avatar_seed
           updated_fields.append("avatar_seed")
-        
+          
+        if "phone_number" in data:
+          user.phone_number = data["phone_number"]
+          updated_fields.append("phone_number")
+        if "gender" in data:
+          user.gender = data["gender"] if data["gender"] else None
+          updated_fields.append("gender")
         if updated_fields:
           user.save()
           if "name" in updated_fields:
@@ -409,7 +404,7 @@ class UserView(APIView):
             send_mail(
               'Name Reset Successful',
               'Your name has been reset successfully.',
-              'teamscrapiz@gmail.com',
+              settings.EMAIL_SUPPORT,
               [user.email],
               fail_silently=False,
               html_message=html_message,
@@ -422,6 +417,7 @@ class UserView(APIView):
     @csrf_exempt
     def delete(self, request):
         user = authenticate_request(request, need_user=True)
+        user_id = user.id
         try:
           with db_transaction.atomic():
             if user.is_deleted:
@@ -444,9 +440,8 @@ class UserView(APIView):
               )
             user_email = user.email
             user_name = user.name
-            user_id = user.id
-            # Create deletion feedback
-            deletion_feedback = AccountDeletionFeedback.objects.create(
+            
+            delete_feedback = AccountDeletionFeedback.objects.create(
               user_id=user_id,
               user_email=user_email,
               user_name=user_name,
@@ -456,7 +451,6 @@ class UserView(APIView):
             anonymize_user_account(user)
             send_deletion_confirmation_email(user_email, user_name)
             ip = get_client_ip(request)
-            # Create audit log with preserved user info and link to feedback
             AuditLog.objects.create(
               user=None, 
               action="account_deleted",
@@ -464,7 +458,7 @@ class UserView(APIView):
               deleted_user_id=user_id,
               deleted_user_email=user_email,
               deleted_user_name=user_name,
-              deletion_feedback=deletion_feedback
+              deletion_feedback=delete_feedback
             )
             return Response({
               "message": "Your account has been deleted successfully"
@@ -639,113 +633,83 @@ class RedeemReferralBalanceView(APIView):
         {"error": f"Failed to redeem balance: {str(e)}"},
         status=status.HTTP_500_INTERNAL_SERVER_ERROR
       )
-
-
-# ----------------- Audit Logs (Admin Only) -----------------
-class AuditLogView(APIView):
-  """
-  Admin endpoint to get audit logs with optional filters.
-  Requires admin/staff privileges.
-  """
-  @csrf_exempt
-  def get(self, request):
-    try:
-      user = authenticate_request(request, need_user=True)
-    except AuthenticationFailed as auth_error:
-      raise auth_error
-    
-    # Check admin privileges
-    if not user.is_staff and not user.is_superuser:
-      return Response(
-        {"error": "Admin privileges required"},
-        status=status.HTTP_403_FORBIDDEN
-      )
-    
-    # Build queryset with optional filters
-    queryset = AuditLog.objects.all().select_related('user', 'deletion_feedback').order_by('-timestamp')
-    
-    # Filter by action
-    action = request.query_params.get('action')
-    if action:
-      queryset = queryset.filter(action=action)
-    
-    # Filter by user_id
-    user_id = request.query_params.get('user_id')
-    if user_id:
-      try:
-        queryset = queryset.filter(user_id=int(user_id))
-      except ValueError:
-        pass
-    
-    # Filter by date range
-    start_date = request.query_params.get('start_date')
-    if start_date:
-      try:
-        queryset = queryset.filter(timestamp__gte=start_date)
-      except ValueError:
-        pass
-    
-    end_date = request.query_params.get('end_date')
-    if end_date:
-      try:
-        queryset = queryset.filter(timestamp__lte=end_date)
-      except ValueError:
-        pass
-    
-    serializer = AuditLogSerializer(queryset, many=True)
-    return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-# ----------------- Deletion Feedback (Admin Only) -----------------
-class DeletionFeedbackView(APIView):
-  """
-  Admin endpoint to get account deletion feedback.
-  Requires admin/staff privileges.
   
-  GET /authentication/deletion-feedback/
-  Query params:
-    - reason: Filter by reason (better_alternative, not_using, privacy_concerns, difficult_to_use, other)
-    - start_date: Filter by deletion date (YYYY-MM-DD)
-    - end_date: Filter by deletion date (YYYY-MM-DD)
-  """
+class AuditLogView(APIView):
+    """
+    Admin endpoint to get audit logs with optional filters.
+    Requires admin/staff privileges.
+    """
+
+    @csrf_exempt
+    def get(self, request):
+        try:
+            user = authenticate_request(request, need_user=True)
+        except AuthenticationFailed as auth_error:
+            raise auth_error
+
+        if not user.is_staff and not user.is_superuser:
+            return Response(
+                {"error": "Admin privileges required"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        queryset = (
+            AuditLog.objects
+            .all()
+            .select_related('user')
+            .order_by('-timestamp')
+        )
+
+        action = request.query_params.get('action')
+        if action:
+            queryset = queryset.filter(action=action)
+
+        user_id = request.query_params.get('user_id')
+        if user_id:
+            try:
+                queryset = queryset.filter(user_id=int(user_id))
+            except ValueError:
+                pass
+
+        start_date = request.query_params.get('start_date')
+        if start_date:
+            queryset = queryset.filter(timestamp__gte=start_date)
+
+        end_date = request.query_params.get('end_date')
+        if end_date:
+            queryset = queryset.filter(timestamp__lte=end_date)
+
+        serializer = AuditLogSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class DeletionFeedbackView(APIView):
   @csrf_exempt
   def get(self, request):
     from ..serializers import DeletionFeedbackSerializer
-    
     try:
       user = authenticate_request(request, need_user=True)
     except AuthenticationFailed as auth_error:
       raise auth_error
-    
-    # Check admin privileges
     if not user.is_staff and not user.is_superuser:
-      return Response(
-        {"error": "Admin privileges required"},
-        status=status.HTTP_403_FORBIDDEN
-      )
-    
-    # Build queryset with optional filters
-    queryset = AccountDeletionFeedback.objects.all().order_by('-deleted_at')
-    
-    # Filter by reason
+      return Response({
+        "error": "Admin privileges required"
+      }, status=status.HTTP_403_FORBIDDEN)
+    queryset = AccountDeletionFeedback.objects.all().order_by('-deleted_at')    
     reason = request.query_params.get('reason')
     if reason:
       queryset = queryset.filter(reason=reason)
-    
-    # Filter by date range
     start_date = request.query_params.get('start_date')
     if start_date:
       try:
         queryset = queryset.filter(deleted_at__gte=start_date)
       except ValueError:
         pass
-    
     end_date = request.query_params.get('end_date')
     if end_date:
       try:
-        queryset = queryset.filter(deleted_at__lte=end_date)
+         queryset = queryset.filter(deleted_at__lte=end_date)
       except ValueError:
-        pass
-    
+         pass
     serializer = DeletionFeedbackSerializer(queryset, many=True)
-    return Response(serializer.data, status=status.HTTP_200_OK)
+    return Response(serializer.data, status=status.HTTP_200_OK)   
+      
