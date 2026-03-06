@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Image,
   ImageSourcePropType,
+  Alert,
 } from 'react-native';
 import {
   ArrowLeft,
@@ -23,11 +24,14 @@ import {
   AlertCircle,
   FileText,
   Truck,
+  XCircle,
 } from 'lucide-react-native';
+import Toast from 'react-native-toast-message';
 import { useRouter } from 'expo-router';
 import { useOrdersData } from '../../../hooks/useOrderData';
 import { useOrderDetails } from '../../../hooks/userOrderDetails';
 import { useTheme } from '../../../context/ThemeContext';
+import { AuthService } from '../../../api/apiService';
 import { RemoteImage } from '../../../components/RemoteImage';
 
 interface HeaderComponentProps {
@@ -149,6 +153,37 @@ export default function OrdersScreen() {
     router.push(`/profile/orders/${orderId}` as any);
   };
 
+  const handleCancelOrder = (orderNumber: string, orderId: number) => {
+    Alert.alert(
+      'Cancel Order',
+      'Are you sure you want to cancel this order?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await AuthService.cancelOrder({ order_number: orderNumber });
+              Toast.show({
+                type: 'success',
+                text1: 'Order Cancelled',
+                text2: `Order #${orderNumber} has been cancelled.`,
+              });
+              refetch();
+            } catch (error: any) {
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: error.message || 'Failed to cancel order',
+              });
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -201,6 +236,7 @@ export default function OrdersScreen() {
         {ordersWithDetails.length > 0 ? (
           ordersWithDetails.map((order) => {
             const statusName = order.statusName || 'pending';
+            const isCancellable = ['pending', 'scheduled', 'transit'].includes(statusName) || statusName === '';
             
             return (
               <TouchableOpacity
@@ -268,8 +304,23 @@ export default function OrdersScreen() {
                       </Text>
                     </View>
                   </View>
-                  <View style={[styles.viewDetailsButton, { backgroundColor: colors.primary + '10' }]}>
-                    <Text style={[styles.viewDetailsText, { color: colors.primary }]}>View Details</Text>
+                  <View style={styles.cardFooterActions}>
+                    {isCancellable && (
+                      <TouchableOpacity
+                        style={styles.cancelOrderBtn}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleCancelOrder(order.order_number, order.id);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <XCircle size={14} color="#dc2626" />
+                        <Text style={styles.cancelOrderBtnText}>Cancel</Text>
+                      </TouchableOpacity>
+                    )}
+                    <View style={[styles.viewDetailsButton, { backgroundColor: colors.primary + '10' }]}>
+                      <Text style={[styles.viewDetailsText, { color: colors.primary }]}>View Details</Text>
+                    </View>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -289,6 +340,7 @@ export default function OrdersScreen() {
         
         <View style={styles.bottomSpacer} />
       </ScrollView>
+      <Toast />
     </View>
   );
 }
@@ -479,6 +531,28 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     fontFamily: 'Inter-SemiBold',
+  },
+  cardFooterActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  cancelOrderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#fef2f2',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  cancelOrderBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
+    color: '#dc2626',
   },
   emptyState: {
     flex: 1,

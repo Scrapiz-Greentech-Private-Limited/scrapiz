@@ -197,7 +197,7 @@ export default function OrderDetails() {
   const canCancelOrder = useMemo(() => {
     if (!order) return false;
     const statusName = (typeof order.status === 'string' ? order.status : order.status?.name || '').toLowerCase();
-    const cancellableStatuses = ['transit', 'scheduled'];
+    const cancellableStatuses = ['pending', 'transit', 'scheduled'];
     return cancellableStatuses.includes(statusName) || statusName === '';
   }, [order]);
 
