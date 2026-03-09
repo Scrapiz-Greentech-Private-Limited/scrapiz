@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
+  FlatList,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -25,6 +26,8 @@ import {
   Trash2,
   X,
   Navigation,
+  ChevronDown,
+  Check,
 } from 'lucide-react-native';
 import clsx from 'clsx';
 
@@ -76,6 +79,16 @@ type AddressFormData = {
   delivery_suggestion: string;
 };
 
+const INDIAN_STATES = [
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
+  'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram',
+  'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
+  'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+  'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu',
+  'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry',
+];
+
 const emptyFormData: AddressFormData = {
   name: '',
   phone_number: '',
@@ -106,6 +119,7 @@ export default function AddressesScreen() {
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
   const [addressType, setAddressType] = useState<'home' | 'office' | 'other'>('other');
   const [showMapPicker, setShowMapPicker] = useState(false);
+  const [showStatePicker, setShowStatePicker] = useState(false);
 
   // --- Input Refs ---
   const phoneInputRef = useRef<TextInput>(null);
@@ -910,34 +924,31 @@ export default function AddressesScreen() {
                     }
                   }}
                   returnKeyType="next"
-                  onSubmitEditing={() => stateInputRef.current?.focus()}
-                  blurOnSubmit={false}
+                  onSubmitEditing={() => setShowStatePicker(true)}
+                  blurOnSubmit={true}
                 />
                 {formErrors.city && <Text style={[styles.errorText, { color: colors.error }]}>{formErrors.city}</Text>}
               </View>
 
               <View style={{ flex: 1 }}>
                 <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>State *</Text>
-                <TextInput
-                  ref={stateInputRef}
+                <TouchableOpacity
                   style={[
                     styles.formInput,
-                    { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.inputText },
+                    { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
                     formErrors.state && { borderColor: colors.error, backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2' }
                   ]}
-                  placeholder="Enter state"
-                  placeholderTextColor={colors.inputPlaceholder}
-                  value={formData.state}
-                  onChangeText={(text) => {
-                    setFormData({ ...formData, state: text });
-                    if (formErrors.state) {
-                      setFormErrors((prev) => ({ ...prev, state: '' }));
-                    }
-                  }}
-                  returnKeyType="next"
-                  onSubmitEditing={() => pincodeInputRef.current?.focus()}
-                  blurOnSubmit={false}
-                />
+                  onPress={() => setShowStatePicker(true)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={{ color: formData.state ? colors.inputText : colors.inputPlaceholder, fontSize: 15, fontFamily: 'Inter-Regular', flex: 1 }}
+                    numberOfLines={1}
+                  >
+                    {formData.state || 'Select state'}
+                  </Text>
+                  <ChevronDown size={16} color={colors.textSecondary} />
+                </TouchableOpacity>
                 {formErrors.state && <Text style={[styles.errorText, { color: colors.error }]}>{formErrors.state}</Text>}
               </View>
             </View>
@@ -972,18 +983,15 @@ export default function AddressesScreen() {
               </View>
 
               <View style={{ flex: 1 }}>
-                <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.text }]}>Country *</Text>
-                <TextInput
+                <Text style={[{ fontSize: 14, fontWeight: '600', marginBottom: 10, color: colors.textSecondary }]}>Country</Text>
+                <View
                   style={[
                     styles.formInput,
-                    { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.inputText }
+                    { backgroundColor: isDark ? '#1f2937' : '#f3f4f6', borderColor: isDark ? '#374151' : '#d1d5db', justifyContent: 'center' }
                   ]}
-                  placeholder="Enter country"
-                  placeholderTextColor={colors.inputPlaceholder}
-                  value={formData.country}
-                  onChangeText={(text) => setFormData({ ...formData, country: text })}
-                  returnKeyType="done"
-                />
+                >
+                  <Text style={{ color: colors.textSecondary, fontSize: 15, fontFamily: 'Inter-Regular' }}>India</Text>
+                </View>
               </View>
             </View>
 
@@ -1026,6 +1034,52 @@ export default function AddressesScreen() {
             </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* State Picker Modal */}
+      <Modal
+        visible={showStatePicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowStatePicker(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '72%' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: colors.text, fontFamily: 'Inter-Bold' }}>Select State</Text>
+              <TouchableOpacity onPress={() => setShowStatePicker(false)}>
+                <X size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={INDIAN_STATES}
+              keyExtractor={(item) => item}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={{
+                    padding: 16,
+                    borderBottomWidth: 1,
+                    borderBottomColor: colors.border,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    backgroundColor: formData.state === item ? (isDark ? 'rgba(34, 197, 94, 0.12)' : '#f0fdf4') : 'transparent',
+                  }}
+                  onPress={() => {
+                    setFormData({ ...formData, state: item });
+                    if (formErrors.state) setFormErrors((prev) => ({ ...prev, state: '' }));
+                    setShowStatePicker(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={{ fontSize: 15, color: formData.state === item ? colors.primary : colors.text, fontFamily: 'Inter-Regular' }}>{item}</Text>
+                  {formData.state === item && <Check size={16} color={colors.primary} />}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
       </Modal>
 
       {/* Map Location Picker */}
