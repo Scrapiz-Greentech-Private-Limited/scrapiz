@@ -70,7 +70,8 @@ INSTALLED_APPS = [
     'agents',
     'dashboard',
     'feedback',
-    'django_celery_beat'
+    'django_celery_beat',
+    'vendor',
 ]
 
 MIDDLEWARE = [
@@ -168,6 +169,7 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 CACHES = {
     'default': {
@@ -205,6 +207,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'notifications.tasks.send_daily_failure_summary_task',
         'schedule': 345600.0,  # Every 4 days (4 * 24 * 60 * 60 = 345,600 seconds)
     },
+    'cleanup-expired-phone-otps': {
+        'task': 'authentication.tasks.cleanup_expired_phone_otps_task',
+        'schedule': 3600.0,  # Every hour
+    },
 }
 
 
@@ -216,6 +222,11 @@ SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY')
 TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID')
 TWILIO_AUTH_TOKEN = os.getenv('TWILIO_ACCOUNT_TOKEN')
 TWILIO_WHATSAPP_NUMBER = os.getenv('TWILIO_WHATSAPP_NUMBER')
+
+# Gupshup WhatsApp API
+GUPSHUP_API_KEY = os.getenv('GUPSHUP_API_KEY')
+GUPSHUP_TEMPLATE_ID = os.getenv('GUPSHUP_TEMPLATE_ID')
+GUPSHUP_SOURCE_NUMBER = os.getenv('GUPSHUP_SOURCE_NUMBER')
 
 
 

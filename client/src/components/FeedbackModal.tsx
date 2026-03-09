@@ -116,18 +116,33 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
   }, []);
 
   const handleTextChange = useCallback((questionId: number, text: string) => {
-    const sanitized = text.slice(0, MAX_TEXT_LENGTH);
-    setResponses(prev => ({
-      ...prev,
-      [questionId]: { question_id: questionId, text_value: sanitized },
-    }));
+    const sliced = text.slice(0, MAX_TEXT_LENGTH);
+    setResponses(prev => {
+      // Remove the entry entirely when the trimmed value is empty so that
+      // required-field checks (which test for key existence) work correctly.
+      if (sliced.trim().length === 0) {
+        const { [questionId]: _removed, ...rest } = prev;
+        return rest;
+      }
+      return {
+        ...prev,
+        [questionId]: { question_id: questionId, text_value: sliced },
+      };
+    });
   }, []);
 
   const handleNext = () => {
     const q = questions[currentStep];
-    if (q.is_required && !responses[q.id]) {
-      Toast.show({ type: 'error', text1: 'Required', text2: 'Please answer this question to continue' });
-      return;
+    if (q.is_required) {
+      const resp = responses[q.id];
+      const isAnswered =
+        q.question_type === 'text'
+          ? (resp?.text_value?.trim().length ?? 0) > 0
+          : !!resp;
+      if (!isAnswered) {
+        Toast.show({ type: 'error', text1: 'Required', text2: 'Please answer this question to continue' });
+        return;
+      }
     }
     if (currentStep < questions.length - 1) {
       setCurrentStep(prev => prev + 1);
@@ -140,9 +155,16 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
 
   const handleSubmit = async () => {
     const q = questions[currentStep];
-    if (q.is_required && !responses[q.id]) {
-      Toast.show({ type: 'error', text1: 'Required', text2: 'Please answer this question to submit' });
-      return;
+    if (q.is_required) {
+      const resp = responses[q.id];
+      const isAnswered =
+        q.question_type === 'text'
+          ? (resp?.text_value?.trim().length ?? 0) > 0
+          : !!resp;
+      if (!isAnswered) {
+        Toast.show({ type: 'error', text1: 'Required', text2: 'Please answer this question to submit' });
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -178,12 +200,11 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
   const handleOpenPlayStore = async () => {
     try {
       await Linking.openURL(PLAY_STORE_URL);
-    } catch {
-      Toast.show({ type: 'error', text1: 'Error', text2: 'Could not open Play Store' });
-    } finally {
       Toast.show({ type: 'success', text1: 'Thank You! 🎉', text2: 'Your support means a lot' });
       onSubmitSuccess?.();
       onClose();
+    } catch {
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Could not open Play Store' });
     }
   };
 

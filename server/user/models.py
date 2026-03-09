@@ -61,6 +61,7 @@ class AddressModel(models.Model):
     country =  models.CharField(max_length=50, null=True, blank=True)
     pincode = models.IntegerField(null= True, blank=True)
     delivery_suggestion = models.CharField(max_length=500, null=True, blank=True)
+    is_default = models.BooleanField(default=False, help_text="Whether this is the user's default address")
 
 
     def __str__(self):

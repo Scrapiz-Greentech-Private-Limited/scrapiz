@@ -1,7 +1,7 @@
 from django.urls import path
 from .views.user import  RegisterView, LoginView, LogoutView, PasswordResetView, PasswordResetRequestView, ResendotpView, UserView,ReferredUsersView , ReferralTransactionsView,RedeemReferralBalanceView, AuditLogView, DeletionFeedbackView
 from .views.oauth import GoogleOAuthLoginView, AppleOAuthLoginView, AppleOAuthConfirmLinkView
-from .views.phone_auth import PhoneVerifyView, PhoneCompleteProfileView, PhoneConfirmLinkView
+from .views.phone_auth import SendPhoneOTPView, VerifyPhoneOTPView, PhoneCompleteProfileView, PhoneConfirmLinkView
 from .views.admin_referral import (
     AdminAllReferredUsersView,
     AdminAllReferralTransactionsView,
@@ -48,7 +48,8 @@ urlpatterns = [
     path('apple-login/', AppleOAuthLoginView.as_view(), name='apple-login'),
     path('apple-login/confirm-link/', AppleOAuthConfirmLinkView.as_view(), name='apple-login-confirm'),
     # Phone authentication endpoints
-    path('phone/verify/', PhoneVerifyView.as_view(), name='phone-verify'),
+    path('phone/send-otp/', SendPhoneOTPView.as_view(), name='phone-send-otp'),
+    path('phone/verify/', VerifyPhoneOTPView.as_view(), name='phone-verify'),
     path('phone/complete-profile/', PhoneCompleteProfileView.as_view(), name='phone-complete-profile'),
     path('phone/confirm-link/', PhoneConfirmLinkView.as_view(), name='phone-confirm-link'),
     # User referral endpoints (for regular users)

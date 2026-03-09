@@ -97,6 +97,26 @@ class AddressAPIView(AuthenticatedAPIView):
           return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class SetDefaultAddressAPIView(AuthenticatedAPIView):
+    """Set a specific address as the user's default, unsetting all others."""
+
+    def post(self, request, pk):
+        user = self.authenticate_user(request)
+
+        try:
+            address = AddressModel.objects.get(pk=pk, user=user)
+        except AddressModel.DoesNotExist:
+            return Response({"error": "Address not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Unset all defaults for this user, then set the chosen one
+        AddressModel.objects.filter(user=user).update(is_default=False)
+        address.is_default = True
+        address.save(update_fields=['is_default'])
+
+        serializer = AddressSerializer(address)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
 class NotificationPreferenceAPIView(AuthenticatedAPIView):
     def get(self, request):
         user = self.authenticate_user(request)

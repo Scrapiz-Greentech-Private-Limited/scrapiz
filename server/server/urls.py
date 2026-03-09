@@ -31,6 +31,7 @@ urlpatterns = [
     path('api/agents/', include('agents.urls')),
     path('api/dashboard/', include('dashboard.urls')),
     path('api/feedback/', include('feedback.urls')),
+    path('api/vendor/', include('vendor.urls')),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

@@ -61,6 +61,7 @@ export interface AddressSummary {
   pincode: number;
   delivery_suggestion: string;
   user: number;
+  is_default: boolean;
 }
 
 export interface CreateAddressRequest {
@@ -725,6 +726,15 @@ export class AuthService {
     } catch (error: any) {
       console.error('Delete address error:', error);
       throw new Error(error.response?.data?.error || error.message || 'Failed to delete address');
+    }
+  }
+
+  static async setDefaultAddress(id: number): Promise<AddressSummary> {
+    try {
+      const response = await apiClient.post(`${API_CONFIG.ENDPOINTS.USER_ADDRESSES}${id}/set-default/`, {});
+      return response.data as AddressSummary;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to set default address');
     }
   }
 

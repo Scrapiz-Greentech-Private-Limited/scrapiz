@@ -14,6 +14,7 @@ import Toast from 'react-native-toast-message';
 import { ArrowLeft, MapPin, Calendar, Clock, Phone, IndianRupee, Package, CheckCircle, X, Hash, User, Star } from 'lucide-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { AuthService, OrderSummary, ProductSummary, AddressSummary, RatingService } from '../../../api/apiService';
+import { normalizeOrderStatus } from '../../../hooks/userOrderDetails';
 import { useLocalization } from '../../../context/LocalizationContext';
 import { RemoteImage } from '../../../components/RemoteImage';
 import { useTheme } from '../../../context/ThemeContext';
@@ -56,7 +57,7 @@ export default function OrderDetails() {
    * Per requirement 4.4: Show "Thanks for your feedback!" for rated orders
    */
   const checkRatingStatus = useCallback(async (orderIdNum: number, orderStatus: string) => {
-    const statusName = orderStatus.toLowerCase();
+    const statusName = normalizeOrderStatus(orderStatus);
     // Only check rating status for completed orders
     if (statusName !== 'completed') {
       setIsRated(null);
@@ -106,7 +107,7 @@ export default function OrderDetails() {
       setAddress(orderAddress);
 
       // Check rating status for completed orders
-      const statusName = (typeof foundOrder.status === 'string' ? foundOrder.status : foundOrder.status?.name || '').toLowerCase();
+      const statusName = normalizeOrderStatus(foundOrder.status);
       if (statusName === 'completed') {
         await checkRatingStatus(foundOrder.id, statusName);
       }

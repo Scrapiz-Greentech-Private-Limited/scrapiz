@@ -22,14 +22,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         db_index=True,
         help_text="Phone number in E.164 format (e.g., +919876543210)"
     )
-    firebase_uid = models.CharField(
-        max_length=128,
-        unique=True,
-        null=True,
-        blank=True,
-        db_index=True,
-        help_text="Firebase unique user identifier for phone authentication"
-    )
+    is_vendor = models.BooleanField(default=False)
     gender = models.CharField(
         max_length=20,
         choices=[
@@ -110,6 +103,7 @@ class AuditLog(models.Model):
         ('phone_registration', 'Phone Registration'),
         ('phone_account_linked', 'Phone Account Linked'),
         ('phone_auth_failed', 'Phone Auth Failed'),
+        ('phone_otp_sent', 'Phone OTP Sent'),
     ]
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     action = models.CharField(max_length=50, choices=ACTION_CHOICES, null=True, blank=True)
@@ -159,5 +153,25 @@ class AccountDeletionFeedback(models.Model):
     ordering = ['-deleted_at']
     verbose_name = 'Account Deletion Feedback'
     verbose_name_plural = 'Account Deletion Feedbacks'
+
   def __str__(self):
     return f"Feedback from {self.user_email} - {self.reason}"
+
+
+class PhoneOTP(models.Model):
+    phone_number = models.CharField(max_length=20, db_index=True)
+    otp_hash = models.CharField(max_length=128)
+    attempts = models.IntegerField(default=0)
+    expires_at = models.DateTimeField()
+    is_verified = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "phone_otps"
+        indexes = [
+            models.Index(fields=['phone_number', 'is_verified']),
+            models.Index(fields=['expires_at']),
+        ]
+
+    def __str__(self):
+        return f"OTP for {self.phone_number} ({'verified' if self.is_verified else 'pending'})"
