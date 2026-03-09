@@ -1181,7 +1181,7 @@ function SellScreenContent() {
 
       {selectedItems.length > 0 && (
         <View style={styles.selectedItems}>
-          <Text style={[styles.selectedItemsTitle, { color: colors.text }]}>Selected Items ({selectedItems.length})</Text>
+          <Text style={[styles.selectedItemsTitle, { color: colors.text }]}>Selected Items({selectedItems.length})</Text>
           {selectedItems.map((item, index) => {
             const fallbackImage = getFallbackImageForProduct(item.name);
             return (
