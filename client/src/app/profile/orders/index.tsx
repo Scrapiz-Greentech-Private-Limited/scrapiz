@@ -142,6 +142,8 @@ export default function OrdersScreen() {
   const { orders, products, loading, error, refetch } = useOrdersData();
   const ordersWithDetails = useOrderDetails(orders, products);
   const [refreshing, setRefreshing] = useState(false);
+  // Track which orders have a cancel request in-flight to prevent duplicates
+  const [cancellingOrderIds, setCancellingOrderIds] = useState<Set<number>>(new Set());
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -154,6 +156,8 @@ export default function OrdersScreen() {
   };
 
   const handleCancelOrder = (orderNumber: string, orderId: number) => {
+    // Prevent duplicate requests for the same order
+    if (cancellingOrderIds.has(orderId)) return;
     Alert.alert(
       'Cancel Order',
       'Are you sure you want to cancel this order?',
@@ -163,6 +167,7 @@ export default function OrdersScreen() {
           text: 'Yes, Cancel',
           style: 'destructive',
           onPress: async () => {
+            setCancellingOrderIds(prev => new Set(prev).add(orderId));
             try {
               await AuthService.cancelOrder({ order_number: orderNumber });
               Toast.show({
@@ -176,6 +181,12 @@ export default function OrdersScreen() {
                 type: 'error',
                 text1: 'Error',
                 text2: error.message || 'Failed to cancel order',
+              });
+            } finally {
+              setCancellingOrderIds(prev => {
+                const next = new Set(prev);
+                next.delete(orderId);
+                return next;
               });
             }
           },
@@ -239,61 +250,64 @@ export default function OrdersScreen() {
             const isCancellable = ['pending', 'scheduled', 'transit'].includes(statusName) || statusName === '';
             
             return (
-              <TouchableOpacity
+              <View
                 key={order.id}
                 style={[styles.orderCard, { backgroundColor: colors.surface }]}
-                onPress={() => handleOrderPress(order.id)}
-                activeOpacity={0.7}
               >
-                {/* Card Header */}
-                <View style={styles.cardHeader}>
-                  <View style={styles.orderIdContainer}>
-                    <View style={[styles.orderIdBadge, { backgroundColor: colors.primary + '15' }]}>
-                      <FileText size={14} color={colors.primary} />
-                    </View>
-                    <View>
-                      <Text style={[styles.orderNumber, { color: colors.text }]}>#{order.order_number}</Text>
-                      <Text style={[styles.orderDate, { color: colors.textSecondary }]}>{formatDate(order.created_at)}</Text>
-                    </View>
-                  </View>
-                  <ChevronRight size={20} color={colors.textSecondary} />
-                </View>
-
-                {/* Progress Indicator */}
-                <View style={[styles.progressSection, { borderColor: colors.border }]}>
-                  <MiniProgressIndicator status={statusName} colors={colors} />
-                </View>
-
-                {/* Items Preview */}
-                <View style={styles.itemsPreview}>
-                  <View style={styles.itemsRow}>
-                    {order.orders.slice(0, 3).map((item, index) => {
-                      const imageSource = item.product.image_url 
-                        ? { uri: item.product.image_url }
-                        : getProductImageFallback(item.product.name);
-                      
-                      return (
-                        <View key={item.id} style={[styles.itemPreviewContainer, index > 0 && { marginLeft: -8 }]}>
-                          <RemoteImage
-                            source={imageSource}
-                            fallback={getProductImageFallback(item.product.name)}
-                            style={[styles.itemPreviewImage, { borderColor: colors.surface }]}
-                          />
-                        </View>
-                      );
-                    })}
-                    {order.orders.length > 3 && (
-                      <View style={[styles.moreItemsBadge, { backgroundColor: colors.primary, marginLeft: -8 }]}>
-                        <Text style={styles.moreItemsText}>+{order.orders.length - 3}</Text>
+                <TouchableOpacity
+                  onPress={() => handleOrderPress(order.id)}
+                  activeOpacity={0.7}
+                >
+                  {/* Card Header */}
+                  <View style={styles.cardHeader}>
+                    <View style={styles.orderIdContainer}>
+                      <View style={[styles.orderIdBadge, { backgroundColor: colors.primary + '15' }]}>
+                        <FileText size={14} color={colors.primary} />
                       </View>
-                    )}
+                      <View>
+                        <Text style={[styles.orderNumber, { color: colors.text }]}>#{order.order_number}</Text>
+                        <Text style={[styles.orderDate, { color: colors.textSecondary }]}>{formatDate(order.created_at)}</Text>
+                      </View>
+                    </View>
+                    <ChevronRight size={20} color={colors.textSecondary} />
                   </View>
-                  <Text style={[styles.itemsCount, { color: colors.textSecondary }]}>
-                    {order.orders.length} {order.orders.length === 1 ? 'item' : 'items'}
-                  </Text>
-                </View>
 
-                {/* Card Footer */}
+                  {/* Progress Indicator */}
+                  <View style={[styles.progressSection, { borderColor: colors.border }]}>
+                    <MiniProgressIndicator status={statusName} colors={colors} />
+                  </View>
+
+                  {/* Items Preview */}
+                  <View style={styles.itemsPreview}>
+                    <View style={styles.itemsRow}>
+                      {order.orders.slice(0, 3).map((item, index) => {
+                        const imageSource = item.product.image_url 
+                          ? { uri: item.product.image_url }
+                          : getProductImageFallback(item.product.name);
+                        
+                        return (
+                          <View key={item.id} style={[styles.itemPreviewContainer, index > 0 && { marginLeft: -8 }]}>
+                            <RemoteImage
+                              source={imageSource}
+                              fallback={getProductImageFallback(item.product.name)}
+                              style={[styles.itemPreviewImage, { borderColor: colors.surface }]}
+                            />
+                          </View>
+                        );
+                      })}
+                      {order.orders.length > 3 && (
+                        <View style={[styles.moreItemsBadge, { backgroundColor: colors.primary, marginLeft: -8 }]}>
+                          <Text style={styles.moreItemsText}>+{order.orders.length - 3}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={[styles.itemsCount, { color: colors.textSecondary }]}>
+                      {order.orders.length} {order.orders.length === 1 ? 'item' : 'items'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Card Footer — outside the navigating TouchableOpacity to avoid nested touchable conflicts */}
                 <View style={[styles.cardFooter, { borderTopColor: colors.border }]}>
                   <View style={styles.amountContainer}>
                     <Text style={[styles.amountLabel, { color: colors.textSecondary }]}>Est. Value</Text>
@@ -307,23 +321,27 @@ export default function OrdersScreen() {
                   <View style={styles.cardFooterActions}>
                     {isCancellable && (
                       <TouchableOpacity
-                        style={styles.cancelOrderBtn}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          handleCancelOrder(order.order_number, order.id);
-                        }}
+                        style={[styles.cancelOrderBtn, cancellingOrderIds.has(order.id) && { opacity: 0.5 }]}
+                        onPress={() => handleCancelOrder(order.order_number, order.id)}
+                        disabled={cancellingOrderIds.has(order.id)}
                         activeOpacity={0.7}
                       >
-                        <XCircle size={14} color="#dc2626" />
+                        {cancellingOrderIds.has(order.id)
+                          ? <ActivityIndicator size="small" color="#dc2626" />
+                          : <XCircle size={14} color="#dc2626" />}
                         <Text style={styles.cancelOrderBtnText}>Cancel</Text>
                       </TouchableOpacity>
                     )}
-                    <View style={[styles.viewDetailsButton, { backgroundColor: colors.primary + '10' }]}>
+                    <TouchableOpacity
+                      style={[styles.viewDetailsButton, { backgroundColor: colors.primary + '10' }]}
+                      onPress={() => handleOrderPress(order.id)}
+                      activeOpacity={0.7}
+                    >
                       <Text style={[styles.viewDetailsText, { color: colors.primary }]}>View Details</Text>
-                    </View>
+                    </TouchableOpacity>
                   </View>
                 </View>
-              </TouchableOpacity>
+              </View>
             );
           })
         ) : (

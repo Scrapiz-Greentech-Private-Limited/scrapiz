@@ -28,6 +28,7 @@ import {
   Navigation,
   ChevronDown,
   Check,
+  Star,
 } from 'lucide-react-native';
 import clsx from 'clsx';
 
@@ -51,6 +52,7 @@ type AddressSummary = {
   country: string;
   pincode: number;
   delivery_suggestion?: string;
+  is_default?: boolean;
 };
 
 type CreateAddressRequest = {
@@ -120,6 +122,7 @@ export default function AddressesScreen() {
   const [addressType, setAddressType] = useState<'home' | 'office' | 'other'>('other');
   const [showMapPicker, setShowMapPicker] = useState(false);
   const [showStatePicker, setShowStatePicker] = useState(false);
+  const [settingDefaultId, setSettingDefaultId] = useState<number | null>(null);
 
   // --- Input Refs ---
   const phoneInputRef = useRef<TextInput>(null);
@@ -151,6 +154,10 @@ export default function AddressesScreen() {
             
             // Populate form with location data
             const updatedFormData = populateFormFromLocation(emptyFormData, locationData);
+            // Geocoded state names may not exactly match our list; clear if not recognized
+            if (!INDIAN_STATES.includes(updatedFormData.state)) {
+              updatedFormData.state = '';
+            }
             console.log('📍 Updated form data:', updatedFormData);
             
             // Set default name to "Home"
@@ -271,8 +278,9 @@ export default function AddressesScreen() {
       street: address.street,
       area: address.area,
       city: address.city,
-      state: address.state,
-      country: address.country,
+      // Validate against known list; clear if the stored value is not a recognized state
+      state: INDIAN_STATES.includes(address.state) ? address.state : '',
+      country: 'India',
       pincode: address.pincode.toString(),
       delivery_suggestion: address.delivery_suggestion || '',
     });
@@ -348,14 +356,12 @@ export default function AddressesScreen() {
       errors.city = 'City must be 50 characters or less';
     }
 
-    // State validation (max 50 chars)
-    if (!formData.state || !formData.state.trim()) {
-      errors.state = 'State is required';
-    } else if (formData.state.length > 50) {
-      errors.state = 'State must be 50 characters or less';
+    // State validation (must be a recognized Indian state)
+    if (!formData.state || !INDIAN_STATES.includes(formData.state)) {
+      errors.state = 'Please select a valid state';
     }
 
-    // Country validation (max 50 chars)
+    // Country validation — always locked to India; sync payload here so display and saved value match
     if (!formData.country || !formData.country.trim()) {
       errors.country = 'Country is required';
     } else if (formData.country.length > 50) {
@@ -419,7 +425,7 @@ export default function AddressesScreen() {
         area: formData.area,
         city: formData.city,
         state: formData.state,
-        country: formData.country,
+        country: 'India', // Always lock to India; UI is non-editable for this field
         pincode: parseInt(formData.pincode, 10),
         delivery_suggestion: formData.delivery_suggestion || '',
       };
@@ -486,8 +492,10 @@ export default function AddressesScreen() {
     try {
       // Populate form fields with location data using helper function
       const updatedFormData = populateFormFromLocation(formData, location);
-      
-      // Set default name to "Home" if empty
+      // Geocoded state names may not exactly match our list; clear if not recognized
+      if (!INDIAN_STATES.includes(updatedFormData.state)) {
+        updatedFormData.state = '';
+      }
       if (!updatedFormData.name || updatedFormData.name === '') {
         updatedFormData.name = 'Home';
       }
@@ -538,11 +546,29 @@ export default function AddressesScreen() {
   };
 
   const getDefaultAddress = (): number | null => {
-    return addresses.length > 0 ? addresses[0].id : null;
+    const def = addresses.find((a) => a.is_default);
+    return def ? def.id : (addresses.length > 0 ? addresses[0].id : null);
   };
 
   const isDefaultAddress = (id: number): boolean => {
     return getDefaultAddress() === id;
+  };
+
+  const handleSetDefault = async (id: number) => {
+    if (isDefaultAddress(id)) return;
+    try {
+      setSettingDefaultId(id);
+      await AuthService.setDefaultAddress(id);
+      setAddresses((prev) =>
+        prev.map((a) => ({ ...a, is_default: a.id === id }))
+      );
+      await reloadAddresses();
+      Toast.show({ type: 'success', text1: 'Default Updated', text2: 'Default address changed successfully.' });
+    } catch (error: any) {
+      Toast.show({ type: 'error', text1: 'Error', text2: error.message || 'Failed to set default address.' });
+    } finally {
+      setSettingDefaultId(null);
+    }
   };
 
   // --- LOADING STATE ---
@@ -649,6 +675,22 @@ export default function AddressesScreen() {
                 {address.delivery_suggestion && (
                   <Text style={[styles.noteText, { color: colors.info }]}>Note: {address.delivery_suggestion}</Text>
                 )}
+
+                {!isDefaultAddress(address.id) && (
+                  <TouchableOpacity
+                    style={[styles.setDefaultButton, { borderColor: colors.primary }]}
+                    onPress={() => handleSetDefault(address.id)}
+                    disabled={settingDefaultId === address.id}
+                    activeOpacity={0.7}
+                  >
+                    {settingDefaultId === address.id ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <Star size={14} color={colors.primary} />
+                    )}
+                    <Text style={[styles.setDefaultText, { color: colors.primary }]}>Set as Default</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             ))}
           </View>
@@ -658,7 +700,7 @@ export default function AddressesScreen() {
           <Text style={[styles.infoTitle, { color: colors.primary }]}>About Addresses</Text>
           <Text style={[styles.infoText, { color: isDark ? '#dcfce7' : '#166534' }]}>
             • You can save multiple pickup addresses for convenience{'\n'}
-            • The first address in the list is your default address{'\n'}
+            • Tap "Set as Default" on any address to make it the default{'\n'}
             • Edit or delete addresses anytime{'\n'}
             • All addresses are securely stored
           </Text>
@@ -942,10 +984,10 @@ export default function AddressesScreen() {
                   activeOpacity={0.7}
                 >
                   <Text
-                    style={{ color: formData.state ? colors.inputText : colors.inputPlaceholder, fontSize: 15, fontFamily: 'Inter-Regular', flex: 1 }}
+                    style={{ color: (formData.state && INDIAN_STATES.includes(formData.state)) ? colors.inputText : colors.inputPlaceholder, fontSize: 15, fontFamily: 'Inter-Regular', flex: 1 }}
                     numberOfLines={1}
                   >
-                    {formData.state || 'Select state'}
+                    {(formData.state && INDIAN_STATES.includes(formData.state)) ? formData.state : 'Select state'}
                   </Text>
                   <ChevronDown size={16} color={colors.textSecondary} />
                 </TouchableOpacity>
@@ -1282,6 +1324,22 @@ const styles = StyleSheet.create({
   noteText: {
     fontSize: 14,
     fontStyle: 'italic',
+  },
+  setDefaultButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  setDefaultText: {
+    fontSize: 12,
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
   },
   infoCard: {
     borderRadius: 16,

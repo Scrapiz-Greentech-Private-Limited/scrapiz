@@ -8,10 +8,19 @@ export interface OrderWithDetails extends OrderSummary {
   formattedDate: string;
 }
 
+/**
+ * Single source of truth for status normalization across all order screens.
+ * Returns a lowercase, underscore-separated status string (e.g. 'in_transit').
+ */
+export function normalizeOrderStatus(status: OrderSummary['status']): string {
+  const raw = typeof status === 'string' ? status : (status?.name ?? 'pending');
+  return raw.toLowerCase().replace(/\s+/g, '_') || 'pending';
+}
+
 export const useOrderDetails = (orders: OrderSummary[], products: ProductSummary[]) => {
   const ordersWithDetails = useMemo(() => {
     return orders.map(order => {
-      const statusName = (typeof order.status === 'string' ? order.status : order.status?.name || 'pending').toLowerCase().replace(' ', '_');
+      const statusName = normalizeOrderStatus(order.status);
 
       // Total Amount
       const totalAmount = order.orders.reduce((sum, item) => {

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User, AuditLog
+from .models import User, AuditLog, PhoneOTP
 
 
 # ✅ Register User model in admin
@@ -30,6 +30,15 @@ class AuditLogAdmin(admin.ModelAdmin):
     list_filter = ('action', 'user')
     search_fields = ('user__email', 'user__name', 'ip_address')
     ordering = ('-timestamp',)
+
+
+@admin.register(PhoneOTP)
+class PhoneOTPAdmin(admin.ModelAdmin):
+    list_display = ('phone_number', 'is_verified', 'attempts', 'expires_at', 'created_at')
+    list_filter = ('is_verified',)
+    search_fields = ('phone_number',)
+    ordering = ('-created_at',)
+    readonly_fields = ('otp_hash', 'created_at')
 
 
 # ✅ Admin branding

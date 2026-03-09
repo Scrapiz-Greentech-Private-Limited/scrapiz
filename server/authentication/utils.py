@@ -1,5 +1,6 @@
 # authentication/utils.py
 import random
+import re
 import string
 import uuid
 import time
@@ -139,6 +140,29 @@ def send_deletion_confirmation_email(user_email, user_name):
   except Exception as e:
     logger.error(f"Failed to send deletion confirmation email to {user_email}: {str(e)}")
     return False
+
+
+def is_valid_e164(phone_number: str) -> bool:
+    if not phone_number:
+        return False
+    e164_pattern = r'^\+[1-9]\d{6,14}$'
+    return bool(re.match(e164_pattern, phone_number))
+
+
+def normalize_phone_number(phone_number: str) -> str:
+    if not phone_number:
+        raise ValueError("Phone number is required")
+    cleaned = re.sub(r'[\s\-\.\(\)]', '', phone_number)
+    if cleaned.startswith('+'):
+        if not is_valid_e164(cleaned):
+            raise ValueError(f"Invalid E.164 phone number format: {phone_number}")
+        return cleaned
+    if cleaned.startswith('00'):
+        cleaned = '+' + cleaned[2:]
+        if not is_valid_e164(cleaned):
+            raise ValueError(f"Invalid phone number format: {phone_number}")
+        return cleaned
+    raise ValueError(f"Phone number must be in E.164 format (e.g., +919876543210): {phone_number}")
    
   
       

@@ -101,12 +101,12 @@ const getISTHour = (): number => {
 
 // Get available time slots based on selected date and current IST time
 const getAvailableTimeSlots = (dateStr: string) => {
-  // Check if selected date is today
-  const today = new Date();
-  const todayStr = today.toLocaleDateString('en-US', {
+  // Check if selected date is today — use IST timezone so comparison is consistent with getISTHour
+  const todayStr = new Date().toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
-    day: 'numeric'
+    day: 'numeric',
+    timeZone: 'Asia/Kolkata',
   });
   if (dateStr !== todayStr) return allTimeSlots;
   const currentHour = getISTHour();
@@ -1181,7 +1181,7 @@ function SellScreenContent() {
 
       {selectedItems.length > 0 && (
         <View style={styles.selectedItems}>
-          <Text style={[styles.selectedItemsTitle, { color: colors.text }]}>Selected Items ({selectedItems.length})</Text>
+          <Text style={[styles.selectedItemsTitle, { color: colors.text }]}>Selected Items({selectedItems.length})</Text>
           {selectedItems.map((item, index) => {
             const fallbackImage = getFallbackImageForProduct(item.name);
             return (
@@ -1240,19 +1240,23 @@ function SellScreenContent() {
     </View>
   );
 
-  const renderStep2 = () => {
-    const availableSlots = selectedDate ? getAvailableTimeSlots(selectedDate) : [];
-
-    // If selected date has no available slots (e.g. today after all slots passed), clear it
-    if (selectedDate && availableSlots.length === 0) {
+  // Clean up selectedDate/selectedTime when available slots change.
+  // This must be a useEffect (not inline in renderStep2) to avoid setState during render.
+  useEffect(() => {
+    if (!selectedDate) return;
+    const availableSlots = getAvailableTimeSlots(selectedDate);
+    if (availableSlots.length === 0) {
       setSelectedDate('');
       setSelectedTime('');
+      return;
     }
-
-    // If selected time is no longer available after date change, clear it
-    if (selectedTime && selectedDate && !availableSlots.find(s => s.label === selectedTime)) {
+    if (selectedTime && !availableSlots.find(s => s.label === selectedTime)) {
       setSelectedTime('');
     }
+  }, [selectedDate, selectedTime]);
+
+  const renderStep2 = () => {
+    const availableSlots = selectedDate ? getAvailableTimeSlots(selectedDate) : [];
 
     return (
       <View style={styles.stepContent}>
@@ -1277,13 +1281,15 @@ function SellScreenContent() {
             {Array.from({ length: 7 }, (_, i) => {
               const date = new Date();
               date.setDate(date.getDate() + i);
-              const weekday = date.toLocaleDateString('en-US', { weekday: 'short' });
-              const day = date.getDate();
-              const month = date.toLocaleDateString('en-US', { month: 'short' });
+              // Use IST timezone for all date labels so they match getISTHour-based comparisons
+              const weekday = date.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'Asia/Kolkata' });
+              const day = parseInt(date.toLocaleDateString('en-US', { day: 'numeric', timeZone: 'Asia/Kolkata' }), 10);
+              const month = date.toLocaleDateString('en-US', { month: 'short', timeZone: 'Asia/Kolkata' });
               const dateStr = date.toLocaleDateString('en-US', {
                 weekday: 'short',
                 month: 'short',
-                day: 'numeric'
+                day: 'numeric',
+                timeZone: 'Asia/Kolkata',
               });
               const isToday = i === 0;
               const isSelected = selectedDate === dateStr;

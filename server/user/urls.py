@@ -1,6 +1,7 @@
 from django.urls import path, include
 from .views import (
-    AddressAPIView, 
+    AddressAPIView,
+    SetDefaultAddressAPIView,
     NotificationPreferenceAPIView,
     RegisterPushTokenAPIView,
     UnregisterPushTokenAPIView,
@@ -11,6 +12,7 @@ from .admin_views import AdminUserAddressesView, AdminAddressDetailView
 urlpatterns = [
     path('address/', AddressAPIView.as_view(), name='address'),
     path('address/<int:pk>/', AddressAPIView.as_view(), name='address-detail'),
+    path('address/<int:pk>/set-default/', SetDefaultAddressAPIView.as_view(), name='address-set-default'),
     path('notification-settings/', NotificationPreferenceAPIView.as_view(), name='notification-settings'),
     path('register-push-token/', RegisterPushTokenAPIView.as_view(), name='register-push-token'),
     path('unregister-push-token/', UnregisterPushTokenAPIView.as_view(), name='unregister-push-token'),

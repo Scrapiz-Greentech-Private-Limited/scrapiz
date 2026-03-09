@@ -6,15 +6,14 @@ services:
       context: ./server
       dockerfile: Dockerfile
     container_name: server_scrapiz_api
-    command: sh -c "python manage.py migrate && 
-                   python manage.py collectstatic --noinput && 
-                   gunicorn server.wsgi:application --bind 0.0.0.0:8000 --workers 4"
+    command: sh -c "python manage.py collectstatic --noinput && gunicorn server.wsgi:application --bind 0.0.0.0:8000 --workers 3"
+    restart: unless-stopped
     volumes:
       - ./server:/app
       - static_volume:/static
       - media_volume:/media
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     depends_on:
       - redis
     networks:
@@ -27,16 +26,34 @@ services:
     container_name: redis_scrapiz
     # Redis serves as the message broker for Celery tasks
     # Used for push notification task queue and results backend
+    restart: unless-stopped
     expose:
       - "6379"
     networks:
       - templet
+      
+  nginx:
+    image: nginx:alpine
+    container_name: nginx_reverse_proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/nginx.conf:ro
+      - static_volume:/static
+      - media_volume:/media
+    depends_on:
+      - server
+    networks:
+      - templet
+      
 
   celery_worker:
     build:
       context: ./server
       dockerfile: Dockerfile
     container_name: celery_worker_scrapiz
+    restart: unless-stopped
     # Celery worker handles async tasks including push notifications
     # -c 2 = 2 concurrent workers for handling multiple tasks
     command: celery -A server worker -l info -c 2
@@ -55,6 +72,7 @@ services:
       context: ./server
       dockerfile: Dockerfile
     container_name: celery_beat_scrapiz
+    restart: unless-stopped
     command: celery -A server beat -l info --scheduler django_celery_beat.schedulers.DatabaseScheduler
     volumes:
       - ./server:/app
@@ -65,6 +83,56 @@ services:
       - templet
     env_file:
       - ./server/.env
+  
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: dozzle_scrapiz
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    expose:
+      - "8080"
+    networks:
+      - templet
+  
+  logs_nginx:
+    image: nginx:alpine
+    container_name: logs_nginx
+    restart: unless-stopped
+    ports:
+      - "9999:80"
+    volumes:
+      - ./nginx-logs.conf:/etc/nginx/nginx.conf:ro
+      - ./htpasswd:/etc/nginx/.htpasswd:ro
+    depends_on:
+     - dozzle
+    networks:
+     - templet
+     
+  uptime_kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime_kuma_scrapiz
+    restart: unless-stopped
+    volumes:
+      - ./uptime-kuma-data:/app/data
+    expose:
+      - "3001"
+    networks:
+      - templet
+      
+  monitor_nginx:
+    image: nginx:alpine
+    container_name: monitor_nginx
+    restart: unless-stopped
+    ports:
+      - "9998:80"
+    volumes:
+      - "./nginx-monitor.conf:/etc/nginx/nginx.conf:ro"
+      - "./monitor_htpasswd:/etc/nginx/.htpasswd:ro"
+    depends_on:
+      - uptime_kuma
+    networks:
+      - templet
 
 
 
