@@ -35,6 +35,8 @@ import {
   Scale,
   AlertCircle,
   Check,
+  Clock,
+  Image as ImageIcon,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -81,13 +83,35 @@ type SelectedItem = {
   image?: any;
 };
 
-const timeSlots = [
-  '9:00 AM - 11:00 AM',
-  '11:00 AM - 1:00 PM',
-  '1:00 PM - 3:00 PM',
-  '3:00 PM - 5:00 PM',
-  '5:00 PM - 7:00 PM'
+const allTimeSlots = [
+  { label: '9:00 AM - 11:00 AM', startHour: 9 },
+  { label: '11:00 AM - 1:00 PM', startHour: 11 },
+  { label: '1:00 PM - 3:00 PM', startHour: 13 },
+  { label: '3:00 PM - 5:00 PM', startHour: 15 },
+  { label: '5:00 PM - 7:00 PM', startHour: 17 },
 ];
+
+// Get current hour in IST (UTC+5:30)
+const getISTHour = (): number => {
+  const now = new Date();
+  const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+  const istMs = utcMs + 5.5 * 3600000;
+  return new Date(istMs).getHours();
+};
+
+// Get available time slots based on selected date and current IST time
+const getAvailableTimeSlots = (dateStr: string) => {
+  // Check if selected date is today
+  const today = new Date();
+  const todayStr = today.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric'
+  });
+  if (dateStr !== todayStr) return allTimeSlots;
+  const currentHour = getISTHour();
+  return allTimeSlots.filter(slot => slot.startHour > currentHour);
+};
 
 const stepTitles = [
   'Select Items',
@@ -778,6 +802,10 @@ function SellScreenContent() {
       else if (!validateMobileNumber(contactForm.mobile)) {
         newErrors.mobile = '📱 Please enter a valid 10-digit mobile number';
       }
+
+      if (selectedImages.length === 0) {
+        newErrors.images = '📸 Please upload at least one photo of your scrap';
+      }
     }
 
     setErrors(newErrors);
@@ -1212,78 +1240,179 @@ function SellScreenContent() {
     </View>
   );
 
-  const renderStep2 = () => (
-    <View style={styles.stepContent}>
-      <Text style={[styles.stepTitle, { color: colors.text }]}>Schedule Pickup</Text>
-      <Text style={[styles.stepSubtitle, { color: colors.textSecondary }]}>Choose your preferred date and time</Text>
+  const renderStep2 = () => {
+    const availableSlots = selectedDate ? getAvailableTimeSlots(selectedDate) : [];
 
-      <View ref={dateTimeRef} style={styles.dateSection}>
-        <Text style={[styles.sectionLabel, { color: colors.text }]}>Select Date</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.datesScroll}>
-          {Array.from({ length: 7 }, (_, i) => {
-            const date = new Date();
-            date.setDate(date.getDate() + i);
-            const dateStr = date.toLocaleDateString('en-US', {
-              weekday: 'short',
-              month: 'short',
-              day: 'numeric'
-            });
-            return (
-              <TouchableOpacity
-                key={i}
-                style={[
-                  styles.dateCard,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
-                  selectedDate === dateStr && { backgroundColor: isDark ? '#064e3b' : '#f0fdf4', borderColor: colors.primary }
-                ]}
-                onPress={() => setSelectedDate(dateStr)}
-              >
-                <Text style={[
-                  styles.dateText,
-                  { color: colors.textSecondary },
-                  selectedDate === dateStr && { color: colors.primary }
-                ]}>
-                  {dateStr}
+    // If selected date has no available slots (e.g. today after all slots passed), clear it
+    if (selectedDate && availableSlots.length === 0) {
+      setSelectedDate('');
+      setSelectedTime('');
+    }
+
+    // If selected time is no longer available after date change, clear it
+    if (selectedTime && selectedDate && !availableSlots.find(s => s.label === selectedTime)) {
+      setSelectedTime('');
+    }
+
+    return (
+      <View style={styles.stepContent}>
+        {/* Header */}
+        <View style={styles.step2Header}>
+          <View style={[styles.step2IconWrapper, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#dcfce7' }]}>
+            <Calendar size={24} color={colors.primary} />
+          </View>
+          <View>
+            <Text style={[styles.stepTitle, { color: colors.text, marginBottom: 2 }]}>Schedule Pickup</Text>
+            <Text style={[styles.stepSubtitle, { color: colors.textSecondary, marginBottom: 0 }]}>Choose your preferred date and time</Text>
+          </View>
+        </View>
+
+        {/* Date Section */}
+        <View ref={dateTimeRef} style={styles.dateSection}>
+          <View style={styles.sectionLabelRow}>
+            <Calendar size={16} color={colors.primary} />
+            <Text style={[styles.sectionLabel, { color: colors.text, marginBottom: 0, marginLeft: 8 }]}>Select Date</Text>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.datesScroll}>
+            {Array.from({ length: 7 }, (_, i) => {
+              const date = new Date();
+              date.setDate(date.getDate() + i);
+              const weekday = date.toLocaleDateString('en-US', { weekday: 'short' });
+              const day = date.getDate();
+              const month = date.toLocaleDateString('en-US', { month: 'short' });
+              const dateStr = date.toLocaleDateString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric'
+              });
+              const isToday = i === 0;
+              const isSelected = selectedDate === dateStr;
+
+              // Skip dates with no available time slots (e.g. today when all slots have passed)
+              if (getAvailableTimeSlots(dateStr).length === 0) return null;
+
+              return (
+                <TouchableOpacity
+                  key={i}
+                  style={[
+                    styles.dateCardPro,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    isSelected && { backgroundColor: colors.primary, borderColor: colors.primary }
+                  ]}
+                  onPress={() => setSelectedDate(dateStr)}
+                >
+                  <Text style={[
+                    styles.dateWeekday,
+                    { color: colors.textSecondary },
+                    isSelected && { color: 'rgba(255,255,255,0.8)' }
+                  ]}>
+                    {isToday ? 'Today' : weekday}
+                  </Text>
+                  <Text style={[
+                    styles.dateDay,
+                    { color: colors.text },
+                    isSelected && { color: '#fff' }
+                  ]}>
+                    {day}
+                  </Text>
+                  <Text style={[
+                    styles.dateMonth,
+                    { color: colors.textSecondary },
+                    isSelected && { color: 'rgba(255,255,255,0.8)' }
+                  ]}>
+                    {month}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* Time Slots Section */}
+        {selectedDate ? (
+          <View style={styles.timeSection}>
+            <View style={styles.sectionLabelRow}>
+              <Clock size={16} color={colors.primary} />
+              <Text style={[styles.sectionLabel, { color: colors.text, marginBottom: 0, marginLeft: 8 }]}>Select Time Slot</Text>
+            </View>
+            {availableSlots.length > 0 ? (
+              <View style={styles.timeSlotsGrid}>
+                {availableSlots.map((slot) => (
+                  <TouchableOpacity
+                    key={slot.label}
+                    style={[
+                      styles.timeSlotPro,
+                      { backgroundColor: colors.surface, borderColor: colors.border },
+                      selectedTime === slot.label && { backgroundColor: isDark ? '#064e3b' : '#f0fdf4', borderColor: colors.primary }
+                    ]}
+                    onPress={() => setSelectedTime(slot.label)}
+                  >
+                    <View style={styles.timeSlotInner}>
+                      <Clock size={14} color={selectedTime === slot.label ? colors.primary : colors.textSecondary} />
+                      <Text style={[
+                        styles.timeSlotText,
+                        { color: colors.textSecondary },
+                        selectedTime === slot.label && { color: colors.primary, fontWeight: '600' }
+                      ]}>
+                        {slot.label}
+                      </Text>
+                    </View>
+                    {selectedTime === slot.label && (
+                      <View style={[styles.timeSlotCheck, { backgroundColor: colors.primary }]}>
+                        <Check size={12} color="#fff" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : (
+              <View style={[styles.noSlotsContainer, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : '#fffbeb', borderColor: '#f59e0b' }]}>
+                <AlertCircle size={20} color="#f59e0b" />
+                <Text style={[styles.noSlotsText, { color: isDark ? '#fbbf24' : '#92400e' }]}>
+                  No time slots available for today. Please select a different date.
                 </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      <View style={styles.timeSection}>
-        <Text style={[styles.sectionLabel, { color: colors.text }]}>Select Time Slot</Text>
-        {timeSlots.map((slot) => (
-          <TouchableOpacity
-            key={slot}
-            style={[
-              styles.timeSlot,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-              selectedTime === slot && { backgroundColor: isDark ? '#064e3b' : '#f0fdf4', borderColor: colors.primary }
-            ]}
-            onPress={() => setSelectedTime(slot)}
-          >
-            <Text style={[
-              styles.timeSlotText,
-              { color: colors.textSecondary },
-              selectedTime === slot && { color: colors.primary }
-            ]}>
-              {slot}
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={[styles.selectDatePrompt, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Calendar size={32} color={colors.textSecondary} />
+            <Text style={[styles.selectDatePromptText, { color: colors.textSecondary }]}>
+              Please select a date first to view available time slots
             </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+          </View>
+        )}
 
-      {errors.schedule && (
-        <Text style={styles.errorTextCentered}>{errors.schedule}</Text>
-      )}
-    </View>
-  );
+        {/* Selection Summary */}
+        {selectedDate && selectedTime ? (
+          <View style={[styles.scheduleSummary, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.1)' : '#f0fdf4', borderColor: colors.primary }]}>
+            <Check size={18} color={colors.primary} />
+            <View style={styles.scheduleSummaryText}>
+              <Text style={[styles.scheduleSummaryLabel, { color: colors.primary }]}>Pickup Scheduled</Text>
+              <Text style={[styles.scheduleSummaryValue, { color: colors.text }]}>{selectedDate} • {selectedTime}</Text>
+            </View>
+          </View>
+        ) : null}
+
+        {errors.schedule && (
+          <Text style={styles.errorTextCentered}>{errors.schedule}</Text>
+        )}
+      </View>
+    );
+  };
 
   const renderStep3 = () => (
     <View style={styles.stepContent}>
-      <Text style={[styles.stepTitle, { color: colors.text }]}>Contact & Address</Text>
-      <Text style={[styles.stepSubtitle, { color: colors.textSecondary }]}>Provide your contact details and pickup address</Text>
+      {/* Header */}
+      <View style={styles.step2Header}>
+        <View style={[styles.step2IconWrapper, { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#dbeafe' }]}>
+          <MapPin size={24} color="#3b82f6" />
+        </View>
+        <View>
+          <Text style={[styles.stepTitle, { color: colors.text, marginBottom: 2 }]}>Contact & Address</Text>
+          <Text style={[styles.stepSubtitle, { color: colors.textSecondary, marginBottom: 0 }]}>Provide your contact details and pickup address</Text>
+        </View>
+      </View>
 
       {/* Contact Information */}
       <View
@@ -1307,6 +1436,7 @@ function SellScreenContent() {
                 setContactForm(prev => ({ ...prev, name: text }));
                 if (errors.name) setErrors(prev => ({ ...prev, name: '' }));
               }}
+              autoFocus={false}
             />
             {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
           </View>
@@ -1326,6 +1456,8 @@ function SellScreenContent() {
                 }}
                 keyboardType="phone-pad"
                 maxLength={15}
+                autoFocus={false}
+                selectTextOnFocus={false}
               />
             </View>
             {errors.mobile && <Text style={styles.errorText}>{errors.mobile}</Text>}
@@ -1523,13 +1655,19 @@ function SellScreenContent() {
       <View style={[styles.photoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View style={styles.photoHeader}>
           <Camera size={20} color={colors.text} />
-          <Text style={[styles.photoHeaderTitle, { color: colors.text }]}>Upload Photos (Optional)</Text>
+          <Text style={[styles.photoHeaderTitle, { color: colors.text }]}>Upload Photos</Text>
         </View>
+        <Text style={[styles.photoDescription, { color: colors.textSecondary }]}>
+          Upload at least one photo of your scrap for accurate pricing.
+        </Text>
+        {errors.images && (
+          <Text style={styles.errorText}>{errors.images}</Text>
+        )}
 
         <TouchableOpacity style={[styles.photoButton, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={pickImage}>
           <Camera size={24} color={colors.textSecondary} />
           <Text style={[styles.photoButtonText, { color: colors.text }]}>Add Photos</Text>
-          <Text style={[styles.photoButtonSubtext, { color: colors.textSecondary }]}>Help us identify your scrap better</Text>
+          <Text style={[styles.photoButtonSubtext, { color: colors.textSecondary }]}>Max 5 images </Text>
         </TouchableOpacity>
 
         {selectedImages.length > 0 && (
@@ -2386,8 +2524,58 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 12,
   },
+  sectionLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  step2Header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 28,
+    gap: 14,
+  },
+  step2IconWrapper: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   datesScroll: {
-    marginHorizontal: -8,
+    marginHorizontal: -4,
+  },
+  dateCardPro: {
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    marginHorizontal: 5,
+    minWidth: 72,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  dateWeekday: {
+    fontSize: 11,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  dateDay: {
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  dateMonth: {
+    fontSize: 11,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   dateCard: {
     backgroundColor: 'white',
@@ -2413,6 +2601,103 @@ const styles = StyleSheet.create({
   },
   timeSection: {
     marginBottom: 24,
+  },
+  timeSlotsGrid: {
+    gap: 10,
+  },
+  timeSlotPro: {
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  timeSlotInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  timeSlotCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  noSlotsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 12,
+  },
+  noSlotsText: {
+    fontSize: 13,
+    fontWeight: '500',
+    flex: 1,
+    lineHeight: 18,
+  },
+  selectDatePrompt: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    gap: 12,
+    marginTop: 8,
+  },
+  selectDatePromptText: {
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  scheduleSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    gap: 12,
+    marginTop: 8,
+  },
+  scheduleSummaryText: {
+    flex: 1,
+  },
+  scheduleSummaryLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  scheduleSummaryValue: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  optionalBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginLeft: 'auto',
+  },
+  optionalBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  photoDescription: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 16,
   },
   timeSlot: {
     backgroundColor: 'white',
