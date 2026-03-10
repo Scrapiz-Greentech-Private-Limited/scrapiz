@@ -45,9 +45,35 @@ const { width } = Dimensions.get('window');
 
 // --- Configuration ---
 const TIME_SLOTS = [
-  '09:00 AM', '11:00 AM', '01:00 PM', 
+  '09:00 AM', '11:00 AM', '01:00 PM',
   '03:00 PM', '05:00 PM', '07:00 PM'
 ];
+
+// Parse "09:00 AM" / "01:00 PM" → 24-hour integer (9 / 13)
+const getSlotHour = (slot: string): number => {
+  const match = slot.match(/(\d+):(\d+) (AM|PM)/);
+  if (!match) return 0;
+  let h = parseInt(match[1], 10);
+  if (match[3] === 'PM' && h < 12) h += 12;
+  if (match[3] === 'AM' && h === 12) h = 0;
+  return h;
+};
+
+// Current hour in IST (UTC+5:30) — keeps comparison consistent regardless of device timezone
+const getCurrentISTHour = (): number => {
+  const now = new Date();
+  const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+  return new Date(utcMs + 5.5 * 3600000).getHours();
+};
+
+// Returns TIME_SLOTS filtered to only future slots when date is today
+const getAvailableTimeSlots = (date: Date | null): string[] => {
+  if (!date) return TIME_SLOTS;
+  const isToday = date.toDateString() === startOfToday().toDateString();
+  if (!isToday) return TIME_SLOTS;
+  const currentHour = getCurrentISTHour();
+  return TIME_SLOTS.filter(slot => getSlotHour(slot) > currentHour);
+};
 
 // Helper to generate next 14 days
 const getBookingDates = () => {
@@ -96,6 +122,21 @@ export default function BookingScreen() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
+
+  // Keep a ref in sync with selectedTime so the date-change effect below can
+  // read the latest value without needing selectedTime in its dependency array.
+  const selectedTimeRef = React.useRef(selectedTime);
+  useEffect(() => { selectedTimeRef.current = selectedTime; }, [selectedTime]);
+
+  // Intentionally depends only on selectedDate — we read selectedTime via ref
+  // to avoid re-running this effect on every keystroke / time selection.
+  useEffect(() => {
+    if (!selectedDate || !selectedTimeRef.current) return;
+    const available = getAvailableTimeSlots(selectedDate);
+    if (!available.includes(selectedTimeRef.current)) {
+      setSelectedTime(null);
+    }
+  }, [selectedDate]);
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
@@ -427,6 +468,8 @@ export default function BookingScreen() {
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateScroll}>
                   {bookingDates.map((item, index) => {
+                    // Hide today (and any date) if it has no remaining time slots
+                    if (getAvailableTimeSlots(item.fullDate).length === 0) return null;
                     const isSelected = selectedDate?.toDateString() === item.fullDate.toDateString();
                     return (
                       <TouchableOpacity
@@ -452,24 +495,36 @@ export default function BookingScreen() {
                   <Clock size={20} color={colors.text} />
                   <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0, marginLeft: 0 }]}>Select Time</Text>
                 </View>
-                <View style={styles.timeGrid}>
-                  {TIME_SLOTS.map((slot, index) => {
-                    const isSelected = selectedTime === slot;
+                {(() => {
+                  const availableSlots = getAvailableTimeSlots(selectedDate);
+                  if (availableSlots.length === 0) {
                     return (
-                      <TouchableOpacity
-                        key={index}
-                        style={[
-                          styles.timeChip,
-                          { backgroundColor: colors.surface, borderColor: colors.border },
-                          isSelected && { backgroundColor: colors.primary, borderColor: colors.primary }
-                        ]}
-                        onPress={() => setSelectedTime(slot)}
-                      >
-                        <Text style={[styles.timeText, { color: colors.text }, isSelected && styles.textSelected]}>{slot}</Text>
-                      </TouchableOpacity>
+                      <Text style={[styles.noSlotsText, { color: colors.textSecondary }]}>
+                        No time slots available for today. Please select another date.
+                      </Text>
                     );
-                  })}
-                </View>
+                  }
+                  return (
+                    <View style={styles.timeGrid}>
+                      {availableSlots.map((slot, index) => {
+                        const isSelected = selectedTime === slot;
+                        return (
+                          <TouchableOpacity
+                            key={index}
+                            style={[
+                              styles.timeChip,
+                              { backgroundColor: colors.surface, borderColor: colors.border },
+                              isSelected && { backgroundColor: colors.primary, borderColor: colors.primary }
+                            ]}
+                            onPress={() => setSelectedTime(slot)}
+                          >
+                            <Text style={[styles.timeText, { color: colors.text }, isSelected && styles.textSelected]}>{slot}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  );
+                })()}
               </View>
 
               {/* Section 5: Notes */}
@@ -699,6 +754,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+  },
+  noSlotsText: {
+    fontSize: 14,
+    textAlign: 'center',
+    paddingVertical: 16,
   },
   timeChip: {
     width: '31%',  // 3 items per row with space between
