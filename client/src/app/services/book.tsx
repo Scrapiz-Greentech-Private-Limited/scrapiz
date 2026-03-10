@@ -123,11 +123,17 @@ export default function BookingScreen() {
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
 
-  // Clear selectedTime if it falls outside the available slots for the newly selected date
+  // Keep a ref in sync with selectedTime so the date-change effect below can
+  // read the latest value without needing selectedTime in its dependency array.
+  const selectedTimeRef = React.useRef(selectedTime);
+  useEffect(() => { selectedTimeRef.current = selectedTime; }, [selectedTime]);
+
+  // Intentionally depends only on selectedDate — we read selectedTime via ref
+  // to avoid re-running this effect on every keystroke / time selection.
   useEffect(() => {
-    if (!selectedDate || !selectedTime) return;
+    if (!selectedDate || !selectedTimeRef.current) return;
     const available = getAvailableTimeSlots(selectedDate);
-    if (!available.includes(selectedTime)) {
+    if (!available.includes(selectedTimeRef.current)) {
       setSelectedTime(null);
     }
   }, [selectedDate]);
