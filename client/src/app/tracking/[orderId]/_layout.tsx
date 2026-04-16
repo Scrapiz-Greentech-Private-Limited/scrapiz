@@ -16,7 +16,9 @@ export default function TrackingLayout() {
     <OrderTrackingProvider orderId={parsedOrderId}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="search" />
+        <Stack.Screen name="accepted" />
         <Stack.Screen name="live" />
+        <Stack.Screen name="quote" />
         <Stack.Screen name="complete" />
       </Stack>
     </OrderTrackingProvider>

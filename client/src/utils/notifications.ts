@@ -53,12 +53,27 @@ Notifications.setNotificationHandler({
  * Deep link data structure from backend
  */
 export interface DeepLinkData {
-  type: 'order_detail' | 'screen' | 'url';
+  type: 'order_detail' | 'order_quote' | 'order_update' | 'screen' | 'url';
   value: string;
   orderId?: string;
   orderNumber?: string;
   category?: string;
 }
+
+const navigateToOrder = (router: any, orderId?: string, orderNumber?: string) => {
+  if (!orderId) {
+    router.push('/(tabs)/home');
+    return;
+  }
+
+  router.push({
+    pathname: '/profile/orders/[id]',
+    params: {
+      id: orderId,
+      orderNumber,
+    },
+  });
+};
 
 /**
  * Handle notification response when user taps on a notification
@@ -84,19 +99,24 @@ export const handleNotificationResponse = (
     
     switch (data.type) {
       case 'order_detail':
-        // Navigate to order detail screen with order ID
-        if (data.orderId) {
-          router.push({
-            pathname: '/order-detail',
-            params: { 
-              orderId: data.orderId,
-              orderNumber: data.orderNumber 
-            }
-          });
-        } else {
-          console.warn('order_detail type but no orderId provided');
+        navigateToOrder(router, data.orderId, data.orderNumber);
+        break;
+
+      case 'order_quote':
+        if (!data.orderId) {
+          console.warn('order_quote type but no orderId provided');
           router.push('/(tabs)/home');
+          break;
         }
+
+        router.push({
+          pathname: '/tracking/[orderId]/quote',
+          params: { orderId: data.orderId },
+        });
+        break;
+
+      case 'order_update':
+        navigateToOrder(router, data.orderId, data.orderNumber);
         break;
       
       case 'screen':

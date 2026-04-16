@@ -223,8 +223,8 @@ const SCRAP_CATEGORY_DETAILS: Record<ScrapCategoryKey, {
   paper: {
     title: 'Paper Scrap',
     sectionTitle: 'Types of Paper Scrap',
-    headImage: require('../../../assets/images/sell/paper_head.png'),
-    contactImage: require('../../../assets/images/sell/paper_contactUS.png'),
+    headImage: require('../../../assets/images/sell/paper_pile_converted.webp'),
+    contactImage: require('../../../assets/images/sell/contact_us_converted.webp'),
     lightBackground: '#E7CFAE',
     darkBackground: '#E7CFAE',
     accent: '#b7864e',
@@ -234,8 +234,8 @@ const SCRAP_CATEGORY_DETAILS: Record<ScrapCategoryKey, {
   plastic: {
     title: 'Plastic Scrap',
     sectionTitle: 'Types of Plastic Scrap',
-    headImage: require('../../../assets/images/sell/plastic_head.png'),
-    contactImage: require('../../../assets/images/sell/plastic_ContactUs.png'),
+    headImage: require('../../../assets/images/sell/plastic_bg_converted.webp'),
+    contactImage: require('../../../assets/images/sell/contact_us_converted.webp'),
     lightBackground: '#A7D2F2',
     darkBackground: '#A7D2F2',
     accent: '#6ea3c9',
@@ -245,8 +245,8 @@ const SCRAP_CATEGORY_DETAILS: Record<ScrapCategoryKey, {
   metal: {
     title: 'Metal Scrap',
     sectionTitle: 'Types of Metal Scrap',
-    headImage: require('../../../assets/images/sell/meta_head.png'),
-    contactImage: require('../../../assets/images/sell/metal_ContactUs.png'),
+    headImage: require('../../../assets/images/sell/metal_head.png'),
+    contactImage: require('../../../assets/images/sell/contact_us_converted.webp'),
     lightBackground: '#E7716E',
     darkBackground: '#E7716E',
     accent: '#c07444',
@@ -256,8 +256,8 @@ const SCRAP_CATEGORY_DETAILS: Record<ScrapCategoryKey, {
   electronic: {
     title: 'Electronic Scrap',
     sectionTitle: 'Types of Electronic Scrap',
-    headImage: require('../../../assets/images/sell/electronic_head.png'),
-    contactImage: require('../../../assets/images/sell/electronic_contactUs.png'),
+    headImage: require('../../../assets/images/sell/metal_bg_converted.webp'),
+    contactImage: require('../../../assets/images/sell/contact_us_converted.webp'),
     lightBackground: '#F9E28D',
     darkBackground: '#F9E28D',
     accent: '#d5a24a',
@@ -401,7 +401,7 @@ function SellScreenContent() {
 
   const [products, setProducts] = useState<ProductSummary[]>([]);
   const [categories, setCategories] = useState<CategorySummary[]>([]);
-  const [showTypesLanding, setShowTypesLanding] = useState(true);
+  const [showTypesLanding, setShowTypesLanding] = useState(false);
   const [selectedLandingCategory, setSelectedLandingCategory] = useState<ScrapCategoryKey | null>(null);
   const [addresses, setAddresses] = useState<AddressSummary[]>([]);
   const [currentStep, setCurrentStep] = useState(1);
@@ -2370,34 +2370,20 @@ function SellScreenContent() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
-      {!(currentStep === 1 && (showTypesLanding || selectedLandingCategory)) && (
-        <View style={[styles.header, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Sell Scrap</Text>
-          <Text style={[styles.stepTitle, { color: colors.textSecondary }]}>{stepTitles[currentStep - 1]}</Text>
-          {renderStepIndicator()}
-        </View>
-      )}
+      <View style={[styles.header, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Sell Scrap</Text>
+        <Text style={[styles.stepTitle, { color: colors.textSecondary }]}>{stepTitles[currentStep - 1]}</Text>
+        {renderStepIndicator()}
+      </View>
 
       <ScrollView
-        style={[
-          styles.content,
-          currentStep === 1 && !showTypesLanding && selectedLandingCategory
-            ? { backgroundColor: SCRAP_CATEGORY_DETAILS[selectedLandingCategory].lightBackground }
-            : null,
-        ]}
+        style={styles.content}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.scrollViewContent,
-          currentStep === 1 && !showTypesLanding && selectedLandingCategory
-            ? { backgroundColor: SCRAP_CATEGORY_DETAILS[selectedLandingCategory].lightBackground }
-            : null,
-        ]}
+        contentContainerStyle={styles.scrollViewContent}
         keyboardShouldPersistTaps="handled"
         nestedScrollEnabled={true}
       >
-        {currentStep === 1 && showTypesLanding && renderTypesLanding()}
-        {currentStep === 1 && !showTypesLanding && selectedLandingCategory && renderCategoryShowcase(selectedLandingCategory)}
-        {currentStep === 1 && !showTypesLanding && !selectedLandingCategory && renderStep1()}
+        {currentStep === 1 && renderStep1()}
         {currentStep === 2 && renderStep2()}
         {currentStep === 3 && renderStep3()}
         {currentStep === 4 && renderStep4()}

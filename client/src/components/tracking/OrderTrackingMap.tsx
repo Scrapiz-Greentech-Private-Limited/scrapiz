@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, StyleSheet, View } from 'react-native';
 import MapView, {
   AnimatedRegion,
   Circle,
@@ -9,7 +9,7 @@ import MapView, {
   Region,
 } from 'react-native-maps';
 import MapboxGL from '@rnmapbox/maps';
-import { Home, Truck } from 'lucide-react-native';
+import { Home, Truck, User } from 'lucide-react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { MAP_STYLES } from '../../config/mapConfig';
 import { TrackingCoordinate, TrackingPhase, TrackingVendorPin } from '../../types/orderTracking';
@@ -51,13 +51,30 @@ function calculateBearing(from: TrackingCoordinate, to: TrackingCoordinate) {
 function buildActiveVendor(
   acceptedVendorLocation: TrackingCoordinate | null,
   vendorPins: TrackingVendorPin[]
-): TrackingCoordinate | null {
+): TrackingVendorPin | null {
   if (acceptedVendorLocation) {
-    return acceptedVendorLocation;
+    const matchingPin = vendorPins.find(
+      (pin) =>
+        typeof pin.lat === 'number' &&
+        typeof pin.lng === 'number' &&
+        Math.abs(pin.lat - acceptedVendorLocation.lat) < 0.00001 &&
+        Math.abs(pin.lng - acceptedVendorLocation.lng) < 0.00001
+    );
+
+    if (matchingPin) {
+      return matchingPin;
+    }
+
+    return {
+      vendor_id: 0,
+      name: 'Active Partner',
+      pin_role: 'vendor',
+      lat: acceptedVendorLocation.lat,
+      lng: acceptedVendorLocation.lng,
+    };
   }
 
-  const firstPin = vendorPins.find((pin) => typeof pin.lat === 'number' && typeof pin.lng === 'number');
-  return firstPin ? { lat: firstPin.lat, lng: firstPin.lng } : null;
+  return vendorPins.find((pin) => typeof pin.lat === 'number' && typeof pin.lng === 'number') || null;
 }
 
 function buildCurvedLineCoordinates(
@@ -82,10 +99,18 @@ function buildCurvedLineCoordinates(
 
 function buildBounds(
   pickup: TrackingCoordinate,
-  activeVendorLocation: TrackingCoordinate | null,
-  userLocation: TrackingCoordinate | null
+  partnerPins: TrackingVendorPin[],
+  userPin: TrackingCoordinate,
+  activeVendorLocation: TrackingCoordinate | null
 ) {
-  const points = [pickup, ...(activeVendorLocation ? [activeVendorLocation] : []), ...(userLocation ? [userLocation] : [])];
+  const points = [
+    pickup,
+    userPin,
+    ...(activeVendorLocation ? [activeVendorLocation] : []),
+    ...partnerPins
+      .filter((pin) => typeof pin.lat === 'number' && typeof pin.lng === 'number')
+      .map((pin) => ({ lat: pin.lat, lng: pin.lng })),
+  ];
   if (points.length < 2) {
     return null;
   }
@@ -97,6 +122,25 @@ function buildBounds(
     ne: [Math.max(...lngValues), Math.max(...latValues)] as [number, number],
     sw: [Math.min(...lngValues), Math.min(...latValues)] as [number, number],
   };
+}
+
+function isSameCoordinate(a: TrackingCoordinate, b: TrackingCoordinate) {
+  return Math.abs(a.lat - b.lat) < 0.00001 && Math.abs(a.lng - b.lng) < 0.00001;
+}
+
+function isAgentPin(pin: TrackingVendorPin) {
+  return pin.pin_role === 'agent';
+}
+
+function getPassivePinStyle(pin: TrackingVendorPin) {
+  return isAgentPin(pin) ? styles.partnerMarkerAgent : styles.partnerMarkerVendor;
+}
+
+function getActivePinStyle(pin: TrackingVendorPin | null) {
+  if (pin?.pin_role === 'agent') {
+    return styles.partnerMarkerActiveAgent;
+  }
+  return styles.partnerMarkerActiveVendor;
 }
 
 export function OrderTrackingMap({
@@ -111,9 +155,25 @@ export function OrderTrackingMap({
 }: OrderTrackingMapProps) {
   const { colors, isDark } = useTheme();
   const pulse = useRef(new Animated.Value(0.7)).current;
+  const allPartnerPins = useMemo(
+    () => vendorPins.filter((pin) => typeof pin.lat === 'number' && typeof pin.lng === 'number'),
+    [vendorPins]
+  );
+  const userPin = useMemo(
+    () => userLocation || pickup,
+    [userLocation, pickup]
+  );
+  const activeVendorPin = useMemo(
+    () => buildActiveVendor(acceptedVendorLocation, allPartnerPins),
+    [acceptedVendorLocation, allPartnerPins]
+  );
   const activeVendorLocation = useMemo(
-    () => buildActiveVendor(acceptedVendorLocation, vendorPins),
-    [acceptedVendorLocation, vendorPins]
+    () => (activeVendorPin ? { lat: activeVendorPin.lat, lng: activeVendorPin.lng } : null),
+    [activeVendorPin]
+  );
+  const shouldRenderPickupPin = useMemo(
+    () => !isSameCoordinate(userPin, pickup),
+    [pickup, userPin]
   );
   const mapboxCurve = useMemo(
     () =>
@@ -130,8 +190,8 @@ export function OrderTrackingMap({
     [activeVendorLocation, pickup]
   );
   const mapboxBounds = useMemo(
-    () => buildBounds(pickup, activeVendorLocation, userLocation),
-    [pickup, activeVendorLocation, userLocation]
+    () => buildBounds(pickup, allPartnerPins, userPin, activeVendorLocation),
+    [pickup, allPartnerPins, userPin, activeVendorLocation]
   );
   const mapCameraKey = useMemo(() => {
     const parts = [
@@ -139,11 +199,11 @@ export function OrderTrackingMap({
       pickup.lng.toFixed(6),
       activeVendorLocation?.lat?.toFixed(6) || 'no-vendor',
       activeVendorLocation?.lng?.toFixed(6) || 'no-vendor',
-      userLocation?.lat?.toFixed(6) || 'no-user',
-      userLocation?.lng?.toFixed(6) || 'no-user',
+      userPin?.lat?.toFixed(6) || 'no-user',
+      userPin?.lng?.toFixed(6) || 'no-user',
     ];
     return parts.join(':');
-  }, [pickup, activeVendorLocation, userLocation]);
+  }, [pickup, activeVendorLocation, userPin]);
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -157,19 +217,16 @@ export function OrderTrackingMap({
   }, [pulse]);
 
   if (Platform.OS === 'android') {
-    const passiveVendorPins = vendorPins.filter((pin) => {
+    const passiveVendorPins = allPartnerPins.filter((pin) => {
       if (pin.lat === undefined || pin.lng === undefined) {
         return false;
       }
 
-      if (!activeVendorLocation) {
+      if (!activeVendorPin) {
         return true;
       }
 
-      return (
-        Math.abs(pin.lat - activeVendorLocation.lat) > 0.00001 ||
-        Math.abs(pin.lng - activeVendorLocation.lng) > 0.00001
-      );
+      return !(pin.vendor_id === activeVendorPin.vendor_id && pin.pin_role === activeVendorPin.pin_role);
     });
 
     return (
@@ -188,8 +245,8 @@ export function OrderTrackingMap({
             key={mapCameraKey}
             zoomLevel={activeVendorLocation ? 11.8 : 14.5}
             centerCoordinate={[
-              (userLocation?.lng ?? pickup.lng),
-              (userLocation?.lat ?? pickup.lat),
+              (userPin.lng ?? pickup.lng),
+              (userPin.lat ?? pickup.lat),
             ]}
             bounds={
               mapboxBounds
@@ -205,12 +262,6 @@ export function OrderTrackingMap({
             }
             animationMode="flyTo"
             animationDuration={1200}
-          />
-
-          <MapboxGL.UserLocation
-            visible={!!userLocation}
-            androidRenderMode="normal"
-            showsUserHeadingIndicator={false}
           />
 
           {activeVendorLocation && mapboxCurve ? (
@@ -229,22 +280,29 @@ export function OrderTrackingMap({
             </MapboxGL.ShapeSource>
           ) : null}
 
-          <MapboxGL.PointAnnotation id="pickup-marker" coordinate={[pickup.lng, pickup.lat]}>
-            <View style={styles.customerMarkerWrap}>
-              <View style={[styles.customerMarker, { backgroundColor: colors.primary }]}>
-                <Home size={18} color="#fff" />
+          <MapboxGL.PointAnnotation id="user-marker" coordinate={[userPin.lng, userPin.lat]}>
+            <View style={styles.userPinBoardWrap}>
+              <Animated.View
+                style={[
+                  styles.userPinBoardPulse,
+                  {
+                    backgroundColor: 'rgba(37,99,235,0.16)',
+                    transform: [{ scale: pulse }],
+                  },
+                ]}
+              />
+              <View style={styles.userPinBoard}>
+                <User size={16} color="#fff" />
               </View>
             </View>
           </MapboxGL.PointAnnotation>
 
-          {userLocation ? (
-            <MapboxGL.PointAnnotation
-              id="user-location-marker"
-              coordinate={[userLocation.lng, userLocation.lat]}
-            >
-              <View style={styles.userMarkerWrap}>
-                <View style={styles.userMarkerPulse} />
-                <View style={styles.userMarkerCore} />
+          {shouldRenderPickupPin ? (
+            <MapboxGL.PointAnnotation id="pickup-marker" coordinate={[pickup.lng, pickup.lat]}>
+              <View style={styles.pickupPinWrap}>
+                <View style={[styles.pickupPinCore, { backgroundColor: colors.primary }]}>
+                  <Home size={14} color="#fff" />
+                </View>
               </View>
             </MapboxGL.PointAnnotation>
           ) : null}
@@ -254,7 +312,7 @@ export function OrderTrackingMap({
               id="active-vendor-marker"
               coordinate={[activeVendorLocation.lng, activeVendorLocation.lat]}
             >
-              <View style={[styles.vendorMarker, styles.vendorMarkerActive]}>
+              <View style={[styles.partnerMarker, getActivePinStyle(activeVendorPin)]}>
                 <Truck size={18} color="#fff" />
               </View>
             </MapboxGL.PointAnnotation>
@@ -266,7 +324,7 @@ export function OrderTrackingMap({
               id={`vendor-pin-${vendor.vendor_id}`}
               coordinate={[vendor.lng, vendor.lat]}
             >
-              <View style={[styles.vendorMarker, styles.vendorMarkerMuted, { borderColor: colors.border }]}>
+              <View style={[styles.partnerMarker, getPassivePinStyle(vendor), { borderColor: colors.border }]}>
                 <Truck size={16} color="#fff" />
               </View>
             </MapboxGL.PointAnnotation>
@@ -289,7 +347,12 @@ export function OrderTrackingMap({
   const rotationRef = useRef(0);
 
   useEffect(() => {
-    const points = [pickup, ...(activeVendorLocation ? [activeVendorLocation] : [])];
+    const points = [
+      pickup,
+      userPin,
+      ...allPartnerPins.map((pin) => ({ lat: pin.lat, lng: pin.lng })),
+      ...(activeVendorLocation ? [activeVendorLocation] : []),
+    ];
     if (!mapRef.current || !points.length) {
       return;
     }
@@ -301,7 +364,7 @@ export function OrderTrackingMap({
         edgePadding: { top: 80, right: 48, bottom: 220, left: 48 },
       }
     );
-  }, [activeVendorLocation, pickup]);
+  }, [activeVendorLocation, allPartnerPins, pickup, userPin]);
 
   useEffect(() => {
     if (!activeVendorLocation) {
@@ -329,10 +392,7 @@ export function OrderTrackingMap({
     previousVendorRef.current = activeVendorLocation;
   }, [activeVendorLocation, animatedVendor]);
 
-  const visibleVendorPins = useMemo(
-    () => vendorPins.filter((pin) => pin.lat !== undefined && pin.lng !== undefined),
-    [vendorPins]
-  );
+  const visibleVendorPins = allPartnerPins;
 
   return (
     <View style={styles.container}>
@@ -354,40 +414,41 @@ export function OrderTrackingMap({
           strokeWidth={1.5}
         />
 
-        <Marker coordinate={{ latitude: pickup.lat, longitude: pickup.lng }} anchor={{ x: 0.5, y: 0.5 }}>
-          <View style={styles.customerMarkerWrap}>
+        <Marker coordinate={{ latitude: userPin.lat, longitude: userPin.lng }} anchor={{ x: 0.5, y: 0.5 }}>
+          <View style={styles.userPinBoardWrap}>
             <Animated.View
               style={[
-                styles.customerPulse,
+                styles.userPinBoardPulse,
                 {
-                  backgroundColor: 'rgba(22,163,74,0.18)',
+                  backgroundColor: 'rgba(37,99,235,0.16)',
                   transform: [{ scale: pulse }],
                 },
               ]}
             />
-            <View style={[styles.customerMarker, { backgroundColor: colors.primary }]}>
-              <Home size={18} color="#fff" />
+            <View style={styles.userPinBoard}>
+              <User size={16} color="#fff" />
             </View>
           </View>
         </Marker>
 
-        {userLocation ? (
+        {shouldRenderPickupPin ? (
           <Marker
-            coordinate={{ latitude: userLocation.lat, longitude: userLocation.lng }}
+            coordinate={{ latitude: pickup.lat, longitude: pickup.lng }}
             anchor={{ x: 0.5, y: 0.5 }}
           >
-            <View style={styles.userMarkerWrap}>
-              <View style={styles.userMarkerPulse} />
-              <View style={styles.userMarkerCore} />
+            <View style={styles.pickupPinWrap}>
+              <View style={[styles.pickupPinCore, { backgroundColor: colors.primary }]}>
+                <Home size={14} color="#fff" />
+              </View>
             </View>
           </Marker>
         ) : null}
 
         {visibleVendorPins.map((vendor) => {
           const isActive =
-            !!activeVendorLocation &&
-            Math.abs(vendor.lat - activeVendorLocation.lat) < 0.00001 &&
-            Math.abs(vendor.lng - activeVendorLocation.lng) < 0.00001;
+            !!activeVendorPin &&
+            vendor.vendor_id === activeVendorPin.vendor_id &&
+            vendor.pin_role === activeVendorPin.pin_role;
 
           if (isActive && activeVendorLocation) {
             return null;
@@ -399,7 +460,7 @@ export function OrderTrackingMap({
               coordinate={{ latitude: vendor.lat, longitude: vendor.lng }}
               anchor={{ x: 0.5, y: 0.5 }}
             >
-              <View style={[styles.vendorMarker, styles.vendorMarkerMuted, { borderColor: colors.border }]}>
+              <View style={[styles.partnerMarker, getPassivePinStyle(vendor), { borderColor: colors.border }]}>
                 <Truck size={16} color={isDark ? '#e2e8f0' : '#64748b'} />
               </View>
             </Marker>
@@ -428,8 +489,8 @@ export function OrderTrackingMap({
             <MarkerAnimated coordinate={animatedVendor} anchor={{ x: 0.5, y: 0.5 }} flat>
               <View
                 style={[
-                  styles.vendorMarker,
-                  styles.vendorMarkerActive,
+                  styles.partnerMarker,
+                  getActivePinStyle(activeVendorPin),
                   { transform: [{ rotate: `${rotationRef.current}deg` }] },
                 ]}
               >
@@ -448,28 +509,44 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  customerMarkerWrap: {
+  userPinBoardWrap: {
     width: 72,
     height: 72,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  customerPulse: {
+  userPinBoardPulse: {
     position: 'absolute',
     width: 62,
     height: 62,
     borderRadius: 31,
   },
-  customerMarker: {
+  userPinBoard: {
     width: 38,
     height: 38,
     borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
+    backgroundColor: '#2563EB',
     borderColor: 'rgba(255,255,255,0.96)',
   },
-  vendorMarker: {
+  pickupPinWrap: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickupPinCore: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  partnerMarker: {
     width: 34,
     height: 34,
     borderRadius: 17,
@@ -477,11 +554,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
   },
-  vendorMarkerMuted: {
+  partnerMarkerVendor: {
     backgroundColor: 'rgba(30,41,59,0.86)',
     borderColor: 'rgba(255,255,255,0.92)',
   },
-  vendorMarkerActive: {
+  partnerMarkerAgent: {
+    backgroundColor: 'rgba(30,64,175,0.9)',
+    borderColor: 'rgba(255,255,255,0.92)',
+  },
+  partnerMarkerActiveVendor: {
     width: 42,
     height: 42,
     borderRadius: 21,
@@ -493,25 +574,16 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 8,
   },
-  userMarkerWrap: {
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  userMarkerPulse: {
-    position: 'absolute',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(37,99,235,0.18)',
-  },
-  userMarkerCore: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+  partnerMarkerActiveAgent: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: '#2563EB',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
+    borderColor: 'rgba(255,255,255,0.96)',
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.24,
+    shadowRadius: 16,
+    elevation: 8,
   },
 });

@@ -37,6 +37,7 @@ export default function LiveTrackingScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const { colors, isDark } = useTheme();
   const {
+    acceptedItems,
     acceptedVendor,
     callVendor,
     connectionState,
@@ -261,6 +262,27 @@ export default function LiveTrackingScreen() {
         <Text style={[styles.statusCopy, { color: colors.textSecondary }]}>
           {acceptedVendor ? buildStatusCopy(acceptedVendor.name.split(' ')[0], step) : 'Your pickup is active.'}
         </Text>
+
+        {acceptedItems.length > 0 ? (
+          <View style={styles.itemsSection}>
+            <Text style={[styles.itemsSectionTitle, { color: colors.text }]}>Accepted materials</Text>
+            <View style={styles.itemsWrap}>
+              {acceptedItems.slice(0, 4).map((item) => (
+                <View
+                  key={`${item.product_id}-${item.product_name}`}
+                  style={[styles.itemChip, { backgroundColor: colors.background, borderColor: colors.border }]}
+                >
+                  <Text style={[styles.itemChipTitle, { color: colors.text }]} numberOfLines={1}>
+                    {item.product_name}
+                  </Text>
+                  <Text style={[styles.itemChipQty, { color: colors.textSecondary }]}>
+                    {item.quantity} {item.unit}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -401,5 +423,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
     fontFamily: 'Inter-Regular',
+  itemsSection: {
+    gap: 10,
+  },
+  itemsSectionTitle: {
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+  },
+  itemsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  itemChip: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    minWidth: '47%',
+  },
+  itemChipTitle: {
+    fontSize: 12,
+    fontFamily: 'Inter-SemiBold',
+  },
+  itemChipQty: {
+    marginTop: 3,
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+  },
   },
 });

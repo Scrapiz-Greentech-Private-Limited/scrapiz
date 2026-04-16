@@ -47,6 +47,10 @@ const getCurrentISTHour = () => {
 };
 const validatePhone = (value: string) => /^(\+?\d{6,15})$/.test(value.trim());
 
+const BRAND_DARK_GREEN = '#127E2D';
+const BRAND_DARK_GREEN_SOFT = 'rgba(18,126,45,0.22)';
+const BRAND_DARK_GREEN_SOFT_LIGHT = '#E9F7EE';
+
 export default function DebrisBookScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -59,11 +63,11 @@ export default function DebrisBookScreen() {
     border: isDark ? '#36404C' : '#D9D9D9',
     title: isDark ? '#F5F7FA' : '#161616',
     muted: isDark ? '#AAB2BE' : '#7A7A7A',
-    primary: '#EE7A09',
-    primarySoft: isDark ? 'rgba(238,122,9,0.18)' : '#FFF1E3',
-    green: '#29A745',
-    red: '#D63535',
-    yellowBg: isDark ? '#2E2412' : '#FFF8E8',
+    primary: BRAND_DARK_GREEN,
+    primarySoft: isDark ? BRAND_DARK_GREEN_SOFT : BRAND_DARK_GREEN_SOFT_LIGHT,
+    green: BRAND_DARK_GREEN,
+    red: BRAND_DARK_GREEN,
+    yellowBg: isDark ? 'rgba(18,126,45,0.22)' : BRAND_DARK_GREEN_SOFT_LIGHT,
   }), [isDark]);
 
   const [step, setStep] = useState<Step>(1);
@@ -208,7 +212,7 @@ export default function DebrisBookScreen() {
               <Text style={[styles.debrisSubtitle, { color: ui.muted }]}>{item.subtitle}</Text>
               <View style={styles.tagRow}>
                 <View style={[styles.priceTag, { borderColor: ui.primary }]}><Text style={[styles.tagText, { color: ui.primary }]}>{item.price}</Text></View>
-                <View style={[styles.infoTag, { borderColor: item.id === 'wood' || item.id === 'metal' ? '#1E9BEA' : ui.primary }]}><Text style={[styles.tagText, { color: item.id === 'wood' || item.id === 'metal' ? '#1E9BEA' : ui.primary }]}>{item.tag}</Text></View>
+                <View style={[styles.infoTag, { borderColor: ui.primary }]}><Text style={[styles.tagText, { color: ui.primary }]}>{item.tag}</Text></View>
               </View>
             </View>
             <View style={[styles.radioCircle, { borderColor: active ? ui.primary : ui.border, backgroundColor: active ? ui.primary : 'transparent' }]}>{active && <Check size={16} color="#fff" />}</View>
@@ -231,7 +235,7 @@ export default function DebrisBookScreen() {
       <View style={styles.floorRow}><Text style={[styles.sectionHeading, { color: ui.title, marginBottom: 0 }]}>Building Floor ?</Text><View style={[styles.floorInputWrap, { backgroundColor: ui.surface, borderColor: ui.border }]}><TextInput value={buildingFloor} onChangeText={(value) => setBuildingFloor(value.replace(/[^0-9]/g, ''))} keyboardType="numeric" style={[styles.floorInput, { color: ui.title }]} /></View></View>
       <View style={styles.liftRow}><Text style={[styles.sectionHeading, { color: ui.title, marginBottom: 0 }]}>Lift Available ?</Text><View style={styles.liftOptions}>{[true, false].map((value) => { const active = liftAvailable === value; return <TouchableOpacity key={String(value)} style={styles.liftOption} onPress={() => setLiftAvailable(value)}><View style={[styles.radioCircle, { borderColor: active ? ui.primary : ui.border, backgroundColor: active ? ui.primary : 'transparent' }]}>{active && <Check size={16} color="#fff" />}</View><Text style={[styles.liftLabel, { color: ui.muted }]}>{value ? 'Yes' : 'No'}</Text></TouchableOpacity>; })}</View></View>
       <View style={[styles.infoBox, { backgroundColor: ui.card, borderColor: ui.border }]}><Text style={[styles.infoText, { color: ui.muted }]}>Floors above 2nd without lift attract a small manual-carry surcharge shown transparently in your quote.</Text></View>
-      <View style={[styles.hazardBox, { backgroundColor: ui.primarySoft, borderColor: ui.primary }]}><Text style={[styles.hazardTitle, { color: ui.primary }]}>Hazardous material check.</Text><Text style={[styles.hazardText, { color: ui.primary }]}>Does your debris contain asbestos sheets, chemical drums, paint cans, or medical waste?</Text><View style={styles.hazardButtons}><TouchableOpacity style={[styles.hazardButton, { backgroundColor: hazardousMaterial ? ui.surface : '#E9F8EC', borderColor: '#56AE67' }]} onPress={() => setHazardousMaterial(false)}><Text style={[styles.hazardButtonText, { color: '#208338' }]}>No, it doesn’t</Text></TouchableOpacity><TouchableOpacity style={[styles.hazardButton, { backgroundColor: hazardousMaterial ? '#FFECEC' : ui.surface, borderColor: '#D63535' }]} onPress={() => setHazardousMaterial(true)}><Text style={[styles.hazardButtonText, { color: '#C12C2C' }]}>Yes, it does</Text></TouchableOpacity></View></View>
+      <View style={[styles.hazardBox, { backgroundColor: ui.primarySoft, borderColor: ui.primary }]}><Text style={[styles.hazardTitle, { color: ui.primary }]}>Hazardous material check.</Text><Text style={[styles.hazardText, { color: ui.primary }]}>Does your debris contain asbestos sheets, chemical drums, paint cans, or medical waste?</Text><View style={styles.hazardButtons}><TouchableOpacity style={[styles.hazardButton, { backgroundColor: hazardousMaterial ? ui.surface : '#E9F8EC', borderColor: '#56AE67' }]} onPress={() => setHazardousMaterial(false)}><Text style={[styles.hazardButtonText, { color: '#208338' }]}>No, it doesn’t</Text></TouchableOpacity><TouchableOpacity style={[styles.hazardButton, { backgroundColor: hazardousMaterial ? ui.primarySoft : ui.surface, borderColor: ui.primary }]} onPress={() => setHazardousMaterial(true)}><Text style={[styles.hazardButtonText, { color: ui.primary }]}>Yes, it does</Text></TouchableOpacity></View></View>
       <Text style={[styles.sectionHeading, { color: ui.title }]}>Select Date</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateCardsRow}>{DATES.map((item) => { const active = selectedDate?.toDateString() === item.toDateString(); return <TouchableOpacity key={item.toISOString()} style={[styles.dateCard, { backgroundColor: ui.surface, borderColor: ui.border }, active && { backgroundColor: ui.primary, borderColor: ui.primary }]} onPress={() => setSelectedDate(item)}><Text style={[styles.dateDay, { color: active ? '#fff' : ui.muted }]}>{format(item, 'EEE')}</Text><Text style={[styles.dateNumber, { color: active ? '#fff' : ui.title }]}>{format(item, 'd')}</Text><Text style={[styles.dateMonth, { color: active ? '#fff' : ui.muted }]}>{format(item, 'MMM')}</Text></TouchableOpacity>; })}</ScrollView>
       <Text style={[styles.sectionHeading, { color: ui.title }]}>Select Time</Text>
@@ -270,12 +274,12 @@ export default function DebrisBookScreen() {
       <TouchableOpacity style={[styles.photoSelect, { borderColor: ui.border, backgroundColor: ui.surface }]} onPress={pickReviewPhotos}><Text style={[styles.photoSelectText, { color: ui.primary }]}>+ Select Photos</Text></TouchableOpacity>
       {reviewPhotos.length > 0 && <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reviewPhotoRow}>{reviewPhotos.map((photo) => <Image key={photo.uri} source={{ uri: photo.uri }} style={styles.reviewPhoto} />)}</ScrollView>}
       <Text style={[styles.reviewNote, { color: ui.muted }]}>Our team will contact you shortly to confirm the details.</Text>
-      <Image source={require('../../../assets/images/services/debris_removal/thank_you_debris_Removal_converted.webp')} style={styles.thankYouImage} resizeMode="cover" />
+      <Image source={require('../../../assets/images/services/demolition/thank_you_converted.webp')} style={styles.thankYouImage} resizeMode="cover" />
     </>
   );
 
   if (success) {
-    return <View style={[styles.screen, { backgroundColor: ui.bg, paddingTop: insets.top }]}><View style={[styles.header, { borderBottomColor: ui.border }]}><TouchableOpacity style={styles.backButton} onPress={() => router.replace('/(tabs)/services')}><ArrowLeft size={26} color={ui.muted} /></TouchableOpacity><Text style={[styles.headerTitle, { color: ui.title }]}>Debris Removal</Text></View><View style={styles.successWrap}><Image source={require('../../../assets/images/services/debris_removal/thank_you_debris_Removal_converted.webp')} style={styles.successImg} resizeMode="cover" /></View></View>;
+    return <View style={[styles.screen, { backgroundColor: ui.bg, paddingTop: insets.top }]}><View style={[styles.header, { borderBottomColor: ui.border }]}><TouchableOpacity style={styles.backButton} onPress={() => router.replace('/(tabs)/services')}><ArrowLeft size={26} color={ui.muted} /></TouchableOpacity><Text style={[styles.headerTitle, { color: ui.title }]}>Debris Removal</Text></View><View style={styles.successWrap}><Image source={require('../../../assets/images/services/demolition/thank_you_converted.webp')} style={styles.successImg} resizeMode="cover" /></View></View>;
   }
 
   return (

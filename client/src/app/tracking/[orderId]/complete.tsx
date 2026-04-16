@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { CheckCircle2, Star } from 'lucide-react-native';
-import { AuthService, OrderSummary, ProductSummary } from '../../../api/apiService';
+import { AuthService, OrderSummary, ProductSummary, RatingService } from '../../../api/apiService';
 import { useTheme } from '../../../context/ThemeContext';
 import { useOrderTracking } from '../../../context/OrderTrackingContext';
 
@@ -23,6 +23,7 @@ export default function OrderCompleteScreen() {
   const { acceptedVendor, completionSummary } = useOrderTracking();
   const [selectedRating, setSelectedRating] = useState(0);
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
+  const [ratingError, setRatingError] = useState<string | null>(null);
   const [order, setOrder] = useState<OrderSummary | null>(null);
   const [products, setProducts] = useState<ProductSummary[]>([]);
 
@@ -97,16 +98,26 @@ export default function OrderCompleteScreen() {
 
   const submitRating = async (rating: number) => {
     setSelectedRating(rating);
-    if (!acceptedVendor?.id) {
+    setRatingError(null);
+
+    const parsedOrderId = Number(orderId);
+    if (!Number.isFinite(parsedOrderId) || parsedOrderId <= 0) {
+      setRatingSubmitted(false);
+      setRatingError('Unable to rate this order right now.');
       return;
     }
 
     try {
-      await AuthService.rateVendor(acceptedVendor.id, rating);
+      await RatingService.submitRating({
+        order_id: parsedOrderId,
+        rating,
+        tags: [],
+        feedback: '',
+      });
       setRatingSubmitted(true);
-    } catch (error) {
-      console.log('Vendor rating endpoint unavailable', error);
-      setRatingSubmitted(true);
+    } catch {
+      setRatingSubmitted(false);
+      setRatingError('Could not submit your rating. Please try again.');
     }
   };
 
@@ -172,7 +183,9 @@ export default function OrderCompleteScreen() {
             ))}
           </View>
           <Text style={[styles.ratingCaption, { color: colors.textSecondary }]}>
-            {ratingSubmitted ? 'Thanks for your feedback.' : 'Tap a star to send a quick rating.'}
+            {ratingSubmitted
+              ? 'Thanks for your feedback.'
+              : ratingError || 'Tap a star to send a quick rating.'}
           </Text>
         </View>
 

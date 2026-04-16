@@ -24,13 +24,28 @@ export const NOTIFICATION_CHANNELS = {
  * Deep link data structure matching backend
  */
 export interface NotificationData {
-  type?: 'order_detail' | 'screen' | 'url';
+  type?: 'order_detail' | 'order_quote' | 'order_update' | 'screen' | 'url';
   value?: string;
   orderId?: string;
   orderNumber?: string;
   category?: string;
   image?: string;
   largeIcon?: string;
+}
+
+function navigateToOrder(router: any, orderId?: string, orderNumber?: string): void {
+  if (!orderId) {
+    router.push('/(tabs)/home');
+    return;
+  }
+
+  router.push({
+    pathname: '/profile/orders/[id]',
+    params: {
+      id: orderId,
+      orderNumber,
+    },
+  });
 }
 
 /**
@@ -262,17 +277,22 @@ function handleNotificationPress(data: NotificationData | undefined, router: any
 
   switch (data.type) {
     case 'order_detail':
+      navigateToOrder(router, data.orderId, data.orderNumber);
+      break;
+
+    case 'order_quote':
       if (data.orderId) {
         router.push({
-          pathname: '/order-detail',
-          params: {
-            orderId: data.orderId,
-            orderNumber: data.orderNumber,
-          },
+          pathname: '/tracking/[orderId]/quote',
+          params: { orderId: data.orderId },
         });
       } else {
         router.push('/(tabs)/home');
       }
+      break;
+
+    case 'order_update':
+      navigateToOrder(router, data.orderId, data.orderNumber);
       break;
 
     case 'screen':

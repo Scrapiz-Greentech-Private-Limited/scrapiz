@@ -22,6 +22,7 @@ import {
   TrackingCompletionSummary,
   TrackingConnectionState,
   TrackingCoordinate,
+  TrackingLeadItem,
   TrackingPhase,
   TrackingStep,
   TrackingVendorPin,
@@ -39,6 +40,7 @@ interface OrderTrackingContextValue {
   notifiedVendorCount: number;
   expiresAt: string | null;
   acceptedVendor: TrackingVendorSummary | null;
+  acceptedItems: TrackingLeadItem[];
   vendorLocation: TrackingCoordinate | null;
   bookingId: string | null;
   bookingStatus: string | null;
@@ -92,14 +94,32 @@ function normalizePins(pins?: TrackingVendorPin[] | null): TrackingVendorPin[] {
   return (pins || []).filter((pin) => pin?.lat !== undefined && pin?.lng !== undefined).map((pin) => ({
     vendor_id: Number(pin.vendor_id),
     name: pin.name,
+    pin_role: pin.pin_role === 'agent' ? 'agent' : 'vendor',
     lat: Number(pin.lat),
     lng: Number(pin.lng),
     distance_km: pin.distance_km ?? null,
     vehicle_type: pin.vehicle_type ?? null,
     vehicle_number: pin.vehicle_number ?? null,
+    service_city: pin.service_city ?? null,
+    service_area: pin.service_area ?? null,
     phone: pin.phone ?? null,
     rating: pin.rating ?? null,
   }));
+}
+
+function normalizeLeadItems(items?: TrackingLeadItem[] | null): TrackingLeadItem[] {
+  return (items || [])
+    .filter((item) => item && item.product_id !== undefined && item.product_name)
+    .map((item) => ({
+      product_id: Number(item.product_id),
+      product_name: String(item.product_name),
+      quantity: Number(item.quantity || 0),
+      unit: item.unit || '',
+      min_rate: item.min_rate ?? null,
+      max_rate: item.max_rate ?? null,
+      image_url: item.image_url ?? null,
+      category: item.category ?? null,
+    }));
 }
 
 export function OrderTrackingProvider({
@@ -121,6 +141,7 @@ export function OrderTrackingProvider({
   const [notifiedVendorCount, setNotifiedVendorCount] = useState(0);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [acceptedVendor, setAcceptedVendor] = useState<TrackingVendorSummary | null>(null);
+  const [acceptedItems, setAcceptedItems] = useState<TrackingLeadItem[]>([]);
   const [vendorLocation, setVendorLocation] = useState<TrackingCoordinate | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [bookingStatus, setBookingStatus] = useState<string | null>(null);
@@ -183,6 +204,7 @@ export function OrderTrackingProvider({
     const nextLocation = coerceCoordinate(vendor?.lat, vendor?.lng);
 
     setAcceptedVendor(vendor);
+    setAcceptedItems(normalizeLeadItems(event.items));
     setVendorLocation(nextLocation);
     setBookingId(event.booking_id ?? null);
     setVendorPins((current) => {
@@ -199,6 +221,7 @@ export function OrderTrackingProvider({
         return [{
           vendor_id: vendor.id,
           name: vendor.name,
+          pin_role: 'vendor',
           lat: nextLocation.lat,
           lng: nextLocation.lng,
           distance_km: null,
@@ -252,6 +275,7 @@ export function OrderTrackingProvider({
       const nextLocation = coerceCoordinate(vendor?.lat, vendor?.lng);
 
       setAcceptedVendor(vendor);
+      setAcceptedItems(normalizeLeadItems(payload.booking.items));
       setVendorLocation(nextLocation);
       setBookingId(payload.booking.id);
       applyBookingState(payload.booking.status);
@@ -260,6 +284,7 @@ export function OrderTrackingProvider({
 
     setBookingId(null);
     setAcceptedVendor(null);
+    setAcceptedItems([]);
     setVendorLocation(null);
     setBookingStatus(null);
 
@@ -437,6 +462,7 @@ export function OrderTrackingProvider({
     notifiedVendorCount,
     expiresAt,
     acceptedVendor,
+    acceptedItems,
     vendorLocation,
     bookingId,
     bookingStatus,
@@ -451,6 +477,7 @@ export function OrderTrackingProvider({
     callVendor,
   }), [
     acceptedVendor,
+    acceptedItems,
     bookingId,
     bookingStatus,
     callVendor,

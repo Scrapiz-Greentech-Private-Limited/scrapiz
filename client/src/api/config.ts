@@ -49,6 +49,16 @@ export const API_CONFIG = {
     ORDER_NEARBY_AGENTS: (orderId: number | string) => `/order/${orderId}/agents/`,
     VENDOR_NEARBY: '/vendor/nearby/',
     BOOKING_ACTIVE: (bookingId: string) => `/booking/${bookingId}/active/`,
+    BOOKING_ORDER_QUOTE: (orderId: number | string) => `/booking/order/${orderId}/quote/`,
+    BOOKING_ORDER_QUOTE_RESPOND: (orderId: number | string) => `/booking/order/${orderId}/quote/respond/`,
+    // Razorpay quote payment
+    BOOKING_ORDER_QUOTE_RAZORPAY_ORDER: (orderId: number) =>
+      `/booking/order/${orderId}/quote/razorpay-order/`,
+    BOOKING_ORDER_QUOTE_RAZORPAY_VERIFY: (orderId: number) =>
+      `/booking/order/${orderId}/quote/razorpay-verify/`,
+    // Razorpay wallet topup
+    VENDOR_WALLET_RAZORPAY_ORDER: '/vendor/wallet/razorpay-order/',
+    VENDOR_WALLET_RAZORPAY_VERIFY: '/vendor/wallet/razorpay-verify/',
     VENDOR_RATE: (vendorId: number | string) => `/vendor/${vendorId}/rate/`,
     
     // Feedback

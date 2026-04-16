@@ -75,8 +75,9 @@ function buildAgentPins(agents: TrackingNearbyAgent[]): TrackingVendorPin[] {
   return agents
     .filter((agent) => typeof agent.lat === 'number' && typeof agent.lng === 'number')
     .map((agent) => ({
-      vendor_id: agent.id,
+      vendor_id: -Math.abs(agent.id),
       name: agent.name,
+      pin_role: 'agent',
       lat: agent.lat as number,
       lng: agent.lng as number,
       vehicle_type: agent.vehicle_type,
@@ -191,6 +192,29 @@ function CompactAgentCard({ agent }: { agent: TrackingNearbyAgent }) {
   );
 }
 
+function CompactVendorCard({ vendor }: { vendor: TrackingVendorPin }) {
+  return (
+    <View style={styles.compactCard}>
+      <View style={styles.compactAvatarFallback}>
+        <Text style={styles.compactAvatarText}>{getInitials(vendor.name)}</Text>
+      </View>
+      <View style={styles.compactCardCopy}>
+        <Text style={styles.compactCardName} numberOfLines={1}>
+          {vendor.name}
+        </Text>
+        <Text style={styles.compactCardMeta} numberOfLines={1}>
+          {vendor.service_area && vendor.service_city
+            ? `${vendor.service_area}, ${vendor.service_city}`
+            : vendor.vehicle_type || 'Pickup vendor'}
+        </Text>
+      </View>
+      <View style={styles.vendorDistancePill}>
+        <Text style={styles.vendorDistanceText}>{formatTrackingDistance(vendor.distance_km)}</Text>
+      </View>
+    </View>
+  );
+}
+
 export default function VendorSearchScreen() {
   const router = useRouter();
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
@@ -204,14 +228,22 @@ export default function VendorSearchScreen() {
     isBootstrapping,
     phase,
     pickup,
+    vendorPins,
   } = useOrderTracking();
 
   const [nearbyAgents, setNearbyAgents] = useState<TrackingNearbyAgent[]>([]);
+  const [nearbyDispatchVendors, setNearbyDispatchVendors] = useState<TrackingVendorPin[]>([]);
   const [isLoadingAgents, setIsLoadingAgents] = useState(true);
   const [deviceLocation, setDeviceLocation] = useState<{ lat: number; lng: number } | null>(null);
   const requestedLocationRef = useRef(false);
 
   const countdown = useMemo(() => formatCountdown(expiresAt), [expiresAt]);
+
+  useEffect(() => {
+    if (orderId && phase === 'en_route' && acceptedVendor) {
+      router.replace(`/tracking/${orderId}/accepted` as any);
+    }
+  }, [acceptedVendor, orderId, phase, router]);
 
   useEffect(() => {
     if (!orderId || phase !== 'searching') {
@@ -224,13 +256,18 @@ export default function VendorSearchScreen() {
     const loadAgents = async () => {
       try {
         setIsLoadingAgents(true);
-        const data = await AuthService.getNearbyAgents(Number(orderId));
+        const data = await AuthService.getNearbyDispatchParticipants(Number(orderId));
         if (isMounted) {
-          setNearbyAgents(data);
+          setNearbyAgents(data.agents || []);
+          setNearbyDispatchVendors((data.vendors || []).map((vendor) => ({
+            ...vendor,
+            pin_role: 'vendor',
+          })));
         }
       } catch (error) {
         if (isMounted) {
           setNearbyAgents([]);
+          setNearbyDispatchVendors([]);
         }
       } finally {
         if (isMounted) {
@@ -324,9 +361,35 @@ export default function VendorSearchScreen() {
     [deviceLocation, pickup.lat, pickup.lng]
   );
 
-  const searchablePins = useMemo(() => buildAgentPins(nearbyAgents), [nearbyAgents]);
+  const searchablePins = useMemo(() => {
+    const merged = new Map<string, TrackingVendorPin>();
+
+    buildAgentPins(nearbyAgents).forEach((pin) => {
+      merged.set(`agent:${pin.vendor_id}`, pin);
+    });
+
+    nearbyDispatchVendors.forEach((pin) => {
+      const normalizedPin = { ...pin, pin_role: 'vendor' as const };
+      merged.set(`vendor:${normalizedPin.vendor_id}`, {
+        ...merged.get(`vendor:${normalizedPin.vendor_id}`),
+        ...normalizedPin,
+      });
+    });
+
+    vendorPins.forEach((pin) => {
+      const normalizedPin = { ...pin, pin_role: pin.pin_role === 'agent' ? 'agent' : 'vendor' as const };
+      const key = `${normalizedPin.pin_role}:${normalizedPin.vendor_id}`;
+      merged.set(key, { ...merged.get(key), ...normalizedPin });
+    });
+
+    return Array.from(merged.values());
+  }, [nearbyAgents, nearbyDispatchVendors, vendorPins]);
+
   const activeSearchingAgent = nearbyAgents.find(
     (agent) => typeof agent.lat === 'number' && typeof agent.lng === 'number'
+  );
+  const activeSearchingVendor = vendorPins.find(
+    (vendor) => typeof vendor.lat === 'number' && typeof vendor.lng === 'number'
   );
 
   const activeVendorLocation = useMemo(() => {
@@ -344,8 +407,22 @@ export default function VendorSearchScreen() {
       };
     }
 
+    if (activeSearchingVendor?.lat != null && activeSearchingVendor?.lng != null) {
+      return {
+        lat: activeSearchingVendor.lat,
+        lng: activeSearchingVendor.lng,
+      };
+    }
+
     return null;
-  }, [acceptedVendor?.lat, acceptedVendor?.lng, activeSearchingAgent?.lat, activeSearchingAgent?.lng]);
+  }, [
+    acceptedVendor?.lat,
+    acceptedVendor?.lng,
+    activeSearchingAgent?.lat,
+    activeSearchingAgent?.lng,
+    activeSearchingVendor?.lat,
+    activeSearchingVendor?.lng,
+  ]);
 
   const featuredAgent = useMemo(() => {
     if (phase === 'en_route' && acceptedVendor) {
@@ -371,6 +448,14 @@ export default function VendorSearchScreen() {
   const secondaryAgents = useMemo(
     () => nearbyAgents.filter((agent) => agent.id !== featuredAgent?.id).slice(0, 3),
     [featuredAgent?.id, nearbyAgents]
+  );
+
+  const nearbyVendors = useMemo(
+    () => searchablePins
+      .filter((vendor) => vendor.pin_role !== 'agent')
+      .filter((vendor) => vendor.vendor_id !== acceptedVendor?.id)
+      .slice(0, 4),
+    [acceptedVendor?.id, searchablePins]
   );
 
   const distanceLabel = phase === 'en_route'
@@ -460,6 +545,15 @@ export default function VendorSearchScreen() {
               <Text style={styles.secondarySectionTitle}>Other nearby partners</Text>
               {secondaryAgents.map((agent) => (
                 <CompactAgentCard key={agent.id} agent={agent} />
+              ))}
+            </View>
+          ) : null}
+
+          {nearbyVendors.length > 0 ? (
+            <View style={styles.secondarySection}>
+              <Text style={styles.secondarySectionTitle}>Nearby vendors in your service zone</Text>
+              {nearbyVendors.map((vendor) => (
+                <CompactVendorCard key={vendor.vendor_id} vendor={vendor} />
               ))}
             </View>
           ) : null}
@@ -834,6 +928,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter-SemiBold',
     color: '#111827',
+  },
+  vendorDistancePill: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#EEF8F1',
+    marginLeft: 8,
+  },
+  vendorDistanceText: {
+    fontSize: 12,
+    fontFamily: 'Inter-SemiBold',
+    color: '#1E8E3E',
   },
   actionRow: {
     flexDirection: 'row',

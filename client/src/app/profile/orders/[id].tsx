@@ -7,13 +7,12 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  Image,
   ImageSourcePropType,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
-import { ArrowLeft, MapPin, Calendar, Clock, Phone, IndianRupee, Package, CheckCircle, X, Hash, User, Star } from 'lucide-react-native';
+import { ArrowLeft, MapPin, Calendar, Clock, Phone, IndianRupee, CheckCircle, X, Hash, Truck } from 'lucide-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { AuthService, OrderSummary, ProductSummary, AddressSummary, RatingService } from '../../../api/apiService';
+import { AuthService, BookingQuoteSummary, OrderSummary, ProductSummary, AddressSummary, RatingService } from '../../../api/apiService';
 import { normalizeOrderStatus } from '../../../hooks/userOrderDetails';
 import { useLocalization } from '../../../context/LocalizationContext';
 import { RemoteImage } from '../../../components/RemoteImage';
@@ -39,6 +38,8 @@ export default function OrderDetails() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quote, setQuote] = useState<BookingQuoteSummary | null>(null);
 
   // Rating state
   const [isRated, setIsRated] = useState<boolean | null>(null);
@@ -48,15 +49,6 @@ export default function OrderDetails() {
   const [selectedRating, setSelectedRating] = useState<number>(0);
 
   const orderId = Array.isArray(id) ? id[0] : id;
-
-  useEffect(() => {
-    if (orderId) {
-      loadDetails();
-    } else {
-      setError('Invalid order ID');
-      setLoading(false);
-    }
-  }, [orderId]);
 
   /**
    * Check if the order has been rated
@@ -84,7 +76,7 @@ export default function OrderDetails() {
     }
   }, []);
 
-  const loadDetails = async () => {
+  const loadDetails = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -112,6 +104,16 @@ export default function OrderDetails() {
       setProducts(relatedProducts);
       setAddress(orderAddress);
 
+      setQuoteLoading(true);
+      try {
+        const quoteResponse = await AuthService.getOrderQuote(foundOrder.id);
+        setQuote(quoteResponse.quote);
+      } catch {
+        setQuote(null);
+      } finally {
+        setQuoteLoading(false);
+      }
+
       // Check rating status for completed orders
       const statusName = normalizeOrderStatus(foundOrder.status);
       if (statusName === 'completed') {
@@ -123,7 +125,16 @@ export default function OrderDetails() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [checkRatingStatus, orderId]);
+
+  useEffect(() => {
+    if (orderId) {
+      void loadDetails();
+    } else {
+      setError('Invalid order ID');
+      setLoading(false);
+    }
+  }, [loadDetails, orderId]);
 
   const getStatusColor = (status: any) => {
     const statusName = (typeof status === 'string' ? status : status?.name || '').toLowerCase();
@@ -213,6 +224,11 @@ export default function OrderDetails() {
     const statusName = (typeof order.status === 'string' ? order.status : order.status?.name || '').toLowerCase();
     return canTrackVendor(statusName);
   }, [order]);
+
+  const canReviewQuote = useMemo(() => {
+    const quoteStatus = (quote?.status || order?.quote_status || '').toLowerCase();
+    return ['submitted', 'awaiting_payment'].includes(quoteStatus);
+  }, [order?.quote_status, quote?.status]);
 
   /**
    * Check if order is completed and eligible for rating
@@ -412,6 +428,35 @@ export default function OrderDetails() {
         )}
 
         {/* Order Info Card */}
+        {(quoteLoading || quote || canReviewQuote) && (
+          <View style={[styles.card, { backgroundColor: colors.surface }]}> 
+            <View style={styles.cardHeader}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Quote & Payment</Text>
+              {quoteLoading ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <View style={[styles.statusBadge, { backgroundColor: '#fff1e8' }]}> 
+                  <Text style={[styles.statusBadgeText, { color: '#ff5b14' }]}>
+                    {(quote?.status || order?.quote_status || 'pending').toUpperCase()}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <Text style={[styles.quoteAmountLabel, { color: colors.textSecondary }]}>Quoted amount</Text>
+            <Text style={[styles.quoteAmountValue, { color: colors.text }]}>₹{Number(quote?.total_amount || order?.quote_total_amount || 0).toFixed(2)}</Text>
+
+            <TouchableOpacity
+              style={[styles.trackVendorButton, { backgroundColor: '#ff5b14' }, (!canReviewQuote || quoteLoading) && styles.quoteButtonDisabled]}
+              disabled={!canReviewQuote || quoteLoading}
+              onPress={() => router.push(`/tracking/${order.id}/quote` as any)}
+            >
+              <IndianRupee size={18} color="#fff" />
+              <Text style={styles.trackVendorButtonText}>Review Quote & Choose Payment</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <Text style={[styles.cardTitle, { color: colors.text }]}>Order Information</Text>
           <View style={styles.infoGrid}>
@@ -809,6 +854,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: 'Inter-SemiBold',
     color: '#fff',
+  },
+  quoteAmountLabel: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+  },
+  quoteAmountValue: {
+    fontSize: 22,
+    fontWeight: '700',
+    fontFamily: 'Inter-Bold',
+    marginTop: 4,
+    marginBottom: 10,
+  },
+  quoteButtonDisabled: {
+    opacity: 0.55,
   },
   cancelButton: {
     flexDirection: 'row',

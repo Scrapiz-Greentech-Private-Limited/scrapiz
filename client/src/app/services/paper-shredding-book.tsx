@@ -20,6 +20,10 @@ import { useTheme } from '../../context/ThemeContext';
 
 type Step = 1 | 2 | 3;
 
+const BRAND_DARK_GREEN = '#127E2D';
+const BRAND_DARK_GREEN_SOFT = 'rgba(18,126,45,0.22)';
+const BRAND_DARK_GREEN_SOFT_LIGHT = '#E9F7EE';
+
 const SERVICES = [
   {
     id: 'e_waste_collection',
@@ -74,16 +78,16 @@ export default function CorporateTieupBookScreen() {
 
   const ui = useMemo(
     () => ({
-      bg: isDark ? '#101526' : '#FFFFFF',
-      surface: isDark ? '#171E33' : '#FFFFFF',
-      border: isDark ? '#36405C' : '#D9D9D9',
+      bg: isDark ? '#0F1712' : '#FFFFFF',
+      surface: isDark ? '#17221B' : '#FFFFFF',
+      border: isDark ? '#365040' : '#D9D9D9',
       title: isDark ? '#F7F8FA' : '#121212',
       muted: isDark ? '#AAB2C0' : '#787878',
-      primary: '#184A9B',
-      primarySoft: isDark ? 'rgba(24,74,155,0.22)' : '#E4F5FF',
-      summary: isDark ? '#1C2438' : '#EFEFF2',
-      submitCard: isDark ? '#16253B' : '#E4F5FF',
-      submitBorder: isDark ? '#3E7BD8' : '#7ED0FF',
+      primary: BRAND_DARK_GREEN,
+      primarySoft: isDark ? BRAND_DARK_GREEN_SOFT : BRAND_DARK_GREEN_SOFT_LIGHT,
+      summary: isDark ? '#1B2520' : '#EFEFF2',
+      submitCard: isDark ? '#163220' : BRAND_DARK_GREEN_SOFT_LIGHT,
+      submitBorder: BRAND_DARK_GREEN,
     }),
     [isDark]
   );
@@ -197,7 +201,7 @@ export default function CorporateTieupBookScreen() {
             key={item.id}
             style={[
               styles.serviceCard,
-              { backgroundColor: active ? ui.primarySoft : ui.surface, borderColor: active ? '#7ED0FF' : ui.border },
+              { backgroundColor: active ? ui.primarySoft : ui.surface, borderColor: active ? ui.primary : ui.border },
             ]}
             onPress={() =>
               setSelectedServices((current) =>
@@ -210,7 +214,7 @@ export default function CorporateTieupBookScreen() {
               <Text style={[styles.serviceTitle, { color: ui.title }]}>{item.title}</Text>
               <Text style={[styles.serviceSubtitle, { color: ui.muted }]}>{item.subtitle}</Text>
               <View style={styles.serviceTag}>
-                <Text style={[styles.serviceTagText, { color: item.id === 'confidential_shredding' ? '#C03B3B' : '#2C993A' }]}>{item.tag}</Text>
+                <Text style={[styles.serviceTagText, { color: ui.primary }]}>{item.tag}</Text>
               </View>
             </View>
             <View style={[styles.checkCircle, { borderColor: active ? ui.primary : ui.border, backgroundColor: active ? ui.primary : 'transparent' }]}>
@@ -227,7 +231,7 @@ export default function CorporateTieupBookScreen() {
           return (
             <TouchableOpacity
               key={item}
-              style={[styles.frequencyChip, { backgroundColor: active ? ui.primarySoft : ui.surface, borderColor: active ? '#7ED0FF' : ui.border }]}
+              style={[styles.frequencyChip, { backgroundColor: active ? ui.primarySoft : ui.surface, borderColor: active ? ui.primary : ui.border }]}
               onPress={() => setFrequency(item)}
             >
               <Text style={[styles.frequencyText, { color: active ? ui.primary : ui.muted }]}>{item}</Text>
@@ -280,14 +284,14 @@ export default function CorporateTieupBookScreen() {
           return (
             <TouchableOpacity
               key={item.id}
-              style={[styles.societyCard, { backgroundColor: active ? ui.primarySoft : ui.surface, borderColor: active ? '#7ED0FF' : ui.border }]}
+              style={[styles.societyCard, { backgroundColor: active ? ui.primarySoft : ui.surface, borderColor: active ? ui.primary : ui.border }]}
               onPress={() => setIndustryType(item.id)}
             >
               {item.image ? (
                 <Image source={item.image} style={styles.societyImage} />
               ) : (
                 <View style={styles.otherCardIcon}>
-                  <Package size={42} color="#C69742" />
+                  <Package size={42} color={ui.primary} />
                 </View>
               )}
               <Text style={[styles.societyTitle, { color: ui.title }]}>{item.title}</Text>
@@ -333,7 +337,7 @@ export default function CorporateTieupBookScreen() {
         {['<50', '50 - 200', '200 - 500', '500+'].map((item) => {
           const active = employeeCount === item;
           return (
-            <TouchableOpacity key={item} style={[styles.wasteChip, { backgroundColor: active ? ui.primarySoft : ui.surface, borderColor: active ? '#7ED0FF' : ui.border }]} onPress={() => setEmployeeCount(item)}>
+            <TouchableOpacity key={item} style={[styles.wasteChip, { backgroundColor: active ? ui.primarySoft : ui.surface, borderColor: active ? ui.primary : ui.border }]} onPress={() => setEmployeeCount(item)}>
               <Text style={[styles.wasteText, { color: active ? ui.primary : ui.muted }]}>{item}</Text>
             </TouchableOpacity>
           );
@@ -346,7 +350,7 @@ export default function CorporateTieupBookScreen() {
       </View>
 
       <Text style={[styles.sectionHeading, { color: ui.title }]}>Office Locations</Text>
-      <TouchableOpacity style={[styles.locationCard, { backgroundColor: multipleLocations ? ui.primarySoft : ui.surface, borderColor: multipleLocations ? '#7ED0FF' : ui.border }]} onPress={() => setMultipleLocations((current) => !current)}>
+      <TouchableOpacity style={[styles.locationCard, { backgroundColor: multipleLocations ? ui.primarySoft : ui.surface, borderColor: multipleLocations ? ui.primary : ui.border }]} onPress={() => setMultipleLocations((current) => !current)}>
         <View style={{ flex: 1 }}>
           <Text style={[styles.locationTitle, { color: ui.title }]}>Multiple office locations</Text>
           <Text style={[styles.locationDesc, { color: ui.muted }]}>Branches / campuses in the same city</Text>
@@ -361,7 +365,7 @@ export default function CorporateTieupBookScreen() {
         {['1', '2', '3', '4+'].map((item) => {
           const active = numberOfLocations === item;
           return (
-            <TouchableOpacity key={item} style={[styles.wasteChip, { backgroundColor: active ? ui.primarySoft : ui.surface, borderColor: active ? '#7ED0FF' : ui.border }]} onPress={() => setNumberOfLocations(item)}>
+            <TouchableOpacity key={item} style={[styles.wasteChip, { backgroundColor: active ? ui.primarySoft : ui.surface, borderColor: active ? ui.primary : ui.border }]} onPress={() => setNumberOfLocations(item)}>
               <Text style={[styles.wasteText, { color: active ? ui.primary : ui.muted }]}>{item}</Text>
             </TouchableOpacity>
           );
@@ -431,7 +435,7 @@ export default function CorporateTieupBookScreen() {
               <Text style={[styles.submitStepText, { color: ui.primary }]}>{stepNo}</Text>
             </View>
             <Text style={[styles.submitDesc, { color: ui.primary }]}>{text}</Text>
-            <Text style={[styles.submitTime, { color: '#7EC8F7' }]}>{time}</Text>
+            <Text style={[styles.submitTime, { color: ui.primary }]}>{time}</Text>
           </View>
         ))}
       </View>
@@ -509,9 +513,9 @@ const styles = StyleSheet.create({
   frequencyRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   frequencyChip: { minWidth: 90, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, alignItems: 'center' },
   frequencyText: { fontSize: 14, fontWeight: '700' },
-  slaCard: { backgroundColor: '#10244B', borderRadius: 22, padding: 18, marginTop: 18 },
+  slaCard: { backgroundColor: '#123A1D', borderRadius: 22, padding: 18, marginTop: 18 },
   slaTitle: { color: '#FFFFFF', fontSize: 20, lineHeight: 22, fontWeight: '900', marginBottom: 6 },
-  slaBody: { color: '#C9D7F4', fontSize: 15, lineHeight: 19, fontStyle: 'italic', marginBottom: 10 },
+  slaBody: { color: '#D0E8D7', fontSize: 15, lineHeight: 19, fontStyle: 'italic', marginBottom: 10 },
   slaFooter: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
   inputBox: { borderWidth: 1, borderRadius: 14, marginBottom: 10 },
   input: { paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, fontWeight: '600' },
@@ -520,7 +524,7 @@ const styles = StyleSheet.create({
   societyGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12, marginBottom: 6 },
   societyCard: { width: '48%', borderWidth: 1, borderRadius: 16, paddingVertical: 10, paddingHorizontal: 10, alignItems: 'center' },
   societyImage: { width: 94, height: 72, borderRadius: 10, marginBottom: 8 },
-  otherCardIcon: { width: 94, height: 72, borderRadius: 10, marginBottom: 8, backgroundColor: '#F3E7D1', alignItems: 'center', justifyContent: 'center' },
+  otherCardIcon: { width: 94, height: 72, borderRadius: 10, marginBottom: 8, backgroundColor: BRAND_DARK_GREEN_SOFT_LIGHT, alignItems: 'center', justifyContent: 'center' },
   societyTitle: { fontSize: 16, fontWeight: '800', textAlign: 'center' },
   twoColRow: { flexDirection: 'row', justifyContent: 'space-between' },
   halfCol: { width: '48%' },
@@ -543,13 +547,13 @@ const styles = StyleSheet.create({
   summaryValue: { flex: 1, fontSize: 15, fontWeight: '700', textAlign: 'right' },
   summaryDivider: { height: 1, backgroundColor: '#D4D4D8' },
   selectedServicesWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-  selectedPill: { borderRadius: 999, borderWidth: 1, borderColor: '#7ED0FF', backgroundColor: '#EAF5FF', paddingHorizontal: 12, paddingVertical: 5 },
+  selectedPill: { borderRadius: 999, borderWidth: 1, borderColor: BRAND_DARK_GREEN, backgroundColor: BRAND_DARK_GREEN_SOFT_LIGHT, paddingHorizontal: 12, paddingVertical: 5 },
   selectedPillText: { fontSize: 14, fontWeight: '700' },
   frequencySummary: { fontSize: 15, fontWeight: '600' },
   submitCard: { borderRadius: 22, borderWidth: 1, padding: 16, marginBottom: 18 },
   submitTitle: { fontSize: 18, fontWeight: '800', marginBottom: 12 },
   submitRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 },
-  submitStep: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#B6E6FF', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  submitStep: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#CBECD5', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   submitStepText: { fontSize: 14, fontWeight: '800' },
   submitDesc: { flex: 1, fontSize: 15, lineHeight: 19, fontWeight: '700' },
   submitTime: { fontSize: 14, fontWeight: '700', marginLeft: 10 },

@@ -12,6 +12,10 @@ import { LocationResult } from '../../utils/addressHelpers';
 
 type Step = 1 | 2 | 3;
 
+const BRAND_DARK_GREEN = '#127E2D';
+const BRAND_DARK_GREEN_SOFT = 'rgba(18,126,45,0.22)';
+const BRAND_DARK_GREEN_SOFT_LIGHT = '#E9F7EE';
+
 const SERVICES = [
   { id: 'scrap_collection', title: 'Scrap collection drives', subtitle: 'Metal, plastic, paper & e-waste\ncollected from residents. We sort\n& recycle.', tag: 'Core service - Always included', image: require('../../../assets/images/services/society_tieup/scrap_Collection_Drives.webp') },
   { id: 'dry_waste', title: 'Dry waste collection', subtitle: 'Cardboard, paper, plastic bottles\npicked up flat-to-flat or at common\npoint.', tag: 'Recommended', image: require('../../../assets/images/services/society_tieup/dry_Waste_collection.webp') },
@@ -32,13 +36,13 @@ export default function SocietyTieupBookScreen() {
   const { isDark } = useTheme();
   const { reloadAddresses } = useLocation();
   const ui = useMemo(() => ({
-    bg: isDark ? '#101526' : '#FFFFFF',
-    surface: isDark ? '#171E33' : '#FFFFFF',
-    border: isDark ? '#36405C' : '#D9D9D9',
+    bg: isDark ? '#0F1712' : '#FFFFFF',
+    surface: isDark ? '#17221B' : '#FFFFFF',
+    border: isDark ? '#365040' : '#D9D9D9',
     title: isDark ? '#F7F8FA' : '#121212',
     muted: isDark ? '#AAB2C0' : '#787878',
-    primary: '#1117A5',
-    primarySoft: isDark ? 'rgba(17,23,165,0.22)' : '#E4F5FF',
+    primary: BRAND_DARK_GREEN,
+    primarySoft: isDark ? BRAND_DARK_GREEN_SOFT : BRAND_DARK_GREEN_SOFT_LIGHT,
   }), [isDark]);
 
   const [step, setStep] = useState<Step>(1);
@@ -145,16 +149,16 @@ export default function SocietyTieupBookScreen() {
       {SERVICES.map((item) => {
         const active = selectedServices.includes(item.id);
         return (
-          <TouchableOpacity key={item.id} style={[styles.serviceCard, { backgroundColor: active ? ui.primarySoft : ui.surface, borderColor: active ? '#7ED0FF' : ui.border }]} onPress={() => setSelectedServices((current) => current.includes(item.id) ? current.filter((value) => value !== item.id) : [...current, item.id])}>
+          <TouchableOpacity key={item.id} style={[styles.serviceCard, { backgroundColor: active ? ui.primarySoft : ui.surface, borderColor: active ? ui.primary : ui.border }]} onPress={() => setSelectedServices((current) => current.includes(item.id) ? current.filter((value) => value !== item.id) : [...current, item.id])}>
             <Image source={item.image} style={styles.serviceImage} />
-            <View style={styles.serviceText}><Text style={[styles.serviceTitle, { color: ui.title }]}>{item.title}</Text><Text style={[styles.serviceSubtitle, { color: ui.muted }]}>{item.subtitle}</Text><View style={styles.serviceTag}><Text style={[styles.serviceTagText, { color: '#2C993A' }]}>{item.tag}</Text></View></View>
+            <View style={styles.serviceText}><Text style={[styles.serviceTitle, { color: ui.title }]}>{item.title}</Text><Text style={[styles.serviceSubtitle, { color: ui.muted }]}>{item.subtitle}</Text><View style={styles.serviceTag}><Text style={[styles.serviceTagText, { color: ui.primary }]}>{item.tag}</Text></View></View>
             <View style={[styles.checkCircle, { borderColor: active ? ui.primary : ui.border, backgroundColor: active ? ui.primary : 'transparent' }]}>{active && <Check size={16} color="#fff" />}</View>
           </TouchableOpacity>
         );
       })}
       <Text style={[styles.sectionEyebrow, { color: ui.muted, marginTop: 22 }]}>PREFERRED DRIVE FREQUENCY</Text>
-      <View style={styles.frequencyRow}>{['Fortnightly', 'Monthly', 'Bi-monthly'].map((item) => { const active = frequency === item; return <TouchableOpacity key={item} style={[styles.frequencyChip, { backgroundColor: active ? ui.primarySoft : ui.surface, borderColor: active ? '#7ED0FF' : ui.border }]} onPress={() => setFrequency(item)}><Text style={[styles.frequencyText, { color: active ? ui.primary : ui.muted }]}>{item}</Text></TouchableOpacity>; })}</View>
-      <View style={[styles.otherBox, { backgroundColor: ui.primarySoft, borderColor: '#7ED0FF' }]}><TextInput value={otherRequirement} onChangeText={setOtherRequirement} placeholder="ANY OTHER REQUIREMENT?\ne.g. composting support, specific waste type..." placeholderTextColor={ui.muted} multiline style={[styles.otherInput, { color: ui.title }]} /></View>
+      <View style={styles.frequencyRow}>{['Fortnightly', 'Monthly', 'Bi-monthly'].map((item) => { const active = frequency === item; return <TouchableOpacity key={item} style={[styles.frequencyChip, { backgroundColor: active ? ui.primarySoft : ui.surface, borderColor: active ? ui.primary : ui.border }]} onPress={() => setFrequency(item)}><Text style={[styles.frequencyText, { color: active ? ui.primary : ui.muted }]}>{item}</Text></TouchableOpacity>; })}</View>
+      <View style={[styles.otherBox, { backgroundColor: ui.primarySoft, borderColor: ui.primary }]}><TextInput value={otherRequirement} onChangeText={setOtherRequirement} placeholder="ANY OTHER REQUIREMENT?\ne.g. composting support, specific waste type..." placeholderTextColor={ui.muted} multiline style={[styles.otherInput, { color: ui.title }]} /></View>
     </>
   );
 
@@ -166,7 +170,7 @@ export default function SocietyTieupBookScreen() {
       <View style={[styles.inputBox, { backgroundColor: ui.surface, borderColor: ui.border }]}><TextInput value={phone} onChangeText={setPhone} placeholder="Enter your phone number" placeholderTextColor={ui.muted} keyboardType="phone-pad" style={[styles.input, { color: ui.title }]} /></View>
       <View style={[styles.selectBox, { backgroundColor: ui.surface, borderColor: ui.border }]}><Picker selectedValue={role} onValueChange={setRole} style={{ color: ui.title }} dropdownIconColor={ui.muted}><Picker.Item label="Secretary" value="Secretary" /><Picker.Item label="Chairman" value="Chairman" /><Picker.Item label="Treasurer" value="Treasurer" /><Picker.Item label="Authoritative Committee Member" value="Authoritative Committee Member" /></Picker><ChevronDown size={18} color={ui.muted} style={styles.selectChevron} /></View>
       <Text style={[styles.sectionHeading, { color: ui.title }]}>Society Type</Text>
-      <View style={styles.societyGrid}>{SOCIETY_TYPES.map((item) => { const active = societyType === item.id; return <TouchableOpacity key={item.id} style={[styles.societyCard, { backgroundColor: active ? ui.primarySoft : ui.surface, borderColor: active ? '#7ED0FF' : ui.border }]} onPress={() => setSocietyType(item.id)}><Image source={item.image} style={styles.societyImage} /><Text style={[styles.societyTitle, { color: ui.title }]}>{item.title}</Text><Text style={[styles.societySubtitle, { color: ui.muted }]}>{item.subtitle}</Text></TouchableOpacity>; })}</View>
+      <View style={styles.societyGrid}>{SOCIETY_TYPES.map((item) => { const active = societyType === item.id; return <TouchableOpacity key={item.id} style={[styles.societyCard, { backgroundColor: active ? ui.primarySoft : ui.surface, borderColor: active ? ui.primary : ui.border }]} onPress={() => setSocietyType(item.id)}><Image source={item.image} style={styles.societyImage} /><Text style={[styles.societyTitle, { color: ui.title }]}>{item.title}</Text><Text style={[styles.societySubtitle, { color: ui.muted }]}>{item.subtitle}</Text></TouchableOpacity>; })}</View>
       <Text style={[styles.sectionHeading, { color: ui.title }]}>Society / Building Name</Text>
       <View style={[styles.inputBox, { backgroundColor: ui.surface, borderColor: ui.border }]}><TextInput value={societyName} onChangeText={setSocietyName} placeholder="e.g. Shree Sai CHS" placeholderTextColor={ui.muted} style={[styles.input, { color: ui.title }]} /></View>
       <Text style={[styles.sectionHeading, { color: ui.title }]}>Full Address</Text>
@@ -176,7 +180,7 @@ export default function SocietyTieupBookScreen() {
         <View style={styles.halfCol}><Text style={[styles.sectionHeading, { color: ui.title }]}>Total Flats</Text><View style={[styles.selectBox, { backgroundColor: ui.surface, borderColor: ui.border }]}><Picker selectedValue={flats} onValueChange={setFlats} style={{ color: ui.title }} dropdownIconColor={ui.muted}><Picker.Item label="50 - 100" value="50 - 100" /><Picker.Item label="100 - 200" value="100 - 200" /><Picker.Item label="200 - 500" value="200 - 500" /><Picker.Item label="500 +" value="500 +" /></Picker><ChevronDown size={18} color={ui.muted} style={styles.selectChevron} /></View></View>
       </View>
       <Text style={[styles.sectionHeading, { color: ui.title }]}>Approx. Monthly Waste (KG)</Text>
-      <View style={styles.wasteRow}>{['<500 kg', '500 - 1000', '1000 + kg'].map((item) => { const active = monthlyWaste === item; return <TouchableOpacity key={item} style={[styles.wasteChip, { backgroundColor: active ? ui.primarySoft : ui.surface, borderColor: active ? '#7ED0FF' : ui.border }]} onPress={() => setMonthlyWaste(item)}><Text style={[styles.wasteText, { color: active ? ui.primary : ui.muted }]}>{item}</Text></TouchableOpacity>; })}</View>
+      <View style={styles.wasteRow}>{['<500 kg', '500 - 1000', '1000 + kg'].map((item) => { const active = monthlyWaste === item; return <TouchableOpacity key={item} style={[styles.wasteChip, { backgroundColor: active ? ui.primarySoft : ui.surface, borderColor: active ? ui.primary : ui.border }]} onPress={() => setMonthlyWaste(item)}><Text style={[styles.wasteText, { color: active ? ui.primary : ui.muted }]}>{item}</Text></TouchableOpacity>; })}</View>
     </>
   );
 
@@ -198,13 +202,13 @@ export default function SocietyTieupBookScreen() {
         <View style={styles.selectedServicesWrap}>{selectedServices.map((id) => { const item = SERVICES.find((service) => service.id === id); return <View key={id} style={styles.selectedPill}><Text style={[styles.selectedPillText, { color: ui.primary }]}>{item?.title.replace(' collection', '').replace(' programme', '')}</Text></View>; })}</View>
         <Text style={[styles.frequencySummary, { color: ui.muted }]}>Frequency: {frequency} drives</Text>
       </View>
-      <View style={[styles.submitCard, { backgroundColor: '#E4F5FF', borderColor: '#7ED0FF' }]}>
+      <View style={[styles.submitCard, { backgroundColor: BRAND_DARK_GREEN_SOFT_LIGHT, borderColor: ui.primary }]}> 
         <Text style={[styles.submitTitle, { color: ui.primary }]}>What happens after you submit</Text>
         {[
           ['1', 'Our team calls you within\n24 hours.', '24 hrs'],
           ['2', 'Free site visit & custom\nproposal sent.', '3 - 5 days'],
           ['3', 'Agreement signed, first\ndrive scheduled.', '~ 2 weeks'],
-        ].map(([stepNo, text, time]) => <View key={stepNo} style={styles.submitRow}><View style={styles.submitStep}><Text style={[styles.submitStepText, { color: ui.primary }]}>{stepNo}</Text></View><Text style={[styles.submitDesc, { color: ui.primary }]}>{text}</Text><Text style={[styles.submitTime, { color: '#7EC8F7' }]}>{time}</Text></View>)}
+        ].map(([stepNo, text, time]) => <View key={stepNo} style={styles.submitRow}><View style={styles.submitStep}><Text style={[styles.submitStepText, { color: ui.primary }]}>{stepNo}</Text></View><Text style={[styles.submitDesc, { color: ui.primary }]}>{text}</Text><Text style={[styles.submitTime, { color: ui.primary }]}>{time}</Text></View>)}
       </View>
     </>
   );
@@ -225,7 +229,7 @@ export default function SocietyTieupBookScreen() {
           {step === 3 && <TouchableOpacity style={[styles.primaryButton, { backgroundColor: ui.primary, opacity: submitting ? 0.7 : 1 }]} disabled={submitting} onPress={submitEnquiry}>{submitting ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.primaryButtonText}>Schedule Enquiry</Text>}</TouchableOpacity>}
         </View>
       </KeyboardAvoidingView>
-      <Modal visible={showAddressModal} transparent animationType="slide" onRequestClose={() => setShowAddressModal(false)}><View style={styles.modalOverlay}><View style={[styles.modalCard, { backgroundColor: ui.surface }]}><View style={styles.modalHeader}><Text style={[styles.modalTitle, { color: ui.title }]}>Select Address</Text><TouchableOpacity onPress={() => setShowAddressModal(false)}><Text style={[styles.modalClose, { color: ui.muted }]}>Close</Text></TouchableOpacity></View><ScrollView>{addresses.map((item) => <TouchableOpacity key={item.id} style={[styles.addressItem, { borderColor: ui.border, backgroundColor: ui.bg }]} onPress={() => { setAddress([item.area, item.city, item.pincode].filter(Boolean).join(', ')); setShowAddressModal(false); }}><View style={styles.addressRow}>{item.name.toLowerCase().includes('home') ? <Home size={18} color={ui.primary} /> : item.name.toLowerCase().includes('office') ? <Building size={18} color={ui.primary} /> : <MapPin size={18} color={ui.primary} />}<View style={styles.addressInfo}><Text style={[styles.addressName, { color: ui.title }]}>{item.name}</Text><Text style={[styles.addressValue, { color: ui.muted }]}>{[item.room_number, item.street, item.area, item.city, item.state, item.pincode].filter(Boolean).join(', ')}</Text></View></View></TouchableOpacity>)}<TouchableOpacity style={[styles.addAddress, { backgroundColor: ui.primarySoft, borderColor: '#7ED0FF' }]} onPress={() => { setShowAddressModal(false); setShowMapPicker(true); }}><Plus size={18} color={ui.primary} /><Text style={[styles.addAddressText, { color: ui.primary }]}>Add Another Address</Text></TouchableOpacity></ScrollView></View></View></Modal>
+      <Modal visible={showAddressModal} transparent animationType="slide" onRequestClose={() => setShowAddressModal(false)}><View style={styles.modalOverlay}><View style={[styles.modalCard, { backgroundColor: ui.surface }]}><View style={styles.modalHeader}><Text style={[styles.modalTitle, { color: ui.title }]}>Select Address</Text><TouchableOpacity onPress={() => setShowAddressModal(false)}><Text style={[styles.modalClose, { color: ui.muted }]}>Close</Text></TouchableOpacity></View><ScrollView>{addresses.map((item) => <TouchableOpacity key={item.id} style={[styles.addressItem, { borderColor: ui.border, backgroundColor: ui.bg }]} onPress={() => { setAddress([item.area, item.city, item.pincode].filter(Boolean).join(', ')); setShowAddressModal(false); }}><View style={styles.addressRow}>{item.name.toLowerCase().includes('home') ? <Home size={18} color={ui.primary} /> : item.name.toLowerCase().includes('office') ? <Building size={18} color={ui.primary} /> : <MapPin size={18} color={ui.primary} />}<View style={styles.addressInfo}><Text style={[styles.addressName, { color: ui.title }]}>{item.name}</Text><Text style={[styles.addressValue, { color: ui.muted }]}>{[item.room_number, item.street, item.area, item.city, item.state, item.pincode].filter(Boolean).join(', ')}</Text></View></View></TouchableOpacity>)}<TouchableOpacity style={[styles.addAddress, { backgroundColor: ui.primarySoft, borderColor: ui.primary }]} onPress={() => { setShowAddressModal(false); setShowMapPicker(true); }}><Plus size={18} color={ui.primary} /><Text style={[styles.addAddressText, { color: ui.primary }]}>Add Another Address</Text></TouchableOpacity></ScrollView></View></View></Modal>
       {showMapPicker && <MapLocationPicker onLocationSelect={saveMapLocation} onCancel={() => setShowMapPicker(false)} />}
     </View>
   );
@@ -282,13 +286,13 @@ const styles = StyleSheet.create({
   summaryValue: { flex: 1, fontSize: 13, fontWeight: '800', textAlign: 'right' },
   summaryDivider: { height: 1, backgroundColor: '#D8D8D8' },
   selectedServicesWrap: { gap: 8 },
-  selectedPill: { alignSelf: 'flex-start', borderWidth: 1, borderColor: '#7ED0FF', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 4, backgroundColor: '#E4F5FF' },
+  selectedPill: { alignSelf: 'flex-start', borderWidth: 1, borderColor: BRAND_DARK_GREEN, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 4, backgroundColor: BRAND_DARK_GREEN_SOFT_LIGHT },
   selectedPillText: { fontSize: 13, fontWeight: '800' },
   frequencySummary: { fontSize: 13, fontWeight: '700', marginTop: 12 },
   submitCard: { borderWidth: 1, borderRadius: 18, padding: 16, marginBottom: 12 },
   submitTitle: { fontSize: 18, fontWeight: '800', marginBottom: 12 },
   submitRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 10 },
-  submitStep: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#8ED1FF', alignItems: 'center', justifyContent: 'center' },
+  submitStep: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#CBECD5', alignItems: 'center', justifyContent: 'center' },
   submitStepText: { fontSize: 14, fontWeight: '800' },
   submitDesc: { flex: 1, fontSize: 14, fontWeight: '700', lineHeight: 18 },
   submitTime: { fontSize: 13, fontWeight: '700' },

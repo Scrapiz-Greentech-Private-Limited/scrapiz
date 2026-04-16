@@ -9,114 +9,61 @@ import {
   ImageSourcePropType,
 } from 'react-native';
 import { fs, spacing } from '../utils/responsive';
-import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = width - spacing(36);
+const CARD_WIDTH = width - spacing(26);
 
 interface ServiceCardProps {
   title: string;
-  accentColor: string;
+  description: string;
   image: ImageSourcePropType;
-  included: string[];
   onLearnMore?: () => void;
   onBookNow?: () => void;
 }
 
-function hexToRgba(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-function lightenColor(hex: string, amount = 45): string {
-  const r = Math.min(255, parseInt(hex.slice(1, 3), 16) + amount);
-  const g = Math.min(255, parseInt(hex.slice(3, 5), 16) + amount);
-  const b = Math.min(255, parseInt(hex.slice(5, 7), 16) + amount);
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
 const ServiceCard: React.FC<ServiceCardProps> = ({
   title,
-  accentColor,
+  description,
   image,
-  included,
   onLearnMore,
   onBookNow,
 }) => {
-  const { isDark } = useTheme();
-
-  // Colors
-  const accent = isDark ? lightenColor(accentColor) : accentColor;
-  const cardBg = isDark ? '#1a2332' : '#ffffff';
-  const borderColor = isDark
-    ? hexToRgba(accentColor, 0.5)
-    : accentColor;
-  const includedBg = isDark ? hexToRgba(accentColor, 0.08) : '#f9fafb';
-  const includedBorder = isDark ? hexToRgba(accentColor, 0.25) : '#e5e7eb';
-  const titleColor = accent;
-  const headingColor = isDark ? '#e2e8f0' : '#1f2937';
-  const bulletColor = isDark ? '#94a3b8' : '#4b5563';
-  const btnOutlineBorder = isDark ? hexToRgba(accentColor, 0.5) : accentColor;
-  const btnOutlineText = accent;
-  const btnFillBg = accent;
+  const accent = '#0F8B38';
 
   return (
-    <View
-      style={[
-        styles.card,
-        {
-          backgroundColor: cardBg,
-          borderColor: borderColor,
-          shadowColor: isDark ? '#000' : accentColor,
-        },
-      ]}
-    >
-      {/* ── Image ── */}
-      <View style={styles.imageWrap}>
-        <Image source={image} style={styles.image} resizeMode="cover" />
-      </View>
+    <View style={styles.card}>
+      <View style={styles.contentRow}>
+        <View style={styles.imageWrap}>
+          <Image source={image} style={styles.image} resizeMode="cover" />
+        </View>
 
-      {/* ── Title ── */}
-      <Text style={[styles.title, { color: titleColor }]} numberOfLines={1}>
-        {title}
-      </Text>
-
-      {/* ── What's Included ── */}
-      <View style={[styles.includedBox, { backgroundColor: includedBg, borderColor: includedBorder }]}>
-        <Text style={[styles.includedHeading, { color: headingColor }]}>
-          What's Included?
-        </Text>
-        {included.map((item, index) => (
-          <View key={index} style={styles.bulletRow}>
-            <View style={[styles.bulletDot, { backgroundColor: accent }]} />
-            <Text style={[styles.bulletText, { color: bulletColor }]}>
-              {item}
-            </Text>
-          </View>
-        ))}
-      </View>
-
-      {/* ── Buttons ── */}
-      <View style={styles.btnRow}>
-        <TouchableOpacity
-          style={[styles.btnOutline, { borderColor: btnOutlineBorder }]}
-          activeOpacity={0.7}
-          onPress={onLearnMore}
-        >
-          <Text style={[styles.btnOutlineText, { color: btnOutlineText }]}>
-            Learn more
+        <View style={styles.content}>
+          <Text style={styles.title} numberOfLines={2}>
+            {title}
           </Text>
-        </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.btnFill, { backgroundColor: btnFillBg }]}
-          activeOpacity={0.8}
-          onPress={onBookNow}
-        >
-          <Text style={styles.btnFillText}>Book now</Text>
-        </TouchableOpacity>
+          <Text style={styles.description} numberOfLines={2} ellipsizeMode="tail">
+            {description}
+          </Text>
+
+          <View style={styles.btnRow}>
+            <TouchableOpacity
+              style={[styles.btnOutline, { borderColor: accent }]}
+              activeOpacity={0.7}
+              onPress={onLearnMore}
+            >
+              <Text style={styles.btnOutlineText}>Learn more</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.btnFill}
+              activeOpacity={0.8}
+              onPress={onBookNow}
+            >
+              <Text style={styles.btnFillText}>Book now</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
     </View>
   );
@@ -126,104 +73,93 @@ const styles = StyleSheet.create({
   card: {
     width: CARD_WIDTH,
     alignSelf: 'center',
-    marginBottom: spacing(20),
-    borderRadius: 16,
-    borderWidth: 2,
-    overflow: 'hidden',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    minHeight: spacing(116),
+    marginBottom: spacing(16),
+    borderRadius: 28,
+    borderWidth: 1.8,
+    borderBottomWidth: 3,
+    borderColor: '#12913E',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#0C7B31',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
     shadowRadius: 10,
     elevation: 6,
+    paddingHorizontal: spacing(14),
+    paddingVertical: spacing(14),
   },
-
-  // Image
+  contentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: spacing(84),
+  },
   imageWrap: {
-    marginHorizontal: spacing(12),
-    marginTop: spacing(12),
-    borderRadius: 10,
+    width: spacing(76),
+    height: spacing(86),
+    borderRadius: 18,
     overflow: 'hidden',
+    backgroundColor: '#EAF5ED',
+    flexShrink: 0,
+    borderWidth: 1,
+    borderColor: '#D3E6D9',
   },
   image: {
     width: '100%',
-    height: 170,
+    height: '100%',
   },
-
-  // Title
+  content: {
+    flex: 1,
+    marginLeft: spacing(14),
+    justifyContent: 'space-between',
+    minHeight: spacing(86),
+  },
   title: {
     fontSize: fs(20),
     fontWeight: '800',
     fontFamily: 'Inter-Bold',
-    paddingHorizontal: spacing(14),
-    paddingTop: spacing(14),
-    paddingBottom: spacing(10),
+    lineHeight: fs(24),
+    color: '#0C3A1A',
   },
-
-  // Included box
-  includedBox: {
-    marginHorizontal: spacing(12),
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: spacing(14),
-    paddingTop: spacing(12),
-    paddingBottom: spacing(10),
-    marginBottom: spacing(14),
-  },
-  includedHeading: {
-    fontSize: fs(14),
-    fontWeight: '700',
-    fontFamily: 'Inter-SemiBold',
-    marginBottom: spacing(8),
-  },
-  bulletRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: spacing(5),
-    gap: spacing(8),
-  },
-  bulletDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    marginTop: spacing(5),
-    flexShrink: 0,
-  },
-  bulletText: {
-    flex: 1,
-    fontSize: fs(12.5),
+  description: {
+    marginTop: spacing(6),
+    fontSize: fs(13.5),
     fontFamily: 'Inter-Regular',
     lineHeight: fs(18),
+    color: '#4B6A55',
   },
-
-  // Buttons
   btnRow: {
     flexDirection: 'row',
     gap: spacing(10),
-    paddingHorizontal: spacing(12),
-    paddingBottom: spacing(14),
+    marginTop: spacing(14),
   },
   btnOutline: {
     flex: 1,
-    height: 42,
-    borderRadius: 10,
+    minHeight: spacing(34),
+    borderRadius: 999,
     borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#F4FBF6',
+    paddingHorizontal: spacing(10),
   },
   btnOutlineText: {
-    fontSize: fs(13),
+    fontSize: fs(12.5),
     fontWeight: '700',
     fontFamily: 'Inter-SemiBold',
+    color: '#0F8B38',
   },
   btnFill: {
     flex: 1,
-    height: 42,
-    borderRadius: 10,
+    minHeight: spacing(34),
+    borderRadius: 999,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: spacing(10),
+    backgroundColor: '#0F8B38',
   },
   btnFillText: {
     color: '#fff',
-    fontSize: fs(13),
+    fontSize: fs(12.5),
     fontWeight: '700',
     fontFamily: 'Inter-SemiBold',
   },

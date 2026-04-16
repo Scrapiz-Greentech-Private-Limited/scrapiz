@@ -47,6 +47,67 @@ export interface OrderSummary {
   orders: OrderItemSummary[];
   estimated_order_value?: number;
   redeemed_referral_bonus?: number;
+  quote_status?: string | null;
+  quote_total_amount?: number | null;
+  quote_payment_method?: string | null;
+}
+
+export interface BookingQuoteItemSummary {
+  product_id: number;
+  product_name: string;
+  is_selected: boolean;
+  quoted_rate_per_kg: number;
+  actual_weight_kg: number;
+  subtotal: number;
+}
+
+export interface BookingQuoteSummary {
+  booking_id: string;
+  order_id: number;
+  status: string;
+  payment_method?: 'cash' | 'upi' | null;
+  total_amount: number;
+  customer_upi_id?: string;
+  upi_reference?: string;
+  submitted_at?: string;
+  responded_at?: string;
+  paid_at?: string;
+  items: BookingQuoteItemSummary[];
+}
+
+export interface BookingQuoteResponse {
+  quote: BookingQuoteSummary;
+}
+
+export interface BookingQuoteRespondPayload {
+  action: 'accept' | 'reject';
+  payment_method?: 'cash' | 'upi';
+  customer_upi_id?: string;
+}
+
+// ── Razorpay Gateway Types ─────────────────────────────────────────────────
+export interface RazorpayOrderResponse {
+  razorpay_order_id: string;
+  amount: number;          // paise
+  currency: string;
+  key_id: string;
+  prefill: { name: string; email?: string; contact?: string };
+  quote_total: number;     // rupees, for display
+}
+
+export interface RazorpayVerifyPayload {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+  payment_method: 'card' | 'upi';
+}
+
+export interface WalletRazorpayOrderResponse {
+  razorpay_order_id: string;
+  amount: number;
+  currency: string;
+  key_id: string;
+  prefill: { name: string };
 }
 
 export interface AddressSummary {
@@ -927,12 +988,112 @@ export class AuthService {
     }
   }
 
+  static async getNearbyDispatchParticipants(
+    orderId: number
+  ): Promise<{ agents: TrackingNearbyAgent[]; vendors: TrackingVendorPin[] }> {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.ORDER_NEARBY_AGENTS(orderId));
+      const payload = response.data?.data ?? response.data;
+
+      if (Array.isArray(payload)) {
+        return { agents: payload as TrackingNearbyAgent[], vendors: [] };
+      }
+
+      const agents = Array.isArray(payload?.agents)
+        ? (payload.agents as TrackingNearbyAgent[])
+        : Array.isArray(payload?.results)
+          ? (payload.results as TrackingNearbyAgent[])
+          : [];
+
+      const vendors = Array.isArray(payload?.vendors)
+        ? (payload.vendors as TrackingVendorPin[])
+        : [];
+
+      return { agents, vendors };
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch nearby participants');
+    }
+  }
+
   static async getBookingActive(bookingId: string): Promise<any> {
     try {
       const response = await apiClient.get(API_CONFIG.ENDPOINTS.BOOKING_ACTIVE(bookingId));
       return response.data?.data ?? response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Failed to fetch active booking');
+    }
+  }
+
+  static async getOrderQuote(orderId: number): Promise<BookingQuoteResponse> {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.BOOKING_ORDER_QUOTE(orderId));
+      const payload = response.data?.data ?? response.data;
+      return payload as BookingQuoteResponse;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch order quote');
+    }
+  }
+
+  static async respondOrderQuote(orderId: number, payload: BookingQuoteRespondPayload): Promise<any> {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.BOOKING_ORDER_QUOTE_RESPOND(orderId), payload);
+      return response.data?.data ?? response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to respond to quote');
+    }
+  }
+
+  // ── Razorpay Quote Payment ────────────────────────────────────────────────
+  static async createQuoteRazorpayOrder(orderId: number): Promise<RazorpayOrderResponse> {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.BOOKING_ORDER_QUOTE_RAZORPAY_ORDER(orderId));
+      return (response.data?.data ?? response.data) as RazorpayOrderResponse;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to create Razorpay order');
+    }
+  }
+
+  static async verifyQuoteRazorpayPayment(
+    orderId: number,
+    payload: RazorpayVerifyPayload
+  ): Promise<any> {
+    try {
+      const response = await apiClient.post(
+        API_CONFIG.ENDPOINTS.BOOKING_ORDER_QUOTE_RAZORPAY_VERIFY(orderId),
+        payload
+      );
+      return response.data?.data ?? response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Payment verification failed');
+    }
+  }
+
+  // ── Razorpay Wallet Topup ─────────────────────────────────────────────────
+  static async createWalletRazorpayOrder(amountInr: number): Promise<WalletRazorpayOrderResponse> {
+    try {
+      const response = await apiClient.post(
+        API_CONFIG.ENDPOINTS.VENDOR_WALLET_RAZORPAY_ORDER,
+        { amount: amountInr }
+      );
+      return (response.data?.data ?? response.data) as WalletRazorpayOrderResponse;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to create wallet order');
+    }
+  }
+
+  static async verifyWalletRazorpayPayment(payload: {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }): Promise<{ new_balance: number; credited: number }> {
+    try {
+      const response = await apiClient.post(
+        API_CONFIG.ENDPOINTS.VENDOR_WALLET_RAZORPAY_VERIFY,
+        payload
+      );
+      return response.data?.data ?? response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Wallet payment verification failed');
     }
   }
 

@@ -53,6 +53,10 @@ const getCurrentISTHour = () => {
 };
 const validatePhone = (value: string) => /^(\+?\d{6,15})$/.test(value.trim());
 
+const BRAND_DARK_GREEN = '#127E2D';
+const BRAND_DARK_GREEN_SOFT = 'rgba(18,126,45,0.22)';
+const BRAND_DARK_GREEN_SOFT_LIGHT = '#E9F7EE';
+
 export default function DismantlingBookScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -67,11 +71,11 @@ export default function DismantlingBookScreen() {
     title: isDark ? '#F7F8FA' : '#111111',
     text: isDark ? '#ECEFF3' : '#191919',
     muted: isDark ? '#A7AFBC' : '#7A7A7A',
-    red: '#C72222',
-    redSoft: isDark ? 'rgba(199,34,34,0.2)' : '#FFF1F1',
-    yellowBg: isDark ? '#302500' : '#FFF8D8',
-    yellowBorder: isDark ? '#E4A400' : '#F0A000',
-    yellowText: isDark ? '#FFD36F' : '#F08A00',
+    red: BRAND_DARK_GREEN,
+    redSoft: isDark ? BRAND_DARK_GREEN_SOFT : BRAND_DARK_GREEN_SOFT_LIGHT,
+    yellowBg: isDark ? 'rgba(18,126,45,0.22)' : BRAND_DARK_GREEN_SOFT_LIGHT,
+    yellowBorder: BRAND_DARK_GREEN,
+    yellowText: isDark ? '#CFEED9' : BRAND_DARK_GREEN,
     line: isDark ? '#505764' : '#D8D8D8',
   }), [isDark]);
 
@@ -365,7 +369,7 @@ export default function DismantlingBookScreen() {
   );
 
   if (success) {
-    return <View style={[styles.screen, { backgroundColor: ui.bg, paddingTop: insets.top }]}><View style={[styles.header, { borderBottomColor: ui.faintBorder }]}><TouchableOpacity style={styles.backButton} onPress={() => router.replace('/(tabs)/services')}><ArrowLeft size={26} color={ui.muted} /></TouchableOpacity><Text style={[styles.headerTitle, { color: ui.title }]}>Vehicle Scrapping</Text></View><View style={styles.successWrap}><Image source={require('../../../assets/images/services/vehicle_scrapping/cod_issued.webp')} style={styles.successImage} resizeMode="contain" /><Text style={[styles.successTitle, { color: ui.title }]}>Enquiry Submitted</Text><Text style={[styles.successSubtitle, { color: ui.muted }]}>Your vehicle scrapping request is received and our team will contact you shortly.</Text></View></View>;
+    return <View style={[styles.screen, { backgroundColor: ui.bg, paddingTop: insets.top }]}><View style={[styles.header, { borderBottomColor: ui.faintBorder }]}><TouchableOpacity style={styles.backButton} onPress={() => router.replace('/(tabs)/services')}><ArrowLeft size={26} color={ui.muted} /></TouchableOpacity><Text style={[styles.headerTitle, { color: ui.title }]}>Vehicle Scrapping</Text></View><View style={styles.successWrap}><Image source={require('../../../assets/images/services/demolition/thank_you_converted.webp')} style={styles.successImage} resizeMode="contain" /><Text style={[styles.successTitle, { color: ui.title }]}>Enquiry Submitted</Text><Text style={[styles.successSubtitle, { color: ui.muted }]}>Your vehicle scrapping request is received and our team will contact you shortly.</Text></View></View>;
   }
 
   return (

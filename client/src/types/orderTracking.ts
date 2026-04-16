@@ -10,11 +10,14 @@ export interface TrackingCoordinate {
 export interface TrackingVendorPin {
   vendor_id: number;
   name: string;
+  pin_role?: 'vendor' | 'agent';
   lat: number;
   lng: number;
   distance_km?: number | null;
   vehicle_type?: string | null;
   vehicle_number?: string | null;
+  service_city?: string | null;
+  service_area?: string | null;
   phone?: string | null;
   rating?: number | null;
 }
@@ -29,6 +32,17 @@ export interface TrackingVendorSummary {
   lng?: number | null;
   rating?: number | null;
   last_location_update?: string | null;
+}
+
+export interface TrackingLeadItem {
+  product_id: number;
+  product_name: string;
+  quantity: number;
+  unit: string;
+  min_rate?: number | null;
+  max_rate?: number | null;
+  image_url?: string | null;
+  category?: string | null;
 }
 
 export interface TrackingNearbyAgent {
@@ -68,6 +82,7 @@ export interface TrackingBookingData {
   id: string;
   status: string;
   vendor: TrackingVendorSummary;
+  items?: TrackingLeadItem[];
 }
 
 export interface OrderTrackingResponse {
@@ -104,6 +119,7 @@ export interface LeadAcceptedEvent {
   type: 'lead_accepted';
   booking_id?: string;
   vendor?: TrackingVendorSummary | null;
+  items?: TrackingLeadItem[];
 }
 
 export interface LocationUpdateEvent {
