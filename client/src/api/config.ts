@@ -49,8 +49,12 @@ export const API_CONFIG = {
     ORDER_NEARBY_AGENTS: (orderId: number | string) => `/order/${orderId}/agents/`,
     VENDOR_NEARBY: '/vendor/nearby/',
     BOOKING_ACTIVE: (bookingId: string) => `/booking/${bookingId}/active/`,
-    BOOKING_ORDER_QUOTE: (orderId: number | string) => `/booking/order/${orderId}/quote/`,
+        BOOKING_ORDER_QUOTE: (orderId: number | string) => `/booking/order/${orderId}/quote/`,
     BOOKING_ORDER_QUOTE_RESPOND: (orderId: number | string) => `/booking/order/${orderId}/quote/respond/`,
+    BOOKING_ORDER_QUOTE_RESPOND_V2: (orderId: number | string) => `/booking/order/${orderId}/quote/respond-v2/`,
+    BOOKING_ORDER_PAYMENT: (orderId: number | string) => `/booking/order/${orderId}/payment/`,
+    BOOKING_ORDER_PAYMENT_CONFIRM: (orderId: number | string) => `/booking/order/${orderId}/payment/confirm/`,
+    BOOKING_CUSTOMER_UPI_PROFILE: '/booking/upi-profile/',
     // Razorpay quote payment
     BOOKING_ORDER_QUOTE_RAZORPAY_ORDER: (orderId: number) =>
       `/booking/order/${orderId}/quote/razorpay-order/`,
@@ -75,6 +79,7 @@ export const API_CONFIG = {
     SERVICEABILITY_CITIES: '/serviceability/cities/',
     SERVICEABILITY_CHECK_PINCODE: '/serviceability/check-pincode/',
     SERVICEABILITY_CHECK_COORDINATES: '/serviceability/check-coordinates/',
+    SERVICEABILITY_CHECK_CITY_GATE: '/serviceability/check-city-gate/',
     SERVICEABILITY_PINCODES: '/serviceability/pincodes/',
     // Public endpoints for mobile caching (no auth required)
     SERVICEABILITY_PUBLIC_CITIES: '/serviceability/public/cities/',

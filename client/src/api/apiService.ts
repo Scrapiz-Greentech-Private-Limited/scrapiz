@@ -50,6 +50,8 @@ export interface OrderSummary {
   quote_status?: string | null;
   quote_total_amount?: number | null;
   quote_payment_method?: string | null;
+  payment_status?: string | null;
+  payment_upi_reference?: string | null;
 }
 
 export interface BookingQuoteItemSummary {
@@ -65,10 +67,15 @@ export interface BookingQuoteSummary {
   booking_id: string;
   order_id: number;
   status: string;
+  preferred_payment_method?: 'cash' | 'upi' | null;
+  fallback_payment_method?: 'cash' | 'none' | null;
   payment_method?: 'cash' | 'upi' | null;
   total_amount: number;
   customer_upi_id?: string;
+  customer_upi_name?: string;
   upi_reference?: string;
+  payment_status?: string | null;
+  payment_upi_reference?: string | null;
   submitted_at?: string;
   responded_at?: string;
   paid_at?: string;
@@ -860,7 +867,9 @@ export class AuthService {
     address_id?: number,
     imageUris?: string[],
     estimatedOrderValue?: number,
-    referralAmount?: number
+    referralAmount?: number,
+    pickupLatitude?: number,
+    pickupLongitude?: number
   ): Promise<any> {
     try {
       console.log('createOrder called with:');
@@ -868,6 +877,8 @@ export class AuthService {
       console.log('- address_id:', address_id);
       console.log('- imageUris:', imageUris);
       console.log('- estimatedOrderValue:', estimatedOrderValue);
+      console.log('- pickupLatitude:', pickupLatitude);
+      console.log('- pickupLongitude:', pickupLongitude);
 
       const formData = new FormData();
 
@@ -887,6 +898,14 @@ export class AuthService {
       // Add referral_amount if provided
       if (referralAmount !== undefined && referralAmount > 0) {
         formData.append('referral_amount', referralAmount.toString());
+      }
+
+      // Add optional pickup coordinates for lead dispatch.
+      if (typeof pickupLatitude === 'number' && Number.isFinite(pickupLatitude)) {
+        formData.append('pickup_latitude', pickupLatitude.toString());
+      }
+      if (typeof pickupLongitude === 'number' && Number.isFinite(pickupLongitude)) {
+        formData.append('pickup_longitude', pickupLongitude.toString());
       }
 
       // Add images if provided
@@ -926,7 +945,9 @@ export class AuthService {
       );
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Failed to create order');
+      const apiError: any = new Error(error.response?.data?.error || 'Failed to create order');
+      apiError.code = error.response?.data?.code;
+      throw apiError;
     }
   }
 
@@ -1169,6 +1190,80 @@ export class AuthService {
     }
   }
 
+    // ── New Payment Architecture ───────────────────────────────────────────────
+
+  /** GET saved customer UPI profile */
+  static async getUpiProfile(): Promise<{ default_upi_vpa: string; default_upi_name: string; has_saved_upi: boolean }> {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.BOOKING_CUSTOMER_UPI_PROFILE);
+      return (response.data?.data ?? response.data) as { default_upi_vpa: string; default_upi_name: string; has_saved_upi: boolean };
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch UPI profile');
+    }
+  }
+
+  /** POST save/update customer UPI profile */
+  static async saveUpiProfile(vpa: string, name: string): Promise<{ default_upi_vpa: string; default_upi_name: string }> {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.BOOKING_CUSTOMER_UPI_PROFILE, {
+        default_upi_vpa: vpa,
+        default_upi_name: name,
+      });
+      return (response.data?.data ?? response.data) as { default_upi_vpa: string; default_upi_name: string };
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to save UPI profile');
+    }
+  }
+
+  /** GET server-authoritative payment state for an order (drives QR display) */
+  static async getOrderPaymentState(orderId: number): Promise<any> {
+    try {
+      const response = await apiClient.get(API_CONFIG.ENDPOINTS.BOOKING_ORDER_PAYMENT(orderId));
+      return response.data?.data ?? response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to fetch payment state');
+    }
+  }
+
+  /**
+   * POST v2 quote respond — vendor-controlled payment method.
+   *
+   * @param orderId  - order_id from the order row
+   * @param payload  - action, optional UPI VPA + name, save_upi_details flag
+   */
+  static async respondOrderQuoteV2(orderId: number, payload: {
+    action: 'accept' | 'reject';
+    customer_upi_vpa?: string;
+    customer_upi_name?: string;
+    save_upi_details?: boolean;
+  }): Promise<any> {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.BOOKING_ORDER_QUOTE_RESPOND_V2(orderId), payload);
+      return response.data?.data ?? response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to respond to quote');
+    }
+  }
+
+  /**
+   * POST customer confirms or disputes payment receipt.
+   *
+   * @param orderId       - order_id
+   * @param confirmed     - true = received, false = dispute
+   * @param disputeReason - optional text when confirmed=false
+   */
+  static async confirmPaymentReceipt(orderId: number, confirmed: boolean, disputeReason?: string): Promise<any> {
+    try {
+      const response = await apiClient.post(API_CONFIG.ENDPOINTS.BOOKING_ORDER_PAYMENT_CONFIRM(orderId), {
+        confirmed,
+        ...(disputeReason ? { dispute_reason: disputeReason } : {}),
+      });
+      return response.data?.data ?? response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.error || 'Failed to confirm payment');
+    }
+  }
+
   // Get list of users referred by current user
   static async getReferredUsers(): Promise<ReferredUser[]> {
     try {
@@ -1203,11 +1298,12 @@ export class AuthService {
   }
 
   // Register push notification token
-  static async registerPushToken(token: string, deviceName?: string): Promise<ApiResponse> {
+  static async registerPushToken(token: string, deviceName?: string, appSource: 'client' | 'vendor' = 'client'): Promise<ApiResponse> {
     try {
       const response = await apiClient.post(API_CONFIG.ENDPOINTS.REGISTER_PUSH_TOKEN, {
         token,
-        device_name: deviceName || ''
+        device_name: deviceName || '',
+        app_source: appSource,
       });
       return response.data;
     } catch (error: any) {
@@ -1305,6 +1401,14 @@ export class ServiceabilityAPI {
   private static readonly RETRY_DELAY_MS = 1000;
 
   /**
+   * Backend coordinate serializers accept up to 6 decimal places.
+   * Normalize GPS precision at the API boundary so callers can pass raw device coordinates.
+   */
+  private static normalizeCoordinate(value: number): number {
+    return Number(value.toFixed(6));
+  }
+
+  /**
    * Retry helper for API calls with exponential backoff
    */
   private static async retryWithBackoff<T>(
@@ -1380,10 +1484,13 @@ export class ServiceabilityAPI {
         throw new Error('Invalid longitude. Must be between -180 and 180');
       }
 
+      const normalizedLatitude = ServiceabilityAPI.normalizeCoordinate(latitude);
+      const normalizedLongitude = ServiceabilityAPI.normalizeCoordinate(longitude);
+
       const response = await ServiceabilityAPI.retryWithBackoff(async () => {
         return await apiClient.post(
           API_CONFIG.ENDPOINTS.SERVICEABILITY_CHECK_COORDINATES,
-          { latitude, longitude }
+          { latitude: normalizedLatitude, longitude: normalizedLongitude }
         );
       });
 
@@ -1394,6 +1501,39 @@ export class ServiceabilityAPI {
         error.response?.data?.error ||
         error.message ||
         'Failed to check coordinate serviceability'
+      );
+    }
+  }
+
+  static async checkCityGateCoordinates(
+    latitude: number,
+    longitude: number
+  ): Promise<ServiceabilityResponse> {
+    try {
+      if (latitude < -90 || latitude > 90) {
+        throw new Error('Invalid latitude. Must be between -90 and 90');
+      }
+      if (longitude < -180 || longitude > 180) {
+        throw new Error('Invalid longitude. Must be between -180 and 180');
+      }
+
+      const normalizedLatitude = ServiceabilityAPI.normalizeCoordinate(latitude);
+      const normalizedLongitude = ServiceabilityAPI.normalizeCoordinate(longitude);
+
+      const response = await ServiceabilityAPI.retryWithBackoff(async () => {
+        return await apiClient.post(
+          API_CONFIG.ENDPOINTS.SERVICEABILITY_CHECK_CITY_GATE,
+          { latitude: normalizedLatitude, longitude: normalizedLongitude }
+        );
+      });
+
+      return response.data as ServiceabilityResponse;
+    } catch (error: any) {
+      console.error('ServiceabilityAPI.checkCityGateCoordinates error:', error);
+      throw new Error(
+        error.response?.data?.error ||
+        error.message ||
+        'Failed to check city serviceability'
       );
     }
   }

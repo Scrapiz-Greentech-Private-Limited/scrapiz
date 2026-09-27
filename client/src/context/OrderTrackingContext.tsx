@@ -18,11 +18,14 @@ import {
   estimateEtaMinutes,
   LeadAcceptedEvent,
   LocationUpdateEvent,
+  OrderCancelledEvent,
   OrderTrackingResponse,
   TrackingCompletionSummary,
   TrackingConnectionState,
   TrackingCoordinate,
   TrackingLeadItem,
+  TrackingOrderDetails,
+  TrackingQuote,
   TrackingPhase,
   TrackingStep,
   TrackingVendorPin,
@@ -41,6 +44,8 @@ interface OrderTrackingContextValue {
   expiresAt: string | null;
   acceptedVendor: TrackingVendorSummary | null;
   acceptedItems: TrackingLeadItem[];
+  quote: TrackingQuote | null;
+  orderDetails: TrackingOrderDetails | null;
   vendorLocation: TrackingCoordinate | null;
   bookingId: string | null;
   bookingStatus: string | null;
@@ -60,7 +65,10 @@ const DEFAULT_PICKUP: TrackingCoordinate = {
   lat: DEFAULT_CENTER[1],
 };
 
-const POLL_INTERVAL_MS = 30000;
+// Quote/payment updates are submitted from the vendor app and are not all
+// emitted as socket events. Keep the REST fallback frequent enough that the
+// customer sees a new quote without manually reopening the order.
+const POLL_INTERVAL_MS = 10000;
 
 const OrderTrackingContext = createContext<OrderTrackingContextValue | undefined>(undefined);
 
@@ -142,6 +150,8 @@ export function OrderTrackingProvider({
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [acceptedVendor, setAcceptedVendor] = useState<TrackingVendorSummary | null>(null);
   const [acceptedItems, setAcceptedItems] = useState<TrackingLeadItem[]>([]);
+  const [quote, setQuote] = useState<TrackingQuote | null>(null);
+  const [orderDetails, setOrderDetails] = useState<TrackingOrderDetails | null>(null);
   const [vendorLocation, setVendorLocation] = useState<TrackingCoordinate | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [bookingStatus, setBookingStatus] = useState<string | null>(null);
@@ -258,6 +268,13 @@ export function OrderTrackingProvider({
   }, [applyBookingState]);
 
   const updateFromRestPayload = useCallback((payload: OrderTrackingResponse) => {
+    setOrderDetails({
+      order_number: payload.order_number ?? null,
+      created_at: payload.created_at ?? null,
+      estimated_order_value: payload.estimated_order_value ?? null,
+      address: payload.address ?? null,
+      items: normalizeLeadItems(payload.items),
+    });
     const nextPickup = coerceCoordinate(payload.pickup_lat, payload.pickup_lng);
     if (nextPickup) {
       setPickup(nextPickup);
@@ -276,6 +293,7 @@ export function OrderTrackingProvider({
 
       setAcceptedVendor(vendor);
       setAcceptedItems(normalizeLeadItems(payload.booking.items));
+      setQuote(payload.booking.quote ?? null);
       setVendorLocation(nextLocation);
       setBookingId(payload.booking.id);
       applyBookingState(payload.booking.status);
@@ -285,6 +303,7 @@ export function OrderTrackingProvider({
     setBookingId(null);
     setAcceptedVendor(null);
     setAcceptedItems([]);
+    setQuote(null);
     setVendorLocation(null);
     setBookingStatus(null);
 
@@ -335,6 +354,12 @@ export function OrderTrackingProvider({
               setBookingId(event.booking_id);
             }
             applyBookingState(event.status ?? event.booking_status, event);
+          },
+          onOrderCancelled: (event: OrderCancelledEvent) => {
+            setPhase('cancelled');
+            router.replace(
+              `/tracking/${orderId}/cancelled?orderId=${orderId}&orderNumber=${event.order_number || ''}&cancelledBy=${event.cancelled_by || 'user'}` as any
+            );
           },
           onConnectionChange: (connected) => {
             setConnectionState(connected ? 'connected' : 'offline');
@@ -463,6 +488,8 @@ export function OrderTrackingProvider({
     expiresAt,
     acceptedVendor,
     acceptedItems,
+    quote,
+    orderDetails,
     vendorLocation,
     bookingId,
     bookingStatus,
@@ -478,6 +505,8 @@ export function OrderTrackingProvider({
   }), [
     acceptedVendor,
     acceptedItems,
+    quote,
+    orderDetails,
     bookingId,
     bookingStatus,
     callVendor,

@@ -20,6 +20,7 @@ export default function TrackingLayout() {
         <Stack.Screen name="live" />
         <Stack.Screen name="quote" />
         <Stack.Screen name="complete" />
+        <Stack.Screen name="cancelled" options={{ gestureEnabled: false }} />
       </Stack>
     </OrderTrackingProvider>
   );

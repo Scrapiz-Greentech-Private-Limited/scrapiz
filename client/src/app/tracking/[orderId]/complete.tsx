@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable,  ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import {SafeAreaView} from "react-native-safe-area-context"
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { CheckCircle2, Star } from 'lucide-react-native';

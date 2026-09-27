@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { AuthService } from '../api/apiService';
 import { 
@@ -13,6 +14,10 @@ import {
 if (Platform.OS === 'android') {
   registerBackgroundHandler();
 }
+
+const STORAGE_KEYS = {
+  EXPO_PUSH_TOKEN: '@scrapiz_expo_push_token',
+};
 
 /**
  * Hook for managing push notifications
@@ -55,13 +60,61 @@ export const useNotifications = (router?: any) => {
     };
   }, [router]);
 
+  useEffect(() => {
+    const hydrateStoredToken = async () => {
+      try {
+        const storedToken = await AsyncStorage.getItem(STORAGE_KEYS.EXPO_PUSH_TOKEN);
+        if (storedToken) {
+          setExpoPushToken(storedToken);
+        }
+      } catch (storageError) {
+        console.error('Failed to hydrate stored Expo push token:', storageError);
+      }
+    };
+
+    hydrateStoredToken();
+  }, []);
+
+  const persistToken = useCallback(async (token: string | null) => {
+    try {
+      if (token) {
+        await AsyncStorage.setItem(STORAGE_KEYS.EXPO_PUSH_TOKEN, token);
+      } else {
+        await AsyncStorage.removeItem(STORAGE_KEYS.EXPO_PUSH_TOKEN);
+      }
+    } catch (storageError) {
+      console.error('Failed to persist Expo push token:', storageError);
+    }
+  }, []);
+
+  const getExistingToken = useCallback(async (): Promise<string | null> => {
+    if (expoPushToken) {
+      return expoPushToken;
+    }
+
+    try {
+      const storedToken = await AsyncStorage.getItem(STORAGE_KEYS.EXPO_PUSH_TOKEN);
+      if (storedToken) {
+        setExpoPushToken(storedToken);
+        return storedToken;
+      }
+    } catch (storageError) {
+      console.error('Failed to read stored Expo push token:', storageError);
+    }
+
+    return null;
+  }, [expoPushToken]);
+
   /**
    * Register for push notifications
    * Requests permissions and registers the Expo push token with the backend
    * 
    * @returns The Expo push token if successful, null otherwise
    */
-  const registerForPushNotifications = async (): Promise<string | null> => {
+  const registerForPushNotifications = useCallback(async (
+    options: { skipPermissionPrompt?: boolean; forceTokenRefresh?: boolean } = {}
+  ): Promise<string | null> => {
+    const { skipPermissionPrompt = false, forceTokenRefresh = false } = options;
     setIsRegistering(true);
     setError(null);
 
@@ -80,7 +133,7 @@ export const useNotifications = (router?: any) => {
       let finalStatus = existingStatus;
 
       // Request permission if not already granted
-      if (existingStatus !== 'granted') {
+      if (existingStatus !== 'granted' && !skipPermissionPrompt) {
         const { status } = await Notifications.requestPermissionsAsync();
         finalStatus = status;
       }
@@ -94,12 +147,15 @@ export const useNotifications = (router?: any) => {
         return null;
       }
 
-      // Get the Expo push token
-      const tokenData = await Notifications.getExpoPushTokenAsync();
-      const token = tokenData.data;
+      let token = forceTokenRefresh ? null : await getExistingToken();
+      if (!token) {
+        const tokenData = await Notifications.getExpoPushTokenAsync();
+        token = tokenData.data;
+      }
       
       console.log('Expo Push Token:', token);
       setExpoPushToken(token);
+      await persistToken(token);
 
       // Register token with backend
       try {
@@ -121,7 +177,7 @@ export const useNotifications = (router?: any) => {
       setIsRegistering(false);
       return null;
     }
-  };
+  }, [getExistingToken, persistToken]);
 
   /**
    * Unregister push notification token
@@ -129,9 +185,9 @@ export const useNotifications = (router?: any) => {
    * 
    * @param token - The Expo push token to unregister (optional, uses stored token if not provided)
    */
-  const unregisterPushToken = async (token?: string): Promise<boolean> => {
+  const unregisterPushToken = useCallback(async (token?: string): Promise<boolean> => {
     try {
-      const tokenToUnregister = token || expoPushToken;
+      const tokenToUnregister = token || expoPushToken || await getExistingToken();
       
       if (!tokenToUnregister) {
         console.log('No push token to unregister');
@@ -141,13 +197,14 @@ export const useNotifications = (router?: any) => {
       await AuthService.unregisterPushToken(tokenToUnregister);
       console.log('Push token unregistered:', tokenToUnregister);
       setExpoPushToken(null);
+      await persistToken(null);
       return true;
     } catch (err: any) {
       console.error('Failed to unregister push token:', err);
       setError(err.message || 'Failed to unregister token');
       return false;
     }
-  };
+  }, [expoPushToken, getExistingToken, persistToken]);
 
   /**
    * Set up notification listeners

@@ -1,979 +1,247 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Animated, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Clock3, ShieldCheck, Star, Truck } from 'lucide-react-native';
+import { ArrowLeft, Bell, Check, ChevronRight, Clock3, MapPin, Search, Truck } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { useTheme } from '../../../context/ThemeContext';
 import { useOrderTracking } from '../../../context/OrderTrackingContext';
-import {
-  formatTrackingDistance,
-  TrackingNearbyAgent,
-  TrackingVendorPin,
-} from '../../../types/orderTracking';
-import { AuthService } from '../../../api/apiService';
+import { TrackingCoordinate, TrackingLeadItem } from '../../../types/orderTracking';
 import { OrderTrackingMap } from '../../../components/tracking/OrderTrackingMap';
 import { DEFAULT_CENTER } from '../../../config/mapConfig';
 
-function formatCountdown(expiresAt: string | null) {
-  if (!expiresAt) {
-    return 'Searching nearby agents';
-  }
+const PERSON_IMAGE = require('../../../../assets/images/person1.png');
+const BACKEND_POLL_INTERVAL_MS = 120000;
 
-  const remainingMs = Math.max(0, new Date(expiresAt).getTime() - Date.now());
-  const totalSeconds = Math.floor(remainingMs / 1000);
-  const minutes = Math.floor(totalSeconds / 60)
-    .toString()
-    .padStart(2, '0');
-  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
-  return `${minutes}:${seconds}`;
+function formatDateTime(value?: string | null) {
+  if (!value) return { date: 'Not available', time: 'Not available' };
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return { date: value, time: 'Not available' };
+  return {
+    date: date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+    time: date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+  };
 }
 
-function getInitials(name: string) {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() || '')
-    .join('');
+function formatAddress(address: any) {
+  if (!address) return 'Pickup address will be shared shortly';
+  return [address.room_number, address.street, address.area, address.city, address.state, address.pincode].filter(Boolean).join(', ');
 }
 
-function formatAvailability(value?: string | null) {
-  if (!value) return 'Available';
-  return value
-    .split('_')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+function formatItem(item: TrackingLeadItem) {
+  return `${item.product_name} × ${item.quantity}${item.unit ? ` ${item.unit}` : ''}`;
 }
 
-function renderStars(rating: number) {
-  const rounded = Math.max(0, Math.min(5, Math.round(rating || 0)));
+function RadarWaves() {
+  const waves = useRef<Animated.Value[]>([
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+  ]).current;
+  useEffect(() => {
+    const loops = waves.map((wave, index) => {
+      const animation = Animated.loop(Animated.sequence([
+        Animated.delay(index * 850),
+        Animated.timing(wave, { toValue: 1, duration: 2400, useNativeDriver: true }),
+        Animated.delay(250),
+        Animated.timing(wave, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ]));
+      animation.start();
+      return animation;
+    });
+    return () => loops.forEach((animation) => animation.stop());
+  }, [waves]);
+
   return (
-    <View style={styles.starRow}>
-      {Array.from({ length: 5 }).map((_, index) => (
-        <Star
-          key={index}
-          size={14}
-          color={index < rounded ? '#F4B400' : '#D6DDE7'}
-          fill={index < rounded ? '#F4B400' : 'transparent'}
-        />
+    <View pointerEvents="none" style={styles.radarMarker}>
+      {waves.map((wave, index) => (
+        <Animated.View key={index} style={[styles.radarWave, {
+          opacity: wave.interpolate({ inputRange: [0, 0.25, 1], outputRange: [0, 0.45, 0] }),
+          transform: [{ scale: wave.interpolate({ inputRange: [0, 1], outputRange: [0.55, 2.4] }) }],
+        }]} />
       ))}
+      <View style={styles.radarCore}><MapPin size={18} color="#FFFFFF" fill="#16A34A" /></View>
     </View>
   );
 }
 
-function buildAgentPins(agents: TrackingNearbyAgent[]): TrackingVendorPin[] {
-  return agents
-    .filter((agent) => typeof agent.lat === 'number' && typeof agent.lng === 'number')
-    .map((agent) => ({
-      vendor_id: -Math.abs(agent.id),
-      name: agent.name,
-      pin_role: 'agent',
-      lat: agent.lat as number,
-      lng: agent.lng as number,
-      vehicle_type: agent.vehicle_type,
-      vehicle_number: agent.vehicle_number,
-      rating: agent.average_rating,
-    }));
-}
-
-function FeaturedAgentCard({
-  agent,
-  countdown,
-}: {
-  agent: TrackingNearbyAgent;
-  countdown: string;
-}) {
-  const rating = Number(agent.average_rating || 0);
-
-  const metrics = [
-    { label: 'Rating', value: rating > 0 ? rating.toFixed(1) : 'New' },
-    { label: 'Availability', value: formatAvailability(agent.availability) },
-    { label: 'Travel Window', value: countdown.includes(':') ? countdown : 'Live' },
-    { label: 'Reviews', value: `${agent.rating_count || 0}` },
-    { label: 'Vehicle', value: agent.vehicle_type || 'Assigned on dispatch' },
-    { label: 'Agent ID', value: agent.agent_code || 'Pending' },
-  ];
-
+function Timeline({ phase }: { phase: string }) {
+  const activeIndex = phase === 'en_route' ? 1 : phase === 'completed' ? 2 : 0;
+  const steps = [{ label: 'Finding\npartner', icon: Search }, { label: 'Partner\non the way', icon: Truck }, { label: 'Pickup\nin progress', icon: Check }];
   return (
-    <View style={styles.featuredCard}>
-      <View style={styles.agentHeaderRow}>
-        <View style={styles.agentIdentityRow}>
-          {agent.profile_image_url ? (
-            <Image source={{ uri: agent.profile_image_url }} style={styles.agentAvatarImage} />
-          ) : (
-            <View style={styles.agentAvatarFallback}>
-              <Text style={styles.agentAvatarText}>{getInitials(agent.name)}</Text>
-            </View>
-          )}
-
-          <View style={styles.agentIdentityCopy}>
-            <Text style={styles.agentName}>{agent.name}</Text>
-            <Text style={styles.agentRole}>Pickup Partner</Text>
-          </View>
-        </View>
-
-        <View style={styles.vehicleBlock}>
-          <Text style={styles.vehicleTitle} numberOfLines={1}>
-            {agent.vehicle_type || 'Assigned on dispatch'}
-          </Text>
-          <Text style={styles.vehicleMeta} numberOfLines={1}>
-            {agent.vehicle_number || 'Vehicle details shared after assignment'}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.ratingHeaderRow}>
-        <View style={styles.ratingWrap}>
-          {renderStars(rating)}
-          <Text style={styles.ratingText}>{rating > 0 ? rating.toFixed(1) : 'New'}</Text>
-        </View>
-        <View style={styles.statusPill}>
-          <Text style={styles.statusPillText}>{formatAvailability(agent.availability)}</Text>
-        </View>
-      </View>
-
-      <View style={styles.metricsGrid}>
-        {metrics.map((metric) => (
-          <View key={metric.label} style={styles.metricCell}>
-            <Text style={styles.metricLabel}>{metric.label}</Text>
-            <Text style={styles.metricValue} numberOfLines={2}>
-              {metric.value}
-            </Text>
-          </View>
-        ))}
-      </View>
-
-      <View style={styles.noteCard}>
-        <Text style={styles.noteTitle}>Pickup update</Text>
-        <Text style={styles.noteText}>
-          Your pickup request has been shared with the nearest available partners. You will be notified as
-          soon as one of them accepts the job, and you can safely return to the home screen in the meantime.
-        </Text>
-      </View>
+    <View style={styles.timelineCard}>
+      <View style={styles.timelineTrack} />
+      {steps.map((step, index) => {
+        const Icon = step.icon;
+        const active = index <= activeIndex;
+        return <View key={step.label} style={styles.timelineStep}>
+          <View style={[styles.timelineIcon, active && styles.timelineIconActive]}><Icon size={22} color={active ? '#FFFFFF' : '#8993A3'} strokeWidth={2.4} /></View>
+          <Text style={[styles.timelineLabel, active && styles.timelineLabelActive]}>{step.label}</Text>
+        </View>;
+      })}
     </View>
   );
 }
 
-function CompactAgentCard({ agent }: { agent: TrackingNearbyAgent }) {
-  return (
-    <View style={styles.compactCard}>
-      {agent.profile_image_url ? (
-        <Image source={{ uri: agent.profile_image_url }} style={styles.compactAvatarImage} />
-      ) : (
-        <View style={styles.compactAvatarFallback}>
-          <Text style={styles.compactAvatarText}>{getInitials(agent.name)}</Text>
-        </View>
-      )}
-      <View style={styles.compactCardCopy}>
-        <Text style={styles.compactCardName} numberOfLines={1}>
-          {agent.name}
-        </Text>
-        <Text style={styles.compactCardMeta} numberOfLines={1}>
-          {agent.vehicle_type || 'Pickup partner'}
-        </Text>
-      </View>
-      <View style={styles.compactRatingWrap}>
-        <Star size={12} color="#F4B400" fill="#F4B400" />
-        <Text style={styles.compactRatingText}>
-          {Number(agent.average_rating || 0) > 0 ? Number(agent.average_rating).toFixed(1) : 'New'}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-function CompactVendorCard({ vendor }: { vendor: TrackingVendorPin }) {
-  return (
-    <View style={styles.compactCard}>
-      <View style={styles.compactAvatarFallback}>
-        <Text style={styles.compactAvatarText}>{getInitials(vendor.name)}</Text>
-      </View>
-      <View style={styles.compactCardCopy}>
-        <Text style={styles.compactCardName} numberOfLines={1}>
-          {vendor.name}
-        </Text>
-        <Text style={styles.compactCardMeta} numberOfLines={1}>
-          {vendor.service_area && vendor.service_city
-            ? `${vendor.service_area}, ${vendor.service_city}`
-            : vendor.vehicle_type || 'Pickup vendor'}
-        </Text>
-      </View>
-      <View style={styles.vendorDistancePill}>
-        <Text style={styles.vendorDistanceText}>{formatTrackingDistance(vendor.distance_km)}</Text>
-      </View>
-    </View>
-  );
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return <View style={styles.detailRow}><Text style={styles.detailLabel}>{label}</Text><Text style={styles.detailValue}>{value || 'Not available'}</Text></View>;
 }
 
 export default function VendorSearchScreen() {
   const router = useRouter();
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const { isDark } = useTheme();
-  const {
-    acceptedVendor,
-    cancelOrder,
-    distanceKm,
-    etaMinutes,
-    expiresAt,
-    isBootstrapping,
-    phase,
-    pickup,
-    vendorPins,
-  } = useOrderTracking();
-
-  const [nearbyAgents, setNearbyAgents] = useState<TrackingNearbyAgent[]>([]);
-  const [nearbyDispatchVendors, setNearbyDispatchVendors] = useState<TrackingVendorPin[]>([]);
-  const [isLoadingAgents, setIsLoadingAgents] = useState(true);
-  const [deviceLocation, setDeviceLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const requestedLocationRef = useRef(false);
-
-  const countdown = useMemo(() => formatCountdown(expiresAt), [expiresAt]);
+  const { acceptedVendor, cancelOrder, isBootstrapping, orderDetails, phase, pickup, quote, refreshFromRest } = useOrderTracking();
+  const [deviceLocation, setDeviceLocation] = useState<TrackingCoordinate | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
 
   useEffect(() => {
-    if (orderId && phase === 'en_route' && acceptedVendor) {
-      router.replace(`/tracking/${orderId}/accepted` as any);
-    }
-  }, [acceptedVendor, orderId, phase, router]);
+    const poll = setInterval(() => refreshFromRest().catch((error) => console.warn('Order assignment poll failed', error)), BACKEND_POLL_INTERVAL_MS);
+    return () => clearInterval(poll);
+  }, [refreshFromRest]);
 
   useEffect(() => {
-    if (!orderId || phase !== 'searching') {
-      setIsLoadingAgents(false);
-      return;
-    }
-
-    let isMounted = true;
-
-    const loadAgents = async () => {
+    let mounted = true;
+    (async () => {
       try {
-        setIsLoadingAgents(true);
-        const data = await AuthService.getNearbyDispatchParticipants(Number(orderId));
-        if (isMounted) {
-          setNearbyAgents(data.agents || []);
-          setNearbyDispatchVendors((data.vendors || []).map((vendor) => ({
-            ...vendor,
-            pin_role: 'vendor',
-          })));
-        }
-      } catch (error) {
-        if (isMounted) {
-          setNearbyAgents([]);
-          setNearbyDispatchVendors([]);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoadingAgents(false);
-        }
-      }
-    };
-
-    loadAgents();
-    const interval = setInterval(loadAgents, 30000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [orderId, phase]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const hydrateDeviceLocation = async () => {
-      try {
-        let status = (await Location.getForegroundPermissionsAsync()).status;
-        if (status !== 'granted') {
-          status = (await Location.requestForegroundPermissionsAsync()).status;
-        }
-
-        if (status !== 'granted') {
-          return;
-        }
-
-        try {
-          if (Location.enableNetworkProviderAsync) {
-            await Location.enableNetworkProviderAsync();
-          }
-        } catch (error) {
-          console.log('Search tracking network provider prompt unavailable', error);
-        }
-
-        const current = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.BestForNavigation,
-          timeInterval: 1000,
-          distanceInterval: 0,
-        });
-
-        if (!isMounted) {
-          return;
-        }
-
-        setDeviceLocation({
-          lat: current.coords.latitude,
-          lng: current.coords.longitude,
-        });
-      } catch (error) {
-        console.log('Search tracking location unavailable', error);
-      }
-    };
-
-    if (!requestedLocationRef.current) {
-      requestedLocationRef.current = true;
-      const timer = setTimeout(() => {
-        hydrateDeviceLocation();
-      }, 450);
-
-      return () => {
-        isMounted = false;
-        clearTimeout(timer);
-      };
-    }
-
-    return () => {
-      isMounted = false;
-    };
+        const permission = await Location.getForegroundPermissionsAsync();
+        if (permission.status !== 'granted') return;
+        const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        if (mounted) setDeviceLocation({ lat: current.coords.latitude, lng: current.coords.longitude });
+      } catch (error) { console.log('Tracking location unavailable', error); }
+    })();
+    return () => { mounted = false; };
   }, []);
 
-  const pickupCoordinate = useMemo(
-    () => {
-      const isUsingDefaultPickup =
-        pickup.lat === DEFAULT_CENTER[1] &&
-        pickup.lng === DEFAULT_CENTER[0];
+  const pickupCoordinate = useMemo(() => {
+    if (pickup.lat === DEFAULT_CENTER[1] && pickup.lng === DEFAULT_CENTER[0] && deviceLocation) return deviceLocation;
+    return pickup;
+  }, [deviceLocation, pickup]);
+  const orderDateTime = formatDateTime(orderDetails?.created_at);
+  const items = orderDetails?.items || [];
+  const address = formatAddress(orderDetails?.address);
+  const phone = orderDetails?.address?.phone_number || 'Not available';
+  const hasAcceptedPartner = Boolean(acceptedVendor);
+  const quoteSubmitted = quote?.status === 'submitted';
+  const paymentReady = quote?.status === 'awaiting_payment' || quote?.status === 'paid';
+  const paymentNeedsConfirmation = ['vendor_reference_submitted', 'customer_confirmation_pending'].includes(String(quote?.payment_status || '').toLowerCase());
+  const quotePaymentLabel = quote?.preferred_payment_method === 'upi' ? 'UPI transfer' : 'Cash payout';
+  const quoteItems = quote?.items?.filter((item) => item.is_selected) || [];
+  const value = orderDetails?.estimated_order_value != null ? `₹${Number(orderDetails.estimated_order_value).toLocaleString('en-IN')}` : 'To be confirmed';
 
-      if (isUsingDefaultPickup && deviceLocation) {
-        return deviceLocation;
-      }
+  if (isBootstrapping) return <SafeAreaView style={styles.loadingScreen}><StatusBar style={isDark ? 'light' : 'dark'} /><ActivityIndicator size="large" color="#16A34A" /><Text style={styles.loadingTitle}>Preparing your pickup request</Text><Text style={styles.loadingSubtitle}>Connecting to the latest assignment status.</Text></SafeAreaView>;
 
-      return {
-        lat: pickup.lat,
-        lng: pickup.lng,
-      };
-    },
-    [deviceLocation, pickup.lat, pickup.lng]
-  );
-
-  const searchablePins = useMemo(() => {
-    const merged = new Map<string, TrackingVendorPin>();
-
-    buildAgentPins(nearbyAgents).forEach((pin) => {
-      merged.set(`agent:${pin.vendor_id}`, pin);
-    });
-
-    nearbyDispatchVendors.forEach((pin) => {
-      const normalizedPin = { ...pin, pin_role: 'vendor' as const };
-      merged.set(`vendor:${normalizedPin.vendor_id}`, {
-        ...merged.get(`vendor:${normalizedPin.vendor_id}`),
-        ...normalizedPin,
-      });
-    });
-
-    vendorPins.forEach((pin) => {
-      const normalizedPin = { ...pin, pin_role: pin.pin_role === 'agent' ? 'agent' : 'vendor' as const };
-      const key = `${normalizedPin.pin_role}:${normalizedPin.vendor_id}`;
-      merged.set(key, { ...merged.get(key), ...normalizedPin });
-    });
-
-    return Array.from(merged.values());
-  }, [nearbyAgents, nearbyDispatchVendors, vendorPins]);
-
-  const activeSearchingAgent = nearbyAgents.find(
-    (agent) => typeof agent.lat === 'number' && typeof agent.lng === 'number'
-  );
-  const activeSearchingVendor = vendorPins.find(
-    (vendor) => typeof vendor.lat === 'number' && typeof vendor.lng === 'number'
-  );
-
-  const activeVendorLocation = useMemo(() => {
-    if (acceptedVendor?.lat != null && acceptedVendor?.lng != null) {
-      return {
-        lat: acceptedVendor.lat,
-        lng: acceptedVendor.lng,
-      };
-    }
-
-    if (activeSearchingAgent?.lat != null && activeSearchingAgent?.lng != null) {
-      return {
-        lat: activeSearchingAgent.lat,
-        lng: activeSearchingAgent.lng,
-      };
-    }
-
-    if (activeSearchingVendor?.lat != null && activeSearchingVendor?.lng != null) {
-      return {
-        lat: activeSearchingVendor.lat,
-        lng: activeSearchingVendor.lng,
-      };
-    }
-
-    return null;
-  }, [
-    acceptedVendor?.lat,
-    acceptedVendor?.lng,
-    activeSearchingAgent?.lat,
-    activeSearchingAgent?.lng,
-    activeSearchingVendor?.lat,
-    activeSearchingVendor?.lng,
-  ]);
-
-  const featuredAgent = useMemo(() => {
-    if (phase === 'en_route' && acceptedVendor) {
-      return {
-        id: acceptedVendor.id,
-        agent_code: `VEN-${acceptedVendor.id}`,
-        name: acceptedVendor.name,
-        phone: '',
-        email: '',
-        vehicle_number: acceptedVendor.vehicle_number,
-        vehicle_type: acceptedVendor.vehicle_type,
-        average_rating: acceptedVendor.rating,
-        rating_count: null,
-        availability: 'on_duty',
-        lat: acceptedVendor.lat ?? null,
-        lng: acceptedVendor.lng ?? null,
-      } as TrackingNearbyAgent;
-    }
-
-    return nearbyAgents[0] ?? null;
-  }, [acceptedVendor, nearbyAgents, phase]);
-
-  const secondaryAgents = useMemo(
-    () => nearbyAgents.filter((agent) => agent.id !== featuredAgent?.id).slice(0, 3),
-    [featuredAgent?.id, nearbyAgents]
-  );
-
-  const nearbyVendors = useMemo(
-    () => searchablePins
-      .filter((vendor) => vendor.pin_role !== 'agent')
-      .filter((vendor) => vendor.vendor_id !== acceptedVendor?.id)
-      .slice(0, 4),
-    [acceptedVendor?.id, searchablePins]
-  );
-
-  const distanceLabel = phase === 'en_route'
-    ? `${etaMinutes ? `~${etaMinutes} mins` : 'On the way'} • ${formatTrackingDistance(distanceKm)}`
-    : activeSearchingAgent
-      ? 'Nearby partner mapped to your pickup'
-      : null;
-
-  const goHome = () => {
-    router.replace('/(tabs)/home' as any);
-  };
-
-  if (isBootstrapping) {
-    return (
-      <SafeAreaView style={styles.loadingScreen}>
-        <StatusBar style={isDark ? 'light' : 'dark'} />
-        <View style={styles.loadingCard}>
-          <ActivityIndicator size="large" color="#1E8E3E" />
-          <Text style={styles.loadingTitle}>Preparing your pickup map</Text>
-          <Text style={styles.loadingSubtitle}>
-            We are loading the latest order, partner, and location details for your request.
-          </Text>
+  return <SafeAreaView style={styles.screen} edges={['top']}>
+    <StatusBar style="light" />
+    <View style={styles.mapStage}>
+      <OrderTrackingMap pickup={pickupCoordinate} phase={phase} vendorPins={[]} acceptedVendorLocation={null} userLocation={deviceLocation} notifiedVendorCount={0} />
+      {phase === 'searching' && <RadarWaves />}
+      <Pressable style={styles.backButton} onPress={() => router.back()}><ArrowLeft size={24} color="#FFFFFF" /></Pressable>
+      <View style={styles.mapStatus}><Clock3 size={14} color="#B8F2C7" /><Text style={styles.mapStatusText}>Live pickup search</Text></View>
+    </View>
+    <View style={styles.sheet}>
+      <ScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.handle} />
+        <View style={styles.badge}><Text style={styles.badgeText}>{hasAcceptedPartner ? 'PARTNER ASSIGNED' : 'PICKUP REQUEST SENT'}</Text></View>
+        <View style={styles.heroRow}>
+          <View style={styles.heroCopy}><Text style={styles.title}>Finding the</Text><Text style={styles.titleGreen}>nearest partner</Text><Text style={styles.subtitle}>We’re looking for the nearest available Scrapiz partner in your area.</Text></View>
+          <Image source={PERSON_IMAGE} resizeMode="contain" style={styles.personImage} />
         </View>
-      </SafeAreaView>
-    );
-  }
-
-  return (
-    <SafeAreaView style={styles.screen}>
-      <StatusBar style="light" />
-
-      <View style={styles.mapStage}>
-        <OrderTrackingMap
-          pickup={pickupCoordinate}
-          phase={phase}
-          vendorPins={searchablePins}
-          acceptedVendorLocation={activeVendorLocation}
-          userLocation={deviceLocation}
-          notifiedVendorCount={searchablePins.length}
-          distanceLabel={distanceLabel}
-        />
-
-        <View style={styles.topBar}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <ArrowLeft size={20} color="#FFFFFF" />
-          </Pressable>
-
-          <View style={styles.liveChip}>
-            <Clock3 size={14} color="#9AD7A8" />
-            <Text style={styles.liveChipText}>
-              {phase === 'en_route' ? 'Partner on the way' : countdown}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.sheet}>
-        <ScrollView
-          style={styles.sheetScroll}
-          contentContainerStyle={styles.sheetContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {isLoadingAgents && !featuredAgent ? (
-            <View style={styles.inlineLoader}>
-              <ActivityIndicator color="#1E8E3E" />
-              <Text style={styles.inlineLoaderText}>Loading nearby pickup partners</Text>
-            </View>
-          ) : null}
-
-          {featuredAgent ? (
-            <FeaturedAgentCard agent={featuredAgent} countdown={countdown} />
-          ) : (
-            <View style={styles.emptyStateCard}>
-              <View style={styles.emptyStateIcon}>
-                <Truck size={18} color="#1E8E3E" />
-              </View>
-              <Text style={styles.emptyStateTitle}>Searching nearby partners</Text>
-              <Text style={styles.emptyStateText}>
-                We are checking the closest active pickup partners for your request. You will be notified as
-                soon as one of them accepts.
-              </Text>
-            </View>
-          )}
-
-          {secondaryAgents.length > 0 ? (
-            <View style={styles.secondarySection}>
-              <Text style={styles.secondarySectionTitle}>Other nearby partners</Text>
-              {secondaryAgents.map((agent) => (
-                <CompactAgentCard key={agent.id} agent={agent} />
-              ))}
-            </View>
-          ) : null}
-
-          {nearbyVendors.length > 0 ? (
-            <View style={styles.secondarySection}>
-              <Text style={styles.secondarySectionTitle}>Nearby vendors in your service zone</Text>
-              {nearbyVendors.map((vendor) => (
-                <CompactVendorCard key={vendor.vendor_id} vendor={vendor} />
-              ))}
-            </View>
-          ) : null}
-
-          <View style={styles.actionRow}>
-            <Pressable style={styles.cancelButton} onPress={cancelOrder}>
-              <Text style={styles.cancelButtonText}>Cancel Order</Text>
-            </Pressable>
-
-            <Pressable style={styles.homeButton} onPress={goHome}>
-              <ShieldCheck size={16} color="#FFFFFF" />
-              <Text style={styles.homeButtonText}>Back to Home</Text>
-            </Pressable>
-          </View>
-        </ScrollView>
-      </View>
-    </SafeAreaView>
-  );
+        <Timeline phase={phase} />
+        {!hasAcceptedPartner ? <View style={styles.noteCard}><View style={styles.noteIcon}><Bell size={24} color="#168447" /></View><View style={styles.noteCopy}><Text style={styles.noteTitle}>You can close the app</Text><Text style={styles.noteText}>We’ll notify you as soon as a partner accepts your pickup request.</Text></View></View> : null}
+        {hasAcceptedPartner ? <View style={styles.acceptedFlow}>
+          <View style={styles.acceptedNotice}><Text style={styles.acceptedNoticeText}>{acceptedVendor?.name || 'Your partner'} has accepted your booking.</Text></View>
+          {quote ? <View style={styles.quoteCard}>
+            <View style={styles.quoteHeader}><View><Text style={styles.quoteEyebrow}>PAYOUT QUOTE</Text><Text style={styles.quoteTitle}>{paymentNeedsConfirmation ? 'Confirm your payout' : 'Review your payout'}</Text></View><Text style={styles.quoteStatus}>{paymentNeedsConfirmation ? 'CONFIRM' : paymentReady ? 'READY' : quoteSubmitted ? 'NEW' : 'UPDATING'}</Text></View>
+            {quoteItems.map((item) => <View key={`${item.product_id}-${item.product_name}`} style={styles.quoteItem}><View style={styles.quoteItemCopy}><Text style={styles.quoteItemName}>{item.product_name}</Text><Text style={styles.quoteItemMeta}>{item.actual_weight_kg} kg × ₹{Number(item.quoted_rate_per_kg).toLocaleString('en-IN')}</Text></View><Text style={styles.quoteItemAmount}>₹{Number(item.subtotal).toLocaleString('en-IN')}</Text></View>)}
+            <View style={styles.quoteTotalRow}><Text style={styles.quoteTotalLabel}>Total payout</Text><Text style={styles.quoteTotal}>₹{Number(quote.total_amount).toLocaleString('en-IN')}</Text></View>
+            <Text style={styles.quoteMethod}>Vendor preferred payment: {quotePaymentLabel}</Text>
+            <Pressable style={styles.quoteAction} onPress={() => router.push(`/tracking/${orderId}/${quoteSubmitted ? 'quote' : 'payment'}` as any)}><Text style={styles.quoteActionText}>{quoteSubmitted ? 'Review quote & payment details' : paymentNeedsConfirmation ? 'Confirm payout received' : 'View payment & QR code'}</Text><ChevronRight size={20} color="#FFFFFF" /></Pressable>
+          </View> : <View style={styles.waitingQuote}><ActivityIndicator size="small" color="#168447" /><Text style={styles.waitingQuoteText}>Your partner is preparing the payout quote.</Text></View>}
+        </View> : null}
+        <Pressable style={styles.detailsButton} onPress={() => setShowDetails(true)}><Text style={styles.detailsButtonText}>View Request Details</Text><ChevronRight size={21} color="#168447" /></Pressable>
+        <Pressable style={styles.cancelButton} onPress={cancelOrder}><Text style={styles.cancelButtonText}>Cancel pickup request</Text></Pressable>
+      </ScrollView>
+    </View>
+    <Modal visible={showDetails} transparent animationType="slide" onRequestClose={() => setShowDetails(false)}>
+      <View style={styles.modalBackdrop}><View style={styles.detailsSheet}><View style={styles.modalHandle} /><View style={styles.modalHeader}><Text style={styles.modalTitle}>Request Details</Text><Pressable onPress={() => setShowDetails(false)}><Text style={styles.closeText}>Close</Text></Pressable></View>
+        <ScrollView showsVerticalScrollIndicator={false}><DetailRow label="Order date" value={orderDateTime.date} /><DetailRow label="Order time" value={orderDateTime.time} /><DetailRow label="Estimated value" value={value} /><DetailRow label="Pickup address" value={address} /><DetailRow label="Mobile number" value={phone} /><View style={styles.itemsBlock}><Text style={styles.itemsTitle}>Items</Text>{items.length ? items.map((item) => <Text key={`${item.product_id}-${item.product_name}`} style={styles.itemText}>{formatItem(item)}</Text>) : <Text style={styles.itemText}>Items are syncing with your request.</Text>}</View></ScrollView>
+      </View></View>
+    </Modal>
+  </SafeAreaView>;
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#EEF2F7',
-  },
-  loadingScreen: {
-    flex: 1,
-    backgroundColor: '#EEF2F7',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  loadingCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 28,
-    paddingHorizontal: 24,
-    paddingVertical: 28,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    elevation: 6,
-    alignItems: 'center',
-  },
-  loadingTitle: {
-    marginTop: 16,
-    fontSize: 22,
-    lineHeight: 28,
-    fontFamily: 'Inter-Bold',
-    color: '#0F172A',
-    textAlign: 'center',
-  },
-  loadingSubtitle: {
-    marginTop: 8,
-    fontSize: 15,
-    lineHeight: 22,
-    fontFamily: 'Inter-Medium',
-    color: '#64748B',
-    textAlign: 'center',
-  },
-  mapStage: {
-    height: '45%',
-    backgroundColor: '#DCE9F5',
-  },
-  topBar: {
-    position: 'absolute',
-    top: 10,
-    left: 16,
-    right: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  backButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(15,23,42,0.78)',
-  },
-  liveChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 999,
-    backgroundColor: 'rgba(15,23,42,0.78)',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    gap: 8,
-  },
-  liveChipText: {
-    fontSize: 13,
-    fontFamily: 'Inter-SemiBold',
-    color: '#FFFFFF',
-  },
-  sheet: {
-    flex: 1,
-    marginTop: -24,
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    elevation: 12,
-  },
-  sheetScroll: {
-    flex: 1,
-  },
-  sheetContent: {
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 28,
-    gap: 16,
-  },
-  inlineLoader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 8,
-    paddingBottom: 8,
-  },
-  inlineLoaderText: {
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    color: '#64748B',
-  },
-  featuredCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#E5EAF2',
-    padding: 18,
-  },
-  agentHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  agentIdentityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    minWidth: 0,
-  },
-  agentAvatarImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    marginRight: 12,
-  },
-  agentAvatarFallback: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    marginRight: 12,
-    backgroundColor: '#E4F5E8',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  agentAvatarText: {
-    fontSize: 20,
-    fontFamily: 'Inter-Bold',
-    color: '#1E8E3E',
-  },
-  agentIdentityCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  agentName: {
-    fontSize: 19,
-    lineHeight: 24,
-    fontFamily: 'Inter-Bold',
-    color: '#111827',
-  },
-  agentRole: {
-    marginTop: 2,
-    fontSize: 13,
-    lineHeight: 18,
-    fontFamily: 'Inter-Medium',
-    color: '#6B7280',
-  },
-  vehicleBlock: {
-    alignItems: 'flex-end',
-    maxWidth: '42%',
-  },
-  vehicleTitle: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontFamily: 'Inter-SemiBold',
-    color: '#111827',
-    textAlign: 'right',
-  },
-  vehicleMeta: {
-    marginTop: 2,
-    fontSize: 12,
-    lineHeight: 17,
-    fontFamily: 'Inter-Medium',
-    color: '#6B7280',
-    textAlign: 'right',
-  },
-  ratingHeaderRow: {
-    marginTop: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  ratingWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  starRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  ratingText: {
-    fontSize: 15,
-    fontFamily: 'Inter-Bold',
-    color: '#111827',
-  },
-  statusPill: {
-    borderRadius: 999,
-    backgroundColor: '#EEF8F1',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  statusPillText: {
-    fontSize: 12,
-    fontFamily: 'Inter-SemiBold',
-    color: '#1E8E3E',
-  },
-  metricsGrid: {
-    marginTop: 18,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    rowGap: 18,
-  },
-  metricCell: {
-    width: '33.33%',
-    paddingRight: 10,
-  },
-  metricLabel: {
-    fontSize: 12,
-    lineHeight: 16,
-    fontFamily: 'Inter-Medium',
-    color: '#6B7280',
-    marginBottom: 6,
-  },
-  metricValue: {
-    fontSize: 16,
-    lineHeight: 21,
-    fontFamily: 'Inter-SemiBold',
-    color: '#111827',
-  },
-  noteCard: {
-    marginTop: 18,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#E5EAF2',
-    padding: 16,
-    backgroundColor: '#FBFCFE',
-  },
-  noteTitle: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontFamily: 'Inter-SemiBold',
-    color: '#6B7280',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  noteText: {
-    fontSize: 14,
-    lineHeight: 22,
-    fontFamily: 'Inter-Medium',
-    color: '#111827',
-  },
-  emptyStateCard: {
-    borderRadius: 24,
-    padding: 18,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5EAF2',
-  },
-  emptyStateIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#E4F5E8',
-    marginBottom: 12,
-  },
-  emptyStateTitle: {
-    fontSize: 20,
-    lineHeight: 26,
-    fontFamily: 'Inter-Bold',
-    color: '#111827',
-  },
-  emptyStateText: {
-    marginTop: 8,
-    fontSize: 14,
-    lineHeight: 22,
-    fontFamily: 'Inter-Medium',
-    color: '#64748B',
-  },
-  secondarySection: {
-    gap: 10,
-  },
-  secondarySectionTitle: {
-    fontSize: 15,
-    lineHeight: 20,
-    fontFamily: 'Inter-SemiBold',
-    color: '#111827',
-  },
-  compactCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 18,
-    padding: 14,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5EAF2',
-  },
-  compactAvatarImage: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    marginRight: 12,
-  },
-  compactAvatarFallback: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    marginRight: 12,
-    backgroundColor: '#E4F5E8',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  compactAvatarText: {
-    fontSize: 18,
-    fontFamily: 'Inter-Bold',
-    color: '#1E8E3E',
-  },
-  compactCardCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  compactCardName: {
-    fontSize: 15,
-    lineHeight: 20,
-    fontFamily: 'Inter-SemiBold',
-    color: '#111827',
-  },
-  compactCardMeta: {
-    marginTop: 2,
-    fontSize: 12,
-    lineHeight: 17,
-    fontFamily: 'Inter-Medium',
-    color: '#6B7280',
-  },
-  compactRatingWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginLeft: 8,
-  },
-  compactRatingText: {
-    fontSize: 12,
-    fontFamily: 'Inter-SemiBold',
-    color: '#111827',
-  },
-  vendorDistancePill: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: '#EEF8F1',
-    marginLeft: 8,
-  },
-  vendorDistanceText: {
-    fontSize: 12,
-    fontFamily: 'Inter-SemiBold',
-    color: '#1E8E3E',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 4,
-  },
-  cancelButton: {
-    flex: 1,
-    height: 52,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#D7DEE8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-  cancelButtonText: {
-    fontSize: 15,
-    fontFamily: 'Inter-SemiBold',
-    color: '#111827',
-  },
-  homeButton: {
-    flex: 1,
-    height: 52,
-    borderRadius: 16,
-    backgroundColor: '#1E8E3E',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  homeButtonText: {
-    fontSize: 15,
-    fontFamily: 'Inter-SemiBold',
-    color: '#FFFFFF',
-  },
+  screen: { flex: 1, backgroundColor: '#FFFFFF' },
+  loadingScreen: { flex: 1, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  loadingTitle: { marginTop: 16, fontSize: 21, fontWeight: '800', color: '#122033' },
+  loadingSubtitle: { marginTop: 8, fontSize: 14, color: '#687386', textAlign: 'center' },
+  mapStage: { height: '43%', minHeight: 285, backgroundColor: '#DDE8F1' },
+  backButton: { position: 'absolute', top: 18, left: 18, width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.82)' },
+  mapStatus: { position: 'absolute', top: 25, right: 18, flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 18, paddingHorizontal: 13, paddingVertical: 9, backgroundColor: 'rgba(15,23,42,0.78)' },
+  mapStatusText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+  radarMarker: { position: 'absolute', top: '50%', left: '50%', width: 112, height: 112, marginTop: -56, marginLeft: -56, alignItems: 'center', justifyContent: 'center' },
+  radarWave: { position: 'absolute', width: 86, height: 86, borderRadius: 43, borderWidth: 2, borderColor: '#25C76A', backgroundColor: 'rgba(37,199,106,0.12)' },
+  radarCore: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#16A34A', borderWidth: 5, borderColor: '#D9FBE3', shadowColor: '#16A34A', shadowOpacity: 0.35, shadowRadius: 12, elevation: 8 },
+  sheet: { flex: 1, marginTop: -22, borderTopLeftRadius: 30, borderTopRightRadius: 30, backgroundColor: '#FFFFFF', shadowColor: '#122033', shadowOffset: { width: 0, height: -7 }, shadowOpacity: 0.08, shadowRadius: 18, elevation: 12 },
+  sheetContent: { paddingHorizontal: 24, paddingTop: 11, paddingBottom: 32 },
+  handle: { alignSelf: 'center', width: 68, height: 7, borderRadius: 5, backgroundColor: '#D9DEE6', marginBottom: 22 },
+  badge: { alignSelf: 'flex-start', borderRadius: 24, paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#E5F7EC' },
+  badgeText: { color: '#168447', fontSize: 14, fontWeight: '900', letterSpacing: 0.5 },
+  heroRow: { minHeight: 178, flexDirection: 'row', alignItems: 'center', marginTop: 16 },
+  heroCopy: { flex: 1, zIndex: 1 },
+  title: { color: '#122033', fontSize: 39, lineHeight: 42, fontWeight: '900', letterSpacing: -1.2 },
+  titleGreen: { color: '#168447', fontSize: 39, lineHeight: 42, fontWeight: '900', letterSpacing: -1.2 },
+  subtitle: { marginTop: 14, maxWidth: 280, color: '#6D7788', fontSize: 17, lineHeight: 24, fontWeight: '500' },
+  personImage: { width: 174, height: 205, marginLeft: -35, marginRight: -18, alignSelf: 'flex-end' },
+  timelineCard: { position: 'relative', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6, paddingTop: 18, paddingBottom: 14, marginTop: 10, borderWidth: 1, borderColor: '#E1E6EC', borderRadius: 24 },
+  timelineTrack: { position: 'absolute', top: 42, left: 56, right: 56, borderTopWidth: 2, borderStyle: 'dashed', borderColor: '#D2D9E3' },
+  timelineStep: { width: '33.33%', alignItems: 'center' },
+  timelineIcon: { width: 62, height: 62, borderRadius: 31, backgroundColor: '#F0F2F5', alignItems: 'center', justifyContent: 'center', zIndex: 1 },
+  timelineIconActive: { backgroundColor: '#16A34A', borderWidth: 7, borderColor: '#D8F5E2', shadowColor: '#16A34A', shadowOpacity: 0.25, shadowRadius: 10, elevation: 4 },
+  timelineLabel: { marginTop: 10, color: '#7A8494', fontSize: 15, lineHeight: 19, fontWeight: '600', textAlign: 'center' },
+  timelineLabelActive: { color: '#168447', fontWeight: '900' },
+  noteCard: { flexDirection: 'row', alignItems: 'center', marginTop: 18, padding: 18, borderRadius: 22, borderWidth: 1, borderColor: '#E1E6EC', backgroundColor: '#FBFCFE' },
+  noteIcon: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E1F6E8', marginRight: 16 },
+  noteCopy: { flex: 1 },
+  noteTitle: { color: '#122033', fontSize: 17, fontWeight: '900', marginBottom: 4 },
+  noteText: { color: '#727D8E', fontSize: 15, lineHeight: 22, fontWeight: '500' },
+  acceptedNotice: { marginTop: 14, padding: 14, borderRadius: 14, backgroundColor: '#E5F7EC' },
+  acceptedNoticeText: { color: '#168447', fontSize: 14, fontWeight: '800', lineHeight: 20 },
+  acceptedFlow: { marginTop: 2 },
+  quoteCard: { marginTop: 14, padding: 18, borderRadius: 22, backgroundColor: '#F4FBF6', borderWidth: 1, borderColor: '#BDE8CA' },
+  quoteHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
+  quoteEyebrow: { color: '#168447', fontSize: 11, fontWeight: '900', letterSpacing: 1.1 },
+  quoteTitle: { marginTop: 4, color: '#122033', fontSize: 20, fontWeight: '900' },
+  quoteStatus: { color: '#168447', fontSize: 11, fontWeight: '900', backgroundColor: '#D9F5E1', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 6 },
+  quoteItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#DDEFE2' },
+  quoteItemCopy: { flex: 1, paddingRight: 10 },
+  quoteItemName: { color: '#122033', fontSize: 14, fontWeight: '800' },
+  quoteItemMeta: { marginTop: 3, color: '#687386', fontSize: 12, fontWeight: '600' },
+  quoteItemAmount: { color: '#168447', fontSize: 14, fontWeight: '900' },
+  quoteTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 15 },
+  quoteTotalLabel: { color: '#122033', fontSize: 16, fontWeight: '800' },
+  quoteTotal: { color: '#168447', fontSize: 22, fontWeight: '900' },
+  quoteMethod: { marginTop: 8, color: '#687386', fontSize: 13, fontWeight: '600' },
+  quoteAction: { marginTop: 16, minHeight: 52, paddingHorizontal: 16, borderRadius: 15, backgroundColor: '#168447', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  quoteActionText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  waitingQuote: { marginTop: 14, padding: 16, borderRadius: 16, backgroundColor: '#F4FBF6', flexDirection: 'row', alignItems: 'center', gap: 10 },
+  waitingQuoteText: { flex: 1, color: '#168447', fontSize: 14, fontWeight: '700' },
+  detailsButton: { height: 58, marginTop: 18, borderRadius: 18, borderWidth: 2, borderColor: '#B6E8C8', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  detailsButtonText: { color: '#168447', fontSize: 17, fontWeight: '900' },
+  cancelButton: { alignItems: 'center', paddingVertical: 16 },
+  cancelButtonText: { color: '#7A8494', fontSize: 14, fontWeight: '700' },
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(8,17,29,0.42)' },
+  detailsSheet: { maxHeight: '82%', borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingHorizontal: 22, paddingTop: 12, paddingBottom: 28, backgroundColor: '#FFFFFF' },
+  modalHandle: { alignSelf: 'center', width: 64, height: 6, borderRadius: 4, backgroundColor: '#D9DEE6', marginBottom: 18 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  modalTitle: { color: '#122033', fontSize: 24, fontWeight: '900' },
+  closeText: { color: '#168447', fontSize: 15, fontWeight: '800' },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 18, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#EDF0F4' },
+  detailLabel: { width: '36%', color: '#7A8494', fontSize: 14, fontWeight: '700' },
+  detailValue: { flex: 1, color: '#122033', fontSize: 14, lineHeight: 20, fontWeight: '800', textAlign: 'right' },
+  itemsBlock: { paddingTop: 18 },
+  itemsTitle: { color: '#122033', fontSize: 17, fontWeight: '900', marginBottom: 10 },
+  itemText: { color: '#4E5A6C', fontSize: 14, lineHeight: 22, paddingVertical: 4 },
 });

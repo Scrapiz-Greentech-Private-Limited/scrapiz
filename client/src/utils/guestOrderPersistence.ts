@@ -36,8 +36,8 @@ export interface GuestOrderState {
     }>;
     /** Selected pickup date (ISO string or formatted date string) */
     selectedDate: string;
-    /** Selected pickup time slot */
-    selectedTime: string;
+    /** Legacy pickup time slot. Optional for clients using date-only scheduling. */
+    selectedTime?: string;
     /** Current step in the sell flow the user was on */
     currentStep: number;
     /** Whether referral bonus toggle was enabled */

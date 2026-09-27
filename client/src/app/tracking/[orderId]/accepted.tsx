@@ -2,12 +2,12 @@ import React, { useEffect } from 'react';
 import {
   Image,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import {SafeAreaView} from "react-native-safe-area-context"
 import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CheckCircle2, Phone, Truck } from 'lucide-react-native';

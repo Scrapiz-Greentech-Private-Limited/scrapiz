@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ServiceabilityAPI, ServiceableCity } from '../api/apiService';
 import { CacheService } from '../services/serviceabilityCache';
 import { resetSellServiceability } from '../utils/sellServiceability';
+import { buildReverseGeocodingUrl, KRUTRIM_API_KEY } from '../config/mapConfig';
 
 
 export interface LocationData {
@@ -30,7 +31,7 @@ interface LocationContextType {
   locationSet: boolean; // Renamed from permissionGranted
   isLoading: boolean;
   error: string | null;
-  getCurrentLocation: () => Promise<void>;
+  getCurrentLocation: () => Promise<LocationData | null>;
   setManualLocation: (location: LocationData) => void;
   saveLocation: (location: SavedLocation) => void;
   removeLocation: (id: string) => void;
@@ -146,7 +147,44 @@ export function LocationProvider({ children }: { children: React.ReactNode }){
     }
   }
 
-  const getCurrentLocation = async() =>{
+  const reverseGeocodeWithKrutrim = async (
+    latitude: number,
+    longitude: number
+  ): Promise<Partial<LocationData> | null> => {
+    if (!KRUTRIM_API_KEY) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(buildReverseGeocodingUrl(longitude, latitude));
+      const data = await response.json();
+      if (data?.status !== 'ok' || !Array.isArray(data.results) || data.results.length === 0) {
+        return null;
+      }
+
+      const result = data.results[0];
+      const components = Array.isArray(result.address_components) ? result.address_components : [];
+      const readComponent = (...types: string[]) => {
+        const match = components.find((component: any) =>
+          Array.isArray(component.types) && types.some((type) => component.types.includes(type))
+        );
+        return match?.long_name || match?.short_name || '';
+      };
+
+      return {
+        address: result.formatted_address || '',
+        city: readComponent('city', 'locality', 'administrative_area_level_2'),
+        state: readComponent('state', 'administrative_area_level_1'),
+        pincode: readComponent('postal_code'),
+        area: readComponent('sublocality', 'sublocality_level_1', 'neighborhood', 'suburb') || result.formatted_address || '',
+      };
+    } catch (krutrimError) {
+      console.warn('Krutrim reverse geocoding failed, falling back to Expo geocoder:', krutrimError);
+      return null;
+    }
+  };
+
+  const getCurrentLocation = async(): Promise<LocationData | null> =>{
     setIsLoading(true)
     setError(null)
     try {
@@ -156,7 +194,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }){
             setLocationSet(false);
             await AsyncStorage.setItem(STORAGE_KEYS.LOCATION_SET, 'false');
              setIsLoading(false);
-             return;
+             return null;
         }
         setLocationSet(true)
         await AsyncStorage.setItem(STORAGE_KEYS.LOCATION_SET, 'true');
@@ -168,6 +206,10 @@ export function LocationProvider({ children }: { children: React.ReactNode }){
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
       });
+      const krutrimAddress = await reverseGeocodeWithKrutrim(
+        position.coords.latitude,
+        position.coords.longitude
+      );
       
       // Check serviceability using backend API
       let isServiceable = false;
@@ -236,11 +278,11 @@ export function LocationProvider({ children }: { children: React.ReactNode }){
       const locationData: LocationData = {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
-        address: `${geocode.name || ''}, ${geocode.street || ''}`.trim() || 'Address not available',
-        city: cityName,
-        state: geocode.region || geocode.isoCountryCode || 'Unknown State',
-        pincode: geocode.postalCode || '000000',
-        area: geocode.subregion || geocode.district || geocode.name || 'Unknown Area',
+        address: krutrimAddress?.address || `${geocode.name || ''}, ${geocode.street || ''}`.trim() || 'Address not available',
+        city: krutrimAddress?.city || cityName,
+        state: krutrimAddress?.state || geocode.region || geocode.isoCountryCode || 'Unknown State',
+        pincode: krutrimAddress?.pincode || geocode.postalCode || '000000',
+        area: krutrimAddress?.area || geocode.subregion || geocode.district || geocode.name || 'Unknown Area',
       };
       
       setCurrentLocation(locationData);
@@ -252,6 +294,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }){
       setServiceAvailable(isServiceable)
       await AsyncStorage.setItem(STORAGE_KEYS.SERVICE_AVAILABLE, isServiceable.toString());
       await resetSellServiceability(); // Reset sell serviceability when location changes
+      return locationData;
     } catch (error) {
         let errorMessage = 'Failed to get location. Please try again.';
         if ((error as any).code === 'E_LOCATION_UNAVAILABLE') {
@@ -264,6 +307,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }){
       
       setError(errorMessage);
       console.error('Location error:', error);
+      return null;
     }finally{
         setIsLoading(false)
     }

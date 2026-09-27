@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,7 @@ import {
   Calendar,
   Wallet,
   MapPin,
+  Navigation,
   Camera,
   IndianRupee,
   ArrowRight,
@@ -36,7 +37,6 @@ import {
   Scale,
   AlertCircle,
   Check,
-  Clock,
   Image as ImageIcon,
   Info,
 } from 'lucide-react-native';
@@ -55,6 +55,7 @@ import { useTutorialStore } from '../../store/tutorialStore';
 import TutorialOverlay from '../../components/TutorialOverlay';
 import { useLocation } from '../../context/LocationContext';
 import SellLocationGate from '../../components/SellLocationGate';
+import SellCityLocationGate from '../../components/SellCityLocationGate';
 import SellServiceUnavailable from '../../components/SellServiceUnavailable';
 import {
   hasSellServiceabilityBeenChecked,
@@ -62,11 +63,12 @@ import {
   setSellServiceability,
   resetSellServiceability
 } from '../../utils/sellServiceability';
-import { isSellScreenGateEnforcedCached } from '../../utils/sellScreenEnforcement';
+import { getSellScreenGateConfigCached } from '../../utils/sellScreenEnforcement';
 import FeedbackModal from '../../components/FeedbackModal';
 import NetworkRetryOverlay from '../../components/NetworkRetryOverlay';
 import { useNetworkRetry } from '../../hooks/useNetworkRetry';
 import { useAuthGuard } from '../../hooks/useAuthGuard';
+import MapLocationPicker from '../../components/MapLocationPicker';
 import {
   saveGuestOrderState,
   loadGuestOrderState,
@@ -85,35 +87,8 @@ type SelectedItem = {
   image?: any;
 };
 
-const allTimeSlots = [
-  { label: '9:00 AM - 11:00 AM', startHour: 9 },
-  { label: '11:00 AM - 1:00 PM', startHour: 11 },
-  { label: '1:00 PM - 3:00 PM', startHour: 13 },
-  { label: '3:00 PM - 5:00 PM', startHour: 15 },
-  { label: '5:00 PM - 7:00 PM', startHour: 17 },
-];
-
-// Get current hour in IST (UTC+5:30)
-const getISTHour = (): number => {
-  const now = new Date();
-  const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
-  const istMs = utcMs + 5.5 * 3600000;
-  return new Date(istMs).getHours();
-};
-
-// Get available time slots based on selected date and current IST time
-const getAvailableTimeSlots = (dateStr: string) => {
-  // Check if selected date is today — use IST timezone so comparison is consistent with getISTHour
-  const todayStr = new Date().toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'Asia/Kolkata',
-  });
-  if (dateStr !== todayStr) return allTimeSlots;
-  const currentHour = getISTHour();
-  return allTimeSlots.filter(slot => slot.startHour > currentHour);
-};
+const STANDARD_MIN_BOOKING_ORDER_VALUE = 1500;
+const PAPER_PLASTIC_MIN_BOOKING_ORDER_VALUE = 1000;
 
 const stepTitles = [
   'Select Items',
@@ -179,6 +154,7 @@ const getFallbackImageForProduct = (productName: string) => {
 
 // Gate states for serviceability check
 type SellScreenState = 'checking' | 'location_gate' | 'not_serviceable' | 'serviceable';
+type SellGateMode = 'none' | 'pincode' | 'city';
 
 type ScrapCategoryKey = 'paper' | 'plastic' | 'metal' | 'electronic';
 
@@ -277,11 +253,10 @@ const matchesScrapCategory = (categoryName: string, categoryKey: ScrapCategoryKe
 export default function SellScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
-  const { locationSet, serviceAvailable } = useLocation();
 
   // Serviceability gate state
   const [screenState, setScreenState] = useState<SellScreenState>('checking');
-  const [enforceSellGate, setEnforceSellGate] = useState<boolean>(true); // Default to enforced
+  const [gateMode, setGateMode] = useState<SellGateMode>('pincode');
 
   // Check serviceability on mount
   useEffect(() => {
@@ -290,10 +265,11 @@ export default function SellScreen() {
 
   const checkServiceability = async () => {
     try {
-      // First, check if sell screen gating is enforced from backend
-      const shouldEnforce = await isSellScreenGateEnforcedCached();
+      const gateConfig = await getSellScreenGateConfigCached();
+      const shouldEnforce = gateConfig.enforced;
+      const nextGateMode = gateConfig.mode;
 
-      setEnforceSellGate(shouldEnforce);
+      setGateMode(nextGateMode);
 
       // If enforcement is disabled, skip gating logic entirely
       if (!shouldEnforce) {
@@ -304,13 +280,6 @@ export default function SellScreen() {
 
       // Original gating logic (only runs if enforcement is enabled)
       console.log('🔒 Sell screen gate enforcement enabled - checking serviceability');
-
-      // If location is already set and service is available from context, allow access
-      if (locationSet && serviceAvailable) {
-        await setSellServiceability(true);
-        setScreenState('serviceable');
-        return;
-      }
 
       // Check if we've already done the serviceability check for sell
       const hasChecked = await hasSellServiceabilityBeenChecked();
@@ -341,6 +310,12 @@ export default function SellScreen() {
     setScreenState('not_serviceable');
   };
 
+  const handlePincodeFallback = async () => {
+    await resetSellServiceability();
+    setGateMode('pincode');
+    setScreenState('location_gate');
+  };
+
   const handleGoHome = () => {
     router.replace('/(tabs)/home');
   };
@@ -366,6 +341,16 @@ export default function SellScreen() {
 
   // Show location gate if not checked yet
   if (screenState === 'location_gate') {
+    if (gateMode === 'city') {
+      return (
+        <SellCityLocationGate
+          onServiceable={handleServiceable}
+          onNotServiceable={handleNotServiceable}
+          onPincodeFallback={handlePincodeFallback}
+        />
+      );
+    }
+
     return (
       <SellLocationGate
         onServiceable={handleServiceable}
@@ -392,6 +377,7 @@ export default function SellScreen() {
 function SellScreenContent() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
+  const { currentLocation } = useLocation();
 
   // Auth guard for guest flow - check if user is authenticated
   const { isGuest, isAuthenticated, isLoading: isAuthLoading } = useAuthGuard();
@@ -406,7 +392,6 @@ function SellScreenContent() {
   const [addresses, setAddresses] = useState<AddressSummary[]>([]);
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState('');
-  const [selectedTime, setSelectedTime] = useState('');
   const [useNewAddress, setUseNewAddress] = useState(true);
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
   const [loadingData, setLoadingData] = useState(false);
@@ -460,9 +445,15 @@ function SellScreenContent() {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [notes, setNotes] = useState('');
+  const [showPickupMapPicker, setShowPickupMapPicker] = useState(false);
+  const [pickupCoordinates, setPickupCoordinates] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
 
   // Quantity selector modal state
   const [showQuantityModal, setShowQuantityModal] = useState(false);
+  const [showMinimumOrderModal, setShowMinimumOrderModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductSummary | null>(null);
   const [tempQuantity, setTempQuantity] = useState('1');
 
@@ -586,7 +577,6 @@ function SellScreenContent() {
         console.log('📦 Restoring guest order state:', {
           itemCount: savedState.items?.length || 0,
           date: savedState.selectedDate,
-          time: savedState.selectedTime,
           step: stepParam,
         });
 
@@ -598,9 +588,6 @@ function SellScreenContent() {
         // Restore date/time selections
         if (savedState.selectedDate) {
           setSelectedDate(savedState.selectedDate);
-        }
-        if (savedState.selectedTime) {
-          setSelectedTime(savedState.selectedTime);
         }
 
         // Set the step from URL parameter
@@ -896,6 +883,56 @@ function SellScreenContent() {
     }
   };
 
+  const handleOpenPickupMapPicker = () => {
+    Keyboard.dismiss();
+    setShowPickupMapPicker(true);
+  };
+
+  const handlePickupMapSelect = (location: {
+    latitude: number;
+    longitude: number;
+    address: string;
+    city: string;
+    pincode: string;
+    area: string;
+  }) => {
+    const primaryAddressLine = location.address.split(',')[0]?.trim() || '';
+
+    setUseNewAddress(true);
+    setPickupCoordinates({
+      latitude: location.latitude,
+      longitude: location.longitude,
+    });
+
+    setAddressForm((prev) => ({
+      ...prev,
+      title: prev.title.trim() ? prev.title : 'Home',
+      addressLine: primaryAddressLine || prev.addressLine,
+      landmark:
+        location.area && location.area !== 'Unknown' ? location.area : prev.landmark,
+      city: location.city && location.city !== 'Unknown' ? location.city : prev.city,
+      pinCode: /^\d{6}$/.test(location.pincode || '') ? location.pincode : prev.pinCode,
+    }));
+
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.title;
+      delete next.addressLine;
+      delete next.city;
+      delete next.pinCode;
+      delete next.savedAddress;
+      return next;
+    });
+
+    setShowPickupMapPicker(false);
+
+    Toast.show({
+      type: 'success',
+      text1: 'Pickup location captured',
+      text2: 'Address fields have been pre-filled from your map selection.',
+    });
+  };
+
   // Breakdown sidebar functions
   const openBreakdownSidebar = () => {
     setShowBreakdownSidebar(true);
@@ -926,8 +963,12 @@ function SellScreenContent() {
       newErrors.items = '📦 Please select at least one item to sell';
     }
 
-    if (currentStep === 2 && (!selectedDate || !selectedTime)) {
+    if (currentStep === 2 && !selectedDate) {
       newErrors.schedule = '📅 Please select date and time for pickup';
+    }
+
+    if (currentStep === 2 && !selectedDate) {
+      newErrors.schedule = 'Please select a date for pickup';
     }
 
     if (currentStep === 3) {
@@ -962,7 +1003,6 @@ function SellScreenContent() {
     setCurrentStep(1);
 
     setSelectedDate('');
-    setSelectedTime('');
     setAddressForm({
       title: '',
       addressLine: '',
@@ -978,6 +1018,8 @@ function SellScreenContent() {
     setErrors({});
     setSelectedImages([]);
     setNotes('');
+    setShowPickupMapPicker(false);
+    setPickupCoordinates(null);
     setRewardInputValue('');
     setRewardApplied(false);
     resetOrder();
@@ -991,6 +1033,11 @@ function SellScreenContent() {
         return;
       }
 
+      if (estimatedValue < bookingMinimumOrderValue) {
+        setShowMinimumOrderModal(true);
+        return;
+      }
+
       /**
        * AUTH GATE: Step 2 → Step 3 Transition
        * Guests can complete Steps 1-2 (item selection, scheduling),
@@ -1001,7 +1048,7 @@ function SellScreenContent() {
       if (currentStep === 2 && isGuest && !isAuthLoading) {
         try {
           // Prepare order state to save
-          const orderState: GuestOrderState = {
+          const orderState: Omit<GuestOrderState, 'savedAt'> = {
             items: selectedItems.map(item => ({
               id: item.id,
               name: item.name,
@@ -1011,7 +1058,6 @@ function SellScreenContent() {
               image: item.image,
             })),
             selectedDate,
-            selectedTime,
             currentStep: 3, // They should return to step 3
           };
 
@@ -1089,13 +1135,21 @@ function SellScreenContent() {
       const orderEstimatedValue = estimatedValue;
       const orderReferralBonus = useReferralBonus && rewardApplied ? customReferralAmount : 0;
       const orderTotalPayout = useReferralBonus ? totalPayout : estimatedValue;
+      const effectivePickupCoordinates = pickupCoordinates || (currentLocation
+        ? {
+            latitude: currentLocation.latitude,
+            longitude: currentLocation.longitude,
+          }
+        : null);
 
       const result = await AuthService.createOrder(
         itemsPayload,
         addressId || undefined,
         selectedImages,
         orderEstimatedValue,
-        orderReferralBonus > 0 ? orderReferralBonus : undefined
+        orderReferralBonus > 0 ? orderReferralBonus : undefined,
+        effectivePickupCoordinates?.latitude,
+        effectivePickupCoordinates?.longitude
       );
 
       const orderId = result.order_id;
@@ -1121,6 +1175,10 @@ function SellScreenContent() {
       resetForm();
       router.replace(`/tracking/${orderId}/search` as any);
     } catch (error: any) {
+      if (error?.code === 'minimum_order_value') {
+        setShowMinimumOrderModal(true);
+        return;
+      }
       Alert.alert('Error', error.message || 'Failed to submit order');
     } finally {
       setSubmittingOrder(false);
@@ -1142,6 +1200,15 @@ function SellScreenContent() {
     const category = categories.find(cat => cat.id === categoryId);
     return category?.name || 'Items';
   };
+
+  const bookingMinimumOrderValue = useMemo(() => {
+    const isPaperOrPlasticOrder = selectedItems.length > 0 && selectedItems.every((item) => {
+      const product = products.find((candidate) => candidate.id === item.id);
+      const categoryName = getCategoryName(product?.category || 0).toLowerCase();
+      return categoryName.includes('paper') || categoryName.includes('cardboard') || categoryName.includes('plastic');
+    });
+    return isPaperOrPlasticOrder ? PAPER_PLASTIC_MIN_BOOKING_ORDER_VALUE : STANDARD_MIN_BOOKING_ORDER_VALUE;
+  }, [selectedItems, products, categories]);
 
   const renderStepIndicator = () => (
     <View ref={stepIndicatorRef} style={styles.stepIndicator}>
@@ -1352,24 +1419,7 @@ function SellScreenContent() {
     </View>
   );
 
-  // Clean up selectedDate/selectedTime when available slots change.
-  // This must be a useEffect (not inline in renderStep2) to avoid setState during render.
-  useEffect(() => {
-    if (!selectedDate) return;
-    const availableSlots = getAvailableTimeSlots(selectedDate);
-    if (availableSlots.length === 0) {
-      setSelectedDate('');
-      setSelectedTime('');
-      return;
-    }
-    if (selectedTime && !availableSlots.find(s => s.label === selectedTime)) {
-      setSelectedTime('');
-    }
-  }, [selectedDate, selectedTime]);
-
   const renderStep2 = () => {
-    const availableSlots = selectedDate ? getAvailableTimeSlots(selectedDate) : [];
-
     return (
       <View style={styles.stepContent}>
         {/* Header */}
@@ -1379,7 +1429,7 @@ function SellScreenContent() {
           </View>
           <View>
             <Text style={[styles.stepTitle, { color: colors.text, marginBottom: 2 }]}>Schedule Pickup</Text>
-            <Text style={[styles.stepSubtitle, { color: colors.textSecondary, marginBottom: 0 }]}>Choose your preferred date and time</Text>
+            <Text style={[styles.stepSubtitle, { color: colors.textSecondary, marginBottom: 0 }]}>Choose your preferred pickup date</Text>
           </View>
         </View>
 
@@ -1405,9 +1455,6 @@ function SellScreenContent() {
               });
               const isToday = i === 0;
               const isSelected = selectedDate === dateStr;
-
-              // Skip dates with no available time slots (e.g. today when all slots have passed)
-              if (getAvailableTimeSlots(dateStr).length === 0) return null;
 
               return (
                 <TouchableOpacity
@@ -1446,68 +1493,21 @@ function SellScreenContent() {
           </ScrollView>
         </View>
 
-        {/* Time Slots Section */}
-        {selectedDate ? (
-          <View style={styles.timeSection}>
-            <View style={styles.sectionLabelRow}>
-              <Clock size={16} color={colors.primary} />
-              <Text style={[styles.sectionLabel, { color: colors.text, marginBottom: 0, marginLeft: 8 }]}>Select Time Slot</Text>
-            </View>
-            {availableSlots.length > 0 ? (
-              <View style={styles.timeSlotsGrid}>
-                {availableSlots.map((slot) => (
-                  <TouchableOpacity
-                    key={slot.label}
-                    style={[
-                      styles.timeSlotPro,
-                      { backgroundColor: colors.surface, borderColor: colors.border },
-                      selectedTime === slot.label && { backgroundColor: isDark ? '#064e3b' : '#f0fdf4', borderColor: colors.primary }
-                    ]}
-                    onPress={() => setSelectedTime(slot.label)}
-                  >
-                    <View style={styles.timeSlotInner}>
-                      <Clock size={14} color={selectedTime === slot.label ? colors.primary : colors.textSecondary} />
-                      <Text style={[
-                        styles.timeSlotText,
-                        { color: colors.textSecondary },
-                        selectedTime === slot.label && { color: colors.primary, fontWeight: '600' }
-                      ]}>
-                        {slot.label}
-                      </Text>
-                    </View>
-                    {selectedTime === slot.label && (
-                      <View style={[styles.timeSlotCheck, { backgroundColor: colors.primary }]}>
-                        <Check size={12} color="#fff" />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ) : (
-              <View style={[styles.noSlotsContainer, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : '#fffbeb', borderColor: '#f59e0b' }]}>
-                <AlertCircle size={20} color="#f59e0b" />
-                <Text style={[styles.noSlotsText, { color: isDark ? '#fbbf24' : '#92400e' }]}>
-                  No time slots available for today. Please select a different date.
-                </Text>
-              </View>
-            )}
+        <View style={[styles.pickupEstimateCard, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.12)' : '#f0fdf4', borderColor: colors.primary }]}>
+          <Calendar size={20} color={colors.primary} />
+          <View style={styles.pickupEstimateTextWrap}>
+            <Text style={[styles.pickupEstimateTitle, { color: colors.text }]}>Pickup estimate</Text>
+            <Text style={[styles.pickupEstimateText, { color: colors.textSecondary }]}>Our team will arrange pickup within 2-3 days.</Text>
           </View>
-        ) : (
-          <View style={[styles.selectDatePrompt, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Calendar size={32} color={colors.textSecondary} />
-            <Text style={[styles.selectDatePromptText, { color: colors.textSecondary }]}>
-              Please select a date first to view available time slots
-            </Text>
-          </View>
-        )}
+        </View>
 
         {/* Selection Summary */}
-        {selectedDate && selectedTime ? (
+        {selectedDate ? (
           <View style={[styles.scheduleSummary, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.1)' : '#f0fdf4', borderColor: colors.primary }]}>
             <Check size={18} color={colors.primary} />
             <View style={styles.scheduleSummaryText}>
               <Text style={[styles.scheduleSummaryLabel, { color: colors.primary }]}>Pickup Scheduled</Text>
-              <Text style={[styles.scheduleSummaryValue, { color: colors.text }]}>{selectedDate} • {selectedTime}</Text>
+              <Text style={[styles.scheduleSummaryValue, { color: colors.text }]}>{selectedDate} • Pickup within 2-3 days</Text>
             </View>
           </View>
         ) : null}
@@ -1713,6 +1713,39 @@ function SellScreenContent() {
           <Text style={[styles.addressHeaderTitle, { color: colors.text }]}>Select or Add Address</Text>
         </View>
 
+        <TouchableOpacity
+          style={[
+            styles.pickupMapButton,
+            {
+              backgroundColor: isDark ? 'rgba(59, 130, 246, 0.12)' : '#eff6ff',
+              borderColor: isDark ? '#3b82f6' : '#bfdbfe',
+            },
+          ]}
+          onPress={handleOpenPickupMapPicker}
+          activeOpacity={0.8}
+        >
+          <Navigation size={16} color="#3b82f6" />
+          <View style={styles.pickupMapButtonTextWrap}>
+            <Text style={[styles.pickupMapButtonTitle, { color: colors.text }]}>Choose pickup on map</Text>
+            <Text style={[styles.pickupMapButtonSubtitle, { color: colors.textSecondary }]}>Opens at your current location for precise pickup coordinates.</Text>
+          </View>
+        </TouchableOpacity>
+
+        {pickupCoordinates && (
+          <View
+            style={[
+              styles.pickupCoordinatesChip,
+              {
+                backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#f0fdf4',
+                borderColor: isDark ? '#22c55e' : '#86efac',
+              },
+            ]}
+          >
+            <Check size={14} color={colors.primary} />
+            <Text style={[styles.pickupCoordinatesText, { color: colors.primary }]}>Coordinates captured: {pickupCoordinates.latitude.toFixed(5)}, {pickupCoordinates.longitude.toFixed(5)}</Text>
+          </View>
+        )}
+
         <View style={[styles.addressTabs, { backgroundColor: isDark ? '#1f2937' : '#f3f4f6' }]}>
           <TouchableOpacity
             style={[
@@ -1755,6 +1788,7 @@ function SellScreenContent() {
             ]}
             onPress={() => {
               setUseNewAddress(false);
+              setPickupCoordinates(null);
               const addressErrors = ['title', 'addressLine', 'city', 'pinCode'];
               if (addressErrors.some(key => errors[key])) {
                 const newErrors = { ...errors };
@@ -1860,7 +1894,10 @@ function SellScreenContent() {
                     { backgroundColor: colors.card, borderColor: colors.border },
                     selectedAddressId === address.id && { backgroundColor: isDark ? '#064e3b' : '#f0fdf4', borderColor: colors.primary }
                   ]}
-                  onPress={() => setSelectedAddressId(address.id)}
+                  onPress={() => {
+                    setSelectedAddressId(address.id);
+                    setPickupCoordinates(null);
+                  }}
                 >
                   <View style={styles.savedAddressInfo}>
                     <Text style={[styles.savedAddressTitle, { color: colors.text }]}>
@@ -2223,9 +2260,7 @@ function SellScreenContent() {
             </View>
             <View style={styles.pickupDetailValue}>
               <Text style={[styles.pickupDetailValueText, { color: colors.text }]}>{selectedDate}</Text>
-              <View style={[styles.pickupTimeBadge, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#f0fdf4', borderColor: colors.primary }]}>
-                <Text style={[styles.pickupTimeText, { color: colors.primary }]}>{selectedTime}</Text>
-              </View>
+              <Text style={[styles.pickupEstimateText, { color: colors.primary }]}>Within 2-3 days</Text>
             </View>
           </View>
 
@@ -2441,6 +2476,66 @@ function SellScreenContent() {
           </View>
         </View>
       )}
+
+      <Modal
+        transparent
+        visible={showMinimumOrderModal}
+        animationType="fade"
+        onRequestClose={() => setShowMinimumOrderModal(false)}
+      >
+        <View style={styles.minimumOrderOverlay}>
+          <View style={[styles.minimumOrderCard, { backgroundColor: colors.surface }]}>
+            <TouchableOpacity
+              accessibilityLabel="Close minimum order notice"
+              style={styles.minimumOrderClose}
+              onPress={() => setShowMinimumOrderModal(false)}
+            >
+              <X size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+
+            <View style={styles.minimumOrderImageRow}>
+              {(selectedItems.length > 0
+                ? selectedItems.slice(0, 3).map((item) => ({
+                    key: String(item.id),
+                    source: item.image || getFallbackImageForProduct(item.name),
+                  }))
+                : SCRAP_CATEGORY_CARDS.slice(0, 3).map((item) => ({
+                    key: item.key,
+                    source: item.image,
+                  }))
+              ).map((item) => (
+                <Image key={item.key} source={item.source} style={styles.minimumOrderImage} />
+              ))}
+              <View style={[styles.minimumOrderCartBadge, { backgroundColor: colors.primary }]}>
+                <Wallet size={18} color="#fff" />
+              </View>
+            </View>
+
+            <Text style={[styles.minimumOrderEyebrow, { color: colors.primary }]}>PICKUP NOTICE</Text>
+            <Text style={[styles.minimumOrderTitle, { color: colors.text }]}>Minimum booking value</Text>
+            <Text style={[styles.minimumOrderMessage, { color: colors.textSecondary }]}>A minimum order value of ₹{bookingMinimumOrderValue.toLocaleString('en-IN')} is required during booking. You can combine any number of paper or plastic products.</Text>
+            {/* legacy fixed notice removed */}{false && <Text style={[styles.minimumOrderMessage, { color: colors.textSecondary }]}> 
+              Currently, due to operational flexibility, we are dealing with orders greater than ₹1,500.
+              Please add more items to continue with your pickup booking.
+            </Text>}
+
+            <View style={[styles.minimumOrderValueRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.minimumOrderValueLabel, { color: colors.textSecondary }]}>Required order value</Text>
+              <Text style={[styles.minimumOrderValue, styles.minimumOrderValueLive, { color: colors.primary }]}>₹{bookingMinimumOrderValue.toLocaleString('en-IN')}+</Text>
+              <Text style={[styles.minimumOrderValue, { color: colors.primary }]}>₹1,500+</Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.minimumOrderButton, { backgroundColor: colors.primary }]}
+              onPress={() => setShowMinimumOrderModal(false)}
+              activeOpacity={0.85}
+            >
+              <Plus size={18} color="#fff" />
+              <Text style={styles.minimumOrderButtonText}>Add more items</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Breakdown Sidebar */}
       {showBreakdownSidebar && (
@@ -2682,6 +2777,24 @@ function SellScreenContent() {
 
       {/* Tutorial Overlay */}
       <TutorialOverlay />
+
+      {showPickupMapPicker && (
+        <MapLocationPicker
+          visible={showPickupMapPicker}
+          mode="form-populate"
+          autoOpenGPS
+          initialLocation={
+            currentLocation
+              ? {
+                  latitude: currentLocation.latitude,
+                  longitude: currentLocation.longitude,
+                }
+              : undefined
+          }
+          onClose={() => setShowPickupMapPicker(false)}
+          onLocationSelect={handlePickupMapSelect}
+        />
+      )}
 
       {/* Feedback Modal */}
       <FeedbackModal
@@ -3233,8 +3346,27 @@ const styles = StyleSheet.create({
   dateTextSelected: {
     color: '#16a34a',
   },
-  timeSection: {
-    marginBottom: 24,
+  pickupEstimateCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 16,
+    marginTop: 18,
+    marginBottom: 20,
+  },
+  pickupEstimateTextWrap: {
+    flex: 1,
+    gap: 4,
+  },
+  pickupEstimateTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  pickupEstimateText: {
+    fontSize: 13,
+    lineHeight: 18,
   },
   timeSlotsGrid: {
     gap: 10,
@@ -3375,6 +3507,43 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#111827',
     marginLeft: 8,
+  },
+  pickupMapButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+    gap: 10,
+  },
+  pickupMapButtonTextWrap: {
+    flex: 1,
+  },
+  pickupMapButtonTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  pickupMapButtonSubtitle: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  pickupCoordinatesChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 12,
+  },
+  pickupCoordinatesText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '500',
   },
   addressTabs: {
     flexDirection: 'row',
@@ -4062,20 +4231,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#111827',
   },
-  pickupTimeBadge: {
-    backgroundColor: '#f0fdf4',
-    borderWidth: 1,
-    borderColor: '#16a34a',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-  },
-  pickupTimeText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#16a34a',
-  },
   pickupDetailDivider: {
     height: 1,
     backgroundColor: '#e5e7eb',
@@ -4298,6 +4453,104 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   // Quantity Modal Styles
+  minimumOrderOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.58)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+  },
+  minimumOrderCard: {
+    width: '100%',
+    maxWidth: 390,
+    borderRadius: 24,
+    padding: 22,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    elevation: 10,
+  },
+  minimumOrderClose: {
+    alignSelf: 'flex-end',
+    padding: 4,
+    marginBottom: 2,
+  },
+  minimumOrderImageRow: {
+    height: 88,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 18,
+  },
+  minimumOrderImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 16,
+    resizeMode: 'cover',
+  },
+  minimumOrderCartBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: -28,
+    marginTop: 48,
+    borderWidth: 3,
+    borderColor: '#fff',
+  },
+  minimumOrderEyebrow: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0,
+    marginBottom: 7,
+  },
+  minimumOrderTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  minimumOrderMessage: {
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 18,
+  },
+  minimumOrderValueRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  minimumOrderValueLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  minimumOrderValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    opacity: 0,
+  },
+  minimumOrderValueLive: {
+    opacity: 1,
+  },
+  minimumOrderButton: {
+    minHeight: 52,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  minimumOrderButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
+  },
   quantityModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',

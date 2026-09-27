@@ -13,18 +13,16 @@ import Toast from 'react-native-toast-message';
 import { ArrowLeft, MapPin, Calendar, Clock, Phone, IndianRupee, CheckCircle, X, Hash, Truck } from 'lucide-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { AuthService, BookingQuoteSummary, OrderSummary, ProductSummary, AddressSummary, RatingService } from '../../../api/apiService';
-import { normalizeOrderStatus } from '../../../hooks/userOrderDetails';
 import { useLocalization } from '../../../context/LocalizationContext';
 import { RemoteImage } from '../../../components/RemoteImage';
 import { useTheme } from '../../../context/ThemeContext';
 import { OrderProgressTimeline } from '../../../components/OrderProgressTimeline';
 import InlineStarRating from '../../../components/InlineStarRating';
 import OrderRatingFeedbackModal from '../../../components/OrderRatingFeedbackModal';
+import { isLiveOrderStatus, normalizeOrderStatus } from '../../../utils/orderStatus';
 
 function canTrackVendor(statusName: string) {
-  return ['pending', 'scheduled', 'transit', 'en_route', 'arrived', 'in_progress', 'ready'].includes(
-    (statusName || '').toLowerCase()
-  );
+  return isLiveOrderStatus(statusName);
 }
 
 export default function OrderDetails() {
@@ -137,11 +135,21 @@ export default function OrderDetails() {
   }, [loadDetails, orderId]);
 
   const getStatusColor = (status: any) => {
-    const statusName = (typeof status === 'string' ? status : status?.name || '').toLowerCase();
+    const statusName = normalizeOrderStatus(status);
     switch (statusName) {
       case 'pending': return '#f59e0b';
+      case 'processed':
+      case 'dispatching': return colors.primary;
+      case 'received':
+      case 'order_received':
+      case 'assigned':
+      case 'partner_assigned':
+      case 'finding_partner': return colors.primary;
       case 'scheduled': return '#3b82f6';
       case 'transit': return '#8b5cf6';
+      case 'pickup':
+      case 'accepted':
+      case 'en_route': return '#8b5cf6';
       case 'completed': return '#16a34a';
       case 'cancelled': return '#dc2626';
       default: return '#6b7280';
@@ -149,11 +157,21 @@ export default function OrderDetails() {
   };
 
   const getStatusText = (status: any): string => {
-    const statusName = (typeof status === 'string' ? status : status?.name || '').toLowerCase();
+    const statusName = normalizeOrderStatus(status);
     switch (statusName) {
       case 'pending': return 'Pending';
+      case 'processed':
+      case 'dispatching': return 'Processed';
+      case 'received':
+      case 'order_received': return 'Order Received';
+      case 'assigned':
+      case 'partner_assigned': return 'Partner Assigned';
+      case 'finding_partner': return 'Finding Partner';
       case 'scheduled': return 'Scheduled';
       case 'transit': return 'In Transit';
+      case 'pickup':
+      case 'accepted':
+      case 'en_route': return 'Pickup in progress';
       case 'completed': return 'Completed';
       case 'cancelled': return 'Cancelled';
       default: return 'Unknown';
@@ -227,8 +245,12 @@ export default function OrderDetails() {
 
   const canReviewQuote = useMemo(() => {
     const quoteStatus = (quote?.status || order?.quote_status || '').toLowerCase();
-    return ['submitted', 'awaiting_payment'].includes(quoteStatus);
+    return quoteStatus === 'submitted';
   }, [order?.quote_status, quote?.status]);
+
+  const paymentStatus = String(quote?.payment_status || order?.payment_status || '').toLowerCase();
+  const canReviewPayment = ['awaiting_payment', 'payment_ready', 'payment_initiated', 'vendor_reference_submitted', 'customer_confirmation_pending'].includes(paymentStatus)
+    || ['awaiting_payment'].includes(String(quote?.status || order?.quote_status || '').toLowerCase());
 
   /**
    * Check if order is completed and eligible for rating
@@ -341,7 +363,7 @@ export default function OrderDetails() {
     );
   }
 
-  const statusName = typeof order.status === 'string' ? order.status : order.status?.name || 'pending';
+  const statusName = normalizeOrderStatus(order.status);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -381,7 +403,7 @@ export default function OrderDetails() {
               onPress={() => router.push(`/tracking/${order.id}/search` as any)}
             >
               <Truck size={18} color="#fff" />
-              <Text style={styles.trackVendorButtonText}>Would like to track your vendor?</Text>
+              <Text style={styles.trackVendorButtonText}>Open Live Tracking</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -447,12 +469,12 @@ export default function OrderDetails() {
             <Text style={[styles.quoteAmountValue, { color: colors.text }]}>₹{Number(quote?.total_amount || order?.quote_total_amount || 0).toFixed(2)}</Text>
 
             <TouchableOpacity
-              style={[styles.trackVendorButton, { backgroundColor: '#ff5b14' }, (!canReviewQuote || quoteLoading) && styles.quoteButtonDisabled]}
-              disabled={!canReviewQuote || quoteLoading}
-              onPress={() => router.push(`/tracking/${order.id}/quote` as any)}
+              style={[styles.trackVendorButton, { backgroundColor: '#ff5b14' }, ((!canReviewQuote && !canReviewPayment) || quoteLoading) && styles.quoteButtonDisabled]}
+              disabled={(!canReviewQuote && !canReviewPayment) || quoteLoading}
+              onPress={() => router.push(`/tracking/${order.id}/${canReviewQuote ? 'quote' : 'payment'}` as any)}
             >
               <IndianRupee size={18} color="#fff" />
-              <Text style={styles.trackVendorButtonText}>Review Quote & Choose Payment</Text>
+              <Text style={styles.trackVendorButtonText}>{canReviewQuote ? 'Review Quote & Choose Payment' : paymentStatus === 'vendor_reference_submitted' || paymentStatus === 'customer_confirmation_pending' ? 'Confirm payout received' : 'Review payment status'}</Text>
             </TouchableOpacity>
           </View>
         )}

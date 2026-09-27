@@ -31,7 +31,12 @@ export const OrderProgressTimeline: React.FC<OrderProgressTimelineProps> = ({
     isCompact = false 
 }) => {
     const { colors, isDark } = useTheme();
-    const normalizedStatus = (status || 'pending').toLowerCase();
+    const rawStatus = (status || 'pending').toLowerCase();
+    const normalizedStatus = rawStatus === 'processed' || rawStatus === 'dispatching'
+        ? 'scheduled'
+        : ['pickup', 'accepted', 'en_route', 'arrived', 'in_progress', 'ready'].includes(rawStatus)
+          ? 'transit'
+          : rawStatus;
     const isCancelled = normalizedStatus === 'cancelled';
 
     // Find current step index

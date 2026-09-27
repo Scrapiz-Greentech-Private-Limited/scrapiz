@@ -6,6 +6,7 @@ interface OrderItem {
   rate: number;
   unit: string;
   quantity: number;
+  image?: any;
 }
 
 interface OrderCalculationState {
@@ -158,6 +159,13 @@ export const useOrderCalculationStore = create<OrderCalculationState>((set, get)
       referralBonus, 
       totalPayout 
     });
+  },
+
+  setCustomReferralAmount: (amount) => {
+    const state = get();
+    const referralBonus = Math.max(0, Math.min(amount, state.availableReferralBalance));
+    const totalPayout = state.estimatedValue + referralBonus - state.deliveryCharge;
+    set({ customReferralAmount: referralBonus, referralBonus, totalPayout });
   },
   
   // Calculate estimated value (sum of all items)

@@ -10,13 +10,16 @@ export default function SocietyTieupLearnMoreScreen() {
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
 
+  const BRAND_DARK_GREEN = '#127E2D';
+  const BRAND_DARK_GREEN_SOFT_LIGHT = '#E9F7EE';
+  
   const ui = {
-    bg: isDark ? '#0F1320' : '#FFFFFF',
+    bg: isDark ? '#0F1712' : '#FFFFFF',
     title: isDark ? '#F7F8FA' : '#101010',
     muted: isDark ? '#A9B2C0' : '#787878',
-    primary: '#1414A5',
-    border: isDark ? '#344050' : '#D9D9D9',
-    card: isDark ? '#172032' : '#F3F8FF',
+    primary: BRAND_DARK_GREEN,
+    border: isDark ? '#365040' : '#D9D9D9',
+    card: isDark ? '#17221B' : '#F3F8FF',
     soft: isDark ? '#1C2438' : '#F2F2F2',
     pill: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.15)',
   };
@@ -65,7 +68,7 @@ export default function SocietyTieupLearnMoreScreen() {
             <View key={step} style={styles.timelineRow}>
               <View style={styles.timelineLeft}>
                 <View style={styles.timelineDot}><Text style={[styles.timelineDotText, { color: ui.primary }]}>{step}</Text></View>
-                {index < 2 && <View style={[styles.timelineLine, { backgroundColor: '#8ED1FF' }]} />}
+                {index < 2 && <View style={[styles.timelineLine, { backgroundColor: '#56AE67' }]} />}
               </View>
               <View style={styles.timelineContent}>
                 <Text style={[styles.timelineTitle, { color: ui.primary }]}>{title}</Text>
@@ -77,7 +80,7 @@ export default function SocietyTieupLearnMoreScreen() {
         </View>
 
         <Text style={[styles.sectionEyebrow, { color: ui.muted }]}>WHAT SECRETARIES SAYS ?</Text>
-        <View style={[styles.testimonialCard, { backgroundColor: '#DDF1FF', borderColor: '#8ED1FF' }]}>
+        <View style={[styles.testimonialCard, { backgroundColor: '#E9F7EE', borderColor: '#56AE67' }]}>
           <Text style={styles.quoteMark}>“</Text>
           <Text style={[styles.testimonialText, { color: ui.primary }]}>
             Residents used to dump waste randomly. After this tie-up, segregation compliance went from 20% to 78% in just 3 months.
@@ -86,7 +89,7 @@ export default function SocietyTieupLearnMoreScreen() {
             <View style={[styles.avatarCircle, { backgroundColor: ui.primary }]}><Text style={styles.avatarText}>RS</Text></View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.personName, { color: ui.primary }]}>Ramesh S.</Text>
-              <Text style={[styles.personRole, { color: '#79C5F8' }]}>Secretary</Text>
+              <Text style={[styles.personRole, { color: '#56AE67' }]}>Secretary</Text>
             </View>
             <View style={styles.stars}>
               {Array.from({ length: 5 }).map((_, i) => <Star key={i} size={22} fill="#F5C84B" color="#F5C84B" />)}
@@ -127,16 +130,16 @@ const styles = StyleSheet.create({
   timeline: { marginHorizontal: 16 },
   timelineRow: { flexDirection: 'row', alignItems: 'stretch' },
   timelineLeft: { width: 60, alignItems: 'center' },
-  timelineDot: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#DDF1FF', borderWidth: 1, borderColor: '#8ED1FF', alignItems: 'center', justifyContent: 'center' },
+  timelineDot: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#E9F7EE', borderWidth: 1, borderColor: '#56AE67', alignItems: 'center', justifyContent: 'center' },
   timelineDotText: { fontSize: 18, fontWeight: '800' },
   timelineLine: { width: 2, flex: 1, marginVertical: 6 },
   timelineContent: { flex: 1, paddingBottom: 18 },
   timelineTitle: { fontSize: 18, fontWeight: '800', marginTop: 2 },
   timelineDesc: { fontSize: 13, fontWeight: '700', lineHeight: 17, marginTop: 4, maxWidth: 220 },
-  timelinePill: { alignSelf: 'flex-start', marginTop: 10, borderWidth: 1, borderColor: '#8ED1FF', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 5, backgroundColor: '#EAF6FF' },
+  timelinePill: { alignSelf: 'flex-start', marginTop: 10, borderWidth: 1, borderColor: '#56AE67', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 5, backgroundColor: '#E9F7EE' },
   timelinePillText: { fontSize: 13, fontWeight: '700' },
   testimonialCard: { marginHorizontal: 16, borderRadius: 24, borderWidth: 1, padding: 18, marginTop: 8 },
-  quoteMark: { color: '#8ED1FF', fontSize: 38, fontWeight: '800', lineHeight: 36 },
+  quoteMark: { color: '#56AE67', fontSize: 38, fontWeight: '800', lineHeight: 36 },
   testimonialText: { fontSize: 16, fontWeight: '700', lineHeight: 20, marginTop: 2 },
   testimonialFooter: { flexDirection: 'row', alignItems: 'center', marginTop: 18 },
   avatarCircle: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', marginRight: 12 },

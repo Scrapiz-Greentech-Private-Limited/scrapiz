@@ -70,13 +70,19 @@ export const useHomeDataWithRetry = (): UseHomeDataWithRetryReturn => {
           const userData = await AuthService.getUser();
           if (!isMountedRef.current) return;
           setUser(userData);
-
-          const ordersData = await AuthService.getOrderNos();
-          if (!isMountedRef.current) return;
-          setOrders(ordersData);
         } catch (userErr: any) {
           // If user data fails but public data succeeded, don't block the UI
           console.warn('Failed to load user-specific data:', userErr.message);
+        }
+
+        // Orders are independently required by the home live-order card.
+        // Do not skip them when the optional profile request fails.
+        try {
+          const ordersData = await AuthService.getOrderNos();
+          if (!isMountedRef.current) return;
+          setOrders(ordersData);
+        } catch (ordersErr: any) {
+          console.warn('Failed to load orders for home live-order card:', ordersErr.message);
         }
       } else {
         console.log('useHomeDataWithRetry: Guest user - showing public data only');
@@ -143,12 +149,12 @@ export const useHomeDataWithRetry = (): UseHomeDataWithRetryReturn => {
     };
   }, []);
 
-  const refetch = async () => {
+  const refetch = useCallback(async () => {
     const isConnected = await checkNetworkAndLoad();
     if (isConnected) {
       await loadData();
     }
-  };
+  }, [checkNetworkAndLoad, loadData]);
 
   return {
     user,

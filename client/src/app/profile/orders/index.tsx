@@ -25,6 +25,9 @@ import {
   FileText,
   Truck,
   XCircle,
+  Ban,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react-native';
 import Toast from 'react-native-toast-message';
 import { useRouter } from 'expo-router';
@@ -33,11 +36,10 @@ import { useOrderDetails } from '../../../hooks/userOrderDetails';
 import { useTheme } from '../../../context/ThemeContext';
 import { AuthService } from '../../../api/apiService';
 import { RemoteImage } from '../../../components/RemoteImage';
+import { isLiveOrderStatus } from '../../../utils/orderStatus';
 
 function canTrackVendor(statusName: string) {
-  return ['pending', 'scheduled', 'transit', 'en_route', 'arrived', 'in_progress', 'ready'].includes(
-    (statusName || '').toLowerCase()
-  );
+  return isLiveOrderStatus(statusName);
 }
 
 interface HeaderComponentProps {
@@ -148,8 +150,18 @@ export default function OrdersScreen() {
   const { orders, products, loading, error, refetch } = useOrdersData();
   const ordersWithDetails = useOrderDetails(orders, products);
   const [refreshing, setRefreshing] = useState(false);
-  // Track which orders have a cancel request in-flight to prevent duplicates
   const [cancellingOrderIds, setCancellingOrderIds] = useState<Set<number>>(new Set());
+  const [showCancelledSection, setShowCancelledSection] = useState(false);
+
+  const activeOrders = useMemo(
+    () => ordersWithDetails.filter((o) => (o.statusName || '').toLowerCase() !== 'cancelled'),
+    [ordersWithDetails]
+  );
+
+  const cancelledOrders = useMemo(
+    () => ordersWithDetails.filter((o) => (o.statusName || '').toLowerCase() === 'cancelled'),
+    [ordersWithDetails]
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -162,7 +174,6 @@ export default function OrdersScreen() {
   };
 
   const handleCancelOrder = (orderNumber: string, orderId: number) => {
-    // Prevent duplicate requests for the same order
     if (cancellingOrderIds.has(orderId)) return;
     Alert.alert(
       'Cancel Order',
@@ -209,7 +220,6 @@ export default function OrdersScreen() {
     });
   };
 
-  // Loading state
   if (loading && orders.length === 0) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -222,7 +232,6 @@ export default function OrdersScreen() {
     );
   }
 
-  // Error state
   if (error && orders.length === 0) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -250,11 +259,11 @@ export default function OrdersScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
         }
       >
-        {ordersWithDetails.length > 0 ? (
-          ordersWithDetails.map((order) => {
+        {activeOrders.length > 0 ? (
+          activeOrders.map((order) => {
             const statusName = order.statusName || 'pending';
             const isCancellable = ['pending', 'scheduled', 'transit'].includes(statusName) || statusName === '';
-            
+
             return (
               <View
                 key={order.id}
@@ -264,7 +273,6 @@ export default function OrdersScreen() {
                   onPress={() => handleOrderPress(order.id)}
                   activeOpacity={0.7}
                 >
-                  {/* Card Header */}
                   <View style={styles.cardHeader}>
                     <View style={styles.orderIdContainer}>
                       <View style={[styles.orderIdBadge, { backgroundColor: colors.primary + '15' }]}>
@@ -278,19 +286,16 @@ export default function OrdersScreen() {
                     <ChevronRight size={20} color={colors.textSecondary} />
                   </View>
 
-                  {/* Progress Indicator */}
                   <View style={[styles.progressSection, { borderColor: colors.border }]}>
                     <MiniProgressIndicator status={statusName} colors={colors} />
                   </View>
 
-                  {/* Items Preview */}
                   <View style={styles.itemsPreview}>
                     <View style={styles.itemsRow}>
                       {order.orders.slice(0, 3).map((item, index) => {
-                        const imageSource = item.product.image_url 
+                        const imageSource = item.product.image_url
                           ? { uri: item.product.image_url }
                           : getProductImageFallback(item.product.name);
-                        
                         return (
                           <View key={item.id} style={[styles.itemPreviewContainer, index > 0 && { marginLeft: -8 }]}>
                             <RemoteImage
@@ -313,7 +318,6 @@ export default function OrdersScreen() {
                   </View>
                 </TouchableOpacity>
 
-                {/* Card Footer — outside the navigating TouchableOpacity to avoid nested touchable conflicts */}
                 <View style={[styles.cardFooter, { borderTopColor: colors.border }]}>
                   <View style={styles.amountContainer}>
                     <Text style={[styles.amountLabel, { color: colors.textSecondary }]}>Est. Value</Text>
@@ -332,7 +336,7 @@ export default function OrdersScreen() {
                         activeOpacity={0.8}
                       >
                         <Truck size={14} color="#fff" />
-                        <Text style={styles.trackVendorButtonText}>Track Vendor</Text>
+                        <Text style={styles.trackVendorButtonText}>View Live Order</Text>
                       </TouchableOpacity>
                     )}
                     {isCancellable && (
@@ -365,13 +369,171 @@ export default function OrdersScreen() {
             <View style={[styles.emptyIconContainer, { backgroundColor: colors.border + '30' }]}>
               <Package size={48} color={colors.border} />
             </View>
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>No Orders Yet</Text>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>No Active Orders</Text>
             <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-              Your orders will appear here once you start selling scrap
+              Your active orders will appear here once you start selling scrap
             </Text>
           </View>
         )}
-        
+
+        {cancelledOrders.length > 0 && (
+          <View style={styles.cancelledSection}>
+            <TouchableOpacity
+              style={[
+                styles.cancelledSectionHeader,
+                {
+                  backgroundColor: isDark ? 'rgba(239,68,68,0.08)' : '#fff5f5',
+                  borderColor: isDark ? 'rgba(239,68,68,0.2)' : '#fecaca',
+                },
+              ]}
+              onPress={() => setShowCancelledSection((v) => !v)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.cancelledHeaderLeft}>
+                <View style={[styles.cancelledHeaderIconWrap, { backgroundColor: 'rgba(239,68,68,0.12)' }]}>
+                  <Ban size={16} color="#dc2626" />
+                </View>
+                <View>
+                  <Text style={[styles.cancelledHeaderTitle, { color: isDark ? '#fca5a5' : '#991b1b' }]}>
+                    Cancelled Bookings
+                  </Text>
+                  <Text style={[styles.cancelledHeaderCount, { color: isDark ? 'rgba(252,165,165,0.6)' : '#dc2626' }]}>
+                    {cancelledOrders.length} {cancelledOrders.length === 1 ? 'order' : 'orders'} terminated
+                  </Text>
+                </View>
+              </View>
+              {showCancelledSection ? (
+                <ChevronUp size={18} color="#dc2626" />
+              ) : (
+                <ChevronDown size={18} color="#dc2626" />
+              )}
+            </TouchableOpacity>
+
+            {showCancelledSection && (
+              <View style={styles.cancelledCardList}>
+                {cancelledOrders.map((order) => (
+                  <TouchableOpacity
+                    key={order.id}
+                    style={[
+                      styles.cancelledCard,
+                      {
+                        backgroundColor: isDark ? 'rgba(30,10,10,0.95)' : '#fff',
+                        borderColor: isDark ? 'rgba(239,68,68,0.18)' : '#fecaca',
+                      },
+                    ]}
+                    onPress={() => handleOrderPress(order.id)}
+                    activeOpacity={0.75}
+                  >
+                    <View style={styles.cancelledCardTopRow}>
+                      <View style={styles.cancelledCardLeft}>
+                        <View
+                          style={[
+                            styles.cancelledCardBadge,
+                            { backgroundColor: isDark ? 'rgba(239,68,68,0.12)' : '#fef2f2' },
+                          ]}
+                        >
+                          <XCircle size={13} color="#ef4444" />
+                          <Text style={styles.cancelledCardBadgeText}>CANCELLED</Text>
+                        </View>
+                        <Text
+                          style={[
+                            styles.cancelledCardOrderNum,
+                            { color: isDark ? '#fca5a5' : '#991b1b' },
+                          ]}
+                        >
+                          #{order.order_number}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.cancelledCardDate,
+                            { color: isDark ? 'rgba(255,255,255,0.35)' : '#9ca3af' },
+                          ]}
+                        >
+                          {formatDate(order.created_at)}
+                        </Text>
+                      </View>
+                      <View style={styles.cancelledCardRight}>
+                        <View style={styles.cancelledCardImages}>
+                          {order.orders.slice(0, 2).map((item, idx) => (
+                            <View
+                              key={item.id}
+                              style={[
+                                styles.cancelledCardImgWrap,
+                                idx > 0 && { marginLeft: -8 },
+                                { opacity: 0.55 },
+                              ]}
+                            >
+                              <RemoteImage
+                                source={
+                                  item.product.image_url
+                                    ? { uri: item.product.image_url }
+                                    : getProductImageFallback(item.product.name)
+                                }
+                                fallback={getProductImageFallback(item.product.name)}
+                                style={styles.cancelledCardImg}
+                              />
+                            </View>
+                          ))}
+                          {order.orders.length > 2 && (
+                            <View
+                              style={[
+                                styles.cancelledCardMoreBadge,
+                                { marginLeft: -8, opacity: 0.6, backgroundColor: '#dc2626' },
+                              ]}
+                            >
+                              <Text style={styles.cancelledCardMoreText}>+{order.orders.length - 2}</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text
+                          style={[
+                            styles.cancelledCardAmount,
+                            { color: isDark ? 'rgba(252,165,165,0.5)' : '#dc2626', opacity: 0.7 },
+                          ]}
+                        >
+                          ₹{Math.round(order.totalAmount)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View
+                      style={[
+                        styles.cancelledCardDivider,
+                        { backgroundColor: isDark ? 'rgba(239,68,68,0.1)' : '#fecaca' },
+                      ]}
+                    />
+
+                    <View style={styles.cancelledCardFooter}>
+                      <View style={styles.cancelledCardFooterItem}>
+                        <View style={[styles.cancelledStatusDot, { backgroundColor: '#ef4444' }]} />
+                        <Text
+                          style={[
+                            styles.cancelledCardFooterLabel,
+                            { color: isDark ? 'rgba(255,255,255,0.3)' : '#9ca3af' },
+                          ]}
+                        >
+                          Lead & Booking Cancelled
+                        </Text>
+                      </View>
+                      <View style={styles.cancelledCardViewBtn}>
+                        <Text
+                          style={[
+                            styles.cancelledCardViewBtnText,
+                            { color: isDark ? '#fca5a5' : '#dc2626' },
+                          ]}
+                        >
+                          View
+                        </Text>
+                        <ChevronRight size={12} color={isDark ? '#fca5a5' : '#dc2626'} />
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
         <View style={styles.bottomSpacer} />
       </ScrollView>
       <Toast />
@@ -463,10 +625,16 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderBottomWidth: 1,
   },
-  miniProgressContainer: {
+    miniProgressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  miniProgressDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
   },
   miniProgressBar: {
     flexDirection: 'row',
@@ -531,14 +699,16 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
   },
   cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: 'stretch',
     padding: 16,
     paddingTop: 12,
     borderTopWidth: 1,
+    gap: 12,
   },
-  amountContainer: {},
+  amountContainer: {
+    width: '100%',
+  },
   amountLabel: {
     fontSize: 11,
     fontFamily: 'Inter-Regular',
@@ -557,6 +727,9 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   viewDetailsButton: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
@@ -567,14 +740,16 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
   },
   cardFooterActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
+    width: '100%',
+    flexDirection: 'column',
+    alignItems: 'stretch',
     gap: 8,
   },
   trackVendorButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
@@ -589,6 +764,8 @@ const styles = StyleSheet.create({
   cancelOrderBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
@@ -630,8 +807,165 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-  bottomSpacer: {
+    bottomSpacer: {
     height: 20,
+  },
+  cancelledSection: {
+    marginBottom: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  cancelledSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 2,
+  },
+  cancelledHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  cancelledHeaderIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelledHeaderTitle: {
+    fontSize: 15,
+    fontFamily: 'Inter-SemiBold',
+    fontWeight: '600',
+  },
+  cancelledHeaderCount: {
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+    marginTop: 2,
+  },
+  cancelledCardList: {
+    gap: 8,
+    marginTop: 6,
+  },
+  cancelledCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+    shadowColor: '#ef4444',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  cancelledCardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    padding: 14,
+    paddingBottom: 10,
+  },
+  cancelledCardLeft: {
+    gap: 5,
+  },
+  cancelledCardBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.2)',
+  },
+  cancelledCardBadgeText: {
+    fontSize: 9,
+    fontFamily: 'Inter-Bold',
+    color: '#ef4444',
+    letterSpacing: 1,
+  },
+  cancelledCardOrderNum: {
+    fontSize: 15,
+    fontFamily: 'Inter-SemiBold',
+    fontWeight: '600',
+  },
+  cancelledCardDate: {
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+  },
+  cancelledCardRight: {
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  cancelledCardImages: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cancelledCardImgWrap: {
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  cancelledCardImg: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+  },
+  cancelledCardMoreBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelledCardMoreText: {
+    fontSize: 11,
+    fontFamily: 'Inter-SemiBold',
+    color: '#fff',
+  },
+  cancelledCardAmount: {
+    fontSize: 15,
+    fontFamily: 'Inter-Bold',
+    fontWeight: '700',
+    textDecorationLine: 'line-through',
+  },
+  cancelledCardDivider: {
+    height: 1,
+    marginHorizontal: 14,
+  },
+  cancelledCardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  cancelledCardFooterItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  cancelledStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  cancelledCardFooterLabel: {
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+  },
+  cancelledCardViewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  cancelledCardViewBtnText: {
+    fontSize: 12,
+    fontFamily: 'Inter-SemiBold',
+    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,

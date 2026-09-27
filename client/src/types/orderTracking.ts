@@ -1,4 +1,4 @@
-export type TrackingPhase = 'searching' | 'en_route' | 'no_vendor' | 'completed';
+export type TrackingPhase = 'searching' | 'en_route' | 'no_vendor' | 'completed' | 'cancelled';
 export type TrackingConnectionState = 'connecting' | 'connected' | 'offline';
 export type TrackingStep = 'en_route' | 'arrived' | 'collecting' | 'ready' | 'completed';
 
@@ -45,6 +45,54 @@ export interface TrackingLeadItem {
   category?: string | null;
 }
 
+export interface TrackingQuoteItem {
+  product_id: number;
+  product_name: string;
+  is_selected: boolean;
+  quoted_rate_per_kg: number;
+  actual_weight_kg: number;
+  subtotal: number;
+}
+
+export interface TrackingQuote {
+  booking_id: string;
+  order_id: number;
+  status: string;
+  preferred_payment_method?: 'cash' | 'upi' | null;
+  fallback_payment_method?: 'cash' | 'none' | null;
+  payment_method?: 'cash' | 'upi' | null;
+  total_amount: number;
+  customer_upi_id?: string;
+  customer_upi_name?: string;
+  upi_reference?: string;
+  payment_status?: string | null;
+  payment_upi_reference?: string | null;
+  remarks?: string;
+  submitted_at?: string | null;
+  responded_at?: string | null;
+  paid_at?: string | null;
+  items: TrackingQuoteItem[];
+}
+
+export interface TrackingOrderAddress {
+  name?: string | null;
+  phone_number?: string | null;
+  room_number?: string | null;
+  street?: string | null;
+  area?: string | null;
+  city?: string | null;
+  state?: string | null;
+  pincode?: number | string | null;
+}
+
+export interface TrackingOrderDetails {
+  order_number?: string | null;
+  created_at?: string | null;
+  estimated_order_value?: number | null;
+  address?: TrackingOrderAddress | null;
+  items?: TrackingLeadItem[];
+}
+
 export interface TrackingNearbyAgent {
   id: number;
   agent_code: string;
@@ -83,10 +131,16 @@ export interface TrackingBookingData {
   status: string;
   vendor: TrackingVendorSummary;
   items?: TrackingLeadItem[];
+  quote?: TrackingQuote | null;
 }
 
 export interface OrderTrackingResponse {
   order_id: number;
+  order_number?: string | null;
+  created_at?: string | null;
+  estimated_order_value?: number | null;
+  address?: TrackingOrderAddress | null;
+  items?: TrackingLeadItem[];
   order_status?: string | null;
   lead?: TrackingLeadData | null;
   booking?: TrackingBookingData | null;
@@ -129,6 +183,15 @@ export interface LocationUpdateEvent {
   vendor?: TrackingVendorSummary | null;
   booking_status?: string | null;
   timestamp?: string;
+}
+
+export interface OrderCancelledEvent {
+  type: 'order_cancelled';
+  order_id?: number;
+  order_number?: string;
+  cancelled_by?: 'user' | 'admin' | string;
+  booking_id?: string | null;
+  lead_id?: string | null;
 }
 
 export interface BookingStatusEvent extends TrackingCompletionSummary {

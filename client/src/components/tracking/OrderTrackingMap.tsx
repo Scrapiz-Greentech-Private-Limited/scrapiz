@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Platform, StyleSheet, View } from 'react-native';
 import MapView, {
   AnimatedRegion,
@@ -9,10 +9,18 @@ import MapView, {
   Region,
 } from 'react-native-maps';
 import MapboxGL from '@rnmapbox/maps';
-import { Home, Truck, User } from 'lucide-react-native';
+import { Home, Navigation, Truck, User } from 'lucide-react-native';
+import { Text } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
-import { MAP_STYLES } from '../../config/mapConfig';
+import { MAPBOX_API_KEY, MAP_STYLES, calculateDistance } from '../../config/mapConfig';
 import { TrackingCoordinate, TrackingPhase, TrackingVendorPin } from '../../types/orderTracking';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface RouteUpdateData {
+  instruction: string;
+  distanceM: number;
+}
 
 interface OrderTrackingMapProps {
   pickup: TrackingCoordinate;
@@ -23,7 +31,11 @@ interface OrderTrackingMapProps {
   notifiedVendorCount?: number;
   distanceLabel?: string | null;
   userLocation?: TrackingCoordinate | null;
+  vendorName?: string;
+  onRouteUpdate?: (data: RouteUpdateData | null) => void;
 }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function buildRegion(pickup: TrackingCoordinate): Region {
   return {
@@ -61,9 +73,7 @@ function buildActiveVendor(
         Math.abs(pin.lng - acceptedVendorLocation.lng) < 0.00001
     );
 
-    if (matchingPin) {
-      return matchingPin;
-    }
+    if (matchingPin) return matchingPin;
 
     return {
       vendor_id: 0,
@@ -97,33 +107,6 @@ function buildCurvedLineCoordinates(
   ];
 }
 
-function buildBounds(
-  pickup: TrackingCoordinate,
-  partnerPins: TrackingVendorPin[],
-  userPin: TrackingCoordinate,
-  activeVendorLocation: TrackingCoordinate | null
-) {
-  const points = [
-    pickup,
-    userPin,
-    ...(activeVendorLocation ? [activeVendorLocation] : []),
-    ...partnerPins
-      .filter((pin) => typeof pin.lat === 'number' && typeof pin.lng === 'number')
-      .map((pin) => ({ lat: pin.lat, lng: pin.lng })),
-  ];
-  if (points.length < 2) {
-    return null;
-  }
-
-  const lngValues = points.map((point) => point.lng);
-  const latValues = points.map((point) => point.lat);
-
-  return {
-    ne: [Math.max(...lngValues), Math.max(...latValues)] as [number, number],
-    sw: [Math.min(...lngValues), Math.min(...latValues)] as [number, number],
-  };
-}
-
 function isSameCoordinate(a: TrackingCoordinate, b: TrackingCoordinate) {
   return Math.abs(a.lat - b.lat) < 0.00001 && Math.abs(a.lng - b.lng) < 0.00001;
 }
@@ -136,12 +119,24 @@ function getPassivePinStyle(pin: TrackingVendorPin) {
   return isAgentPin(pin) ? styles.partnerMarkerAgent : styles.partnerMarkerVendor;
 }
 
-function getActivePinStyle(pin: TrackingVendorPin | null) {
-  if (pin?.pin_role === 'agent') {
-    return styles.partnerMarkerActiveAgent;
-  }
-  return styles.partnerMarkerActiveVendor;
-}
+// ─── Chat bubble vendor marker ─────────────────────────────────────────────────
+
+const ChatBubbleMarker: React.FC<{ name: string; color?: string }> = ({
+  name,
+  color = '#1D4ED8',
+}) => (
+  <View style={styles.chatBubbleWrap}>
+    <View style={[styles.chatBubble, { backgroundColor: color }]}>
+      <Navigation size={12} color="#fff" />
+      <Text style={styles.chatBubbleName} numberOfLines={1}>
+        {name}
+      </Text>
+    </View>
+    <View style={[styles.chatBubblePointer, { borderTopColor: color }]} />
+  </View>
+);
+
+// ─── Main component ────────────────────────────────────────────────────────────
 
 export function OrderTrackingMap({
   pickup,
@@ -152,17 +147,24 @@ export function OrderTrackingMap({
   notifiedVendorCount = 0,
   distanceLabel,
   userLocation = null,
+  vendorName,
+  onRouteUpdate,
 }: OrderTrackingMapProps) {
   const { colors, isDark } = useTheme();
   const pulse = useRef(new Animated.Value(0.7)).current;
+
+  // Route state
+  const [routeGeoJSON, setRouteGeoJSON] = useState<any>(null);
+  const lastRouteFetchRef = useRef<TrackingCoordinate | null>(null);
+  const cameraRef = useRef<MapboxGL.Camera>(null);
+  const hasInitialFitRef = useRef(false);
+
   const allPartnerPins = useMemo(
     () => vendorPins.filter((pin) => typeof pin.lat === 'number' && typeof pin.lng === 'number'),
     [vendorPins]
   );
-  const userPin = useMemo(
-    () => userLocation || pickup,
-    [userLocation, pickup]
-  );
+  const userPin = useMemo(() => userLocation || pickup, [userLocation, pickup]);
+
   const activeVendorPin = useMemo(
     () => buildActiveVendor(acceptedVendorLocation, allPartnerPins),
     [acceptedVendorLocation, allPartnerPins]
@@ -175,7 +177,9 @@ export function OrderTrackingMap({
     () => !isSameCoordinate(userPin, pickup),
     [pickup, userPin]
   );
-  const mapboxCurve = useMemo(
+
+  // Fallback curved line (used while real route loads)
+  const fallbackCurve = useMemo(
     () =>
       activeVendorLocation
         ? {
@@ -189,22 +193,8 @@ export function OrderTrackingMap({
         : null,
     [activeVendorLocation, pickup]
   );
-  const mapboxBounds = useMemo(
-    () => buildBounds(pickup, allPartnerPins, userPin, activeVendorLocation),
-    [pickup, allPartnerPins, userPin, activeVendorLocation]
-  );
-  const mapCameraKey = useMemo(() => {
-    const parts = [
-      pickup.lat.toFixed(6),
-      pickup.lng.toFixed(6),
-      activeVendorLocation?.lat?.toFixed(6) || 'no-vendor',
-      activeVendorLocation?.lng?.toFixed(6) || 'no-vendor',
-      userPin?.lat?.toFixed(6) || 'no-user',
-      userPin?.lng?.toFixed(6) || 'no-user',
-    ];
-    return parts.join(':');
-  }, [pickup, activeVendorLocation, userPin]);
 
+  // ── Pulse animation ──────────────────────────────────────────────────────────
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
@@ -216,18 +206,80 @@ export function OrderTrackingMap({
     return () => loop.stop();
   }, [pulse]);
 
-  if (Platform.OS === 'android') {
-    const passiveVendorPins = allPartnerPins.filter((pin) => {
-      if (pin.lat === undefined || pin.lng === undefined) {
-        return false;
-      }
+  // ── Mapbox Directions API ────────────────────────────────────────────────────
+  const fetchRoute = useCallback(
+    async (from: TrackingCoordinate, to: TrackingCoordinate) => {
+      try {
+        const url =
+          `https://api.mapbox.com/directions/v5/mapbox/driving/` +
+          `${from.lng},${from.lat};${to.lng},${to.lat}` +
+          `?access_token=${MAPBOX_API_KEY}&geometries=geojson&overview=full&steps=true&language=en`;
 
-      if (!activeVendorPin) {
-        return true;
-      }
+        const res = await fetch(url);
+        const data = await res.json();
 
-      return !(pin.vendor_id === activeVendorPin.vendor_id && pin.pin_role === activeVendorPin.pin_role);
+        if (data.routes?.[0]) {
+          const route = data.routes[0];
+          setRouteGeoJSON({
+            type: 'Feature',
+            geometry: route.geometry,
+            properties: {},
+          });
+
+          const firstStep = route.legs?.[0]?.steps?.[0];
+          if (firstStep) {
+            const instruction: string = firstStep.maneuver.instruction;
+            const distanceM: number = Math.round(firstStep.distance);
+            onRouteUpdate?.({ instruction, distanceM });
+          }
+
+          lastRouteFetchRef.current = from;
+        }
+      } catch (err) {
+        console.log('[OrderTrackingMap] Directions API error', err);
+      }
+    },
+    [onRouteUpdate]
+  );
+
+  // Re-fetch route when vendor moves more than ~80m
+  useEffect(() => {
+    if (!activeVendorLocation || Platform.OS !== 'android') return;
+
+    const last = lastRouteFetchRef.current;
+    let shouldFetch = !last;
+
+    if (last) {
+      const movedM =
+        calculateDistance(
+          [last.lng, last.lat],
+          [activeVendorLocation.lng, activeVendorLocation.lat]
+        ) * 1000;
+      shouldFetch = movedM > 80;
+    }
+
+    if (shouldFetch) {
+      fetchRoute(activeVendorLocation, pickup);
+    }
+  }, [activeVendorLocation?.lat, activeVendorLocation?.lng, fetchRoute, pickup]);
+
+  // Smooth camera follow (Android only)
+  useEffect(() => {
+    if (!activeVendorLocation || Platform.OS !== 'android') return;
+    if (!cameraRef.current) return;
+
+    (cameraRef.current as any).setCamera({
+      centerCoordinate: [activeVendorLocation.lng, activeVendorLocation.lat],
+      zoomLevel: 15,
+      animationDuration: 900,
+      animationMode: 'easeTo',
     });
+  }, [activeVendorLocation?.lat, activeVendorLocation?.lng]);
+
+  // ── Android – MapboxGL ───────────────────────────────────────────────────────
+
+  if (Platform.OS === 'android') {
+    const activeRouteShape = routeGeoJSON ?? fallbackCurve;
 
     return (
       <View style={styles.container}>
@@ -242,44 +294,44 @@ export function OrderTrackingMap({
           attributionEnabled={false}
         >
           <MapboxGL.Camera
-            key={mapCameraKey}
-            zoomLevel={activeVendorLocation ? 11.8 : 14.5}
+            ref={cameraRef}
+            zoomLevel={activeVendorLocation ? 15 : 14.5}
             centerCoordinate={[
-              (userPin.lng ?? pickup.lng),
-              (userPin.lat ?? pickup.lat),
+              activeVendorLocation?.lng ?? userPin.lng,
+              activeVendorLocation?.lat ?? userPin.lat,
             ]}
-            bounds={
-              mapboxBounds
-                ? {
-                    ne: mapboxBounds.ne,
-                    sw: mapboxBounds.sw,
-                    paddingTop: 80,
-                    paddingBottom: 180,
-                    paddingLeft: 56,
-                    paddingRight: 56,
-                  }
-                : undefined
-            }
             animationMode="flyTo"
             animationDuration={1200}
           />
 
-          {activeVendorLocation && mapboxCurve ? (
-            <MapboxGL.ShapeSource id="tracking-route" shape={mapboxCurve as any}>
+          {/* Route – shadow + solid blue line */}
+          {activeRouteShape && (
+            <MapboxGL.ShapeSource id="tracking-route" shape={activeRouteShape as any}>
+              {/* Glow / shadow */}
+              <MapboxGL.LineLayer
+                id="tracking-route-glow"
+                style={{
+                  lineColor: 'rgba(59,130,246,0.22)',
+                  lineWidth: 12,
+                  lineCap: 'round',
+                  lineJoin: 'round',
+                }}
+              />
+              {/* Main blue route */}
               <MapboxGL.LineLayer
                 id="tracking-route-line"
                 style={{
-                  lineColor: colors.primary,
-                  lineWidth: 3,
-                  lineDasharray: [2, 2],
+                  lineColor: '#3B82F6',
+                  lineWidth: 5,
                   lineCap: 'round',
                   lineJoin: 'round',
-                  lineOpacity: 0.9,
+                  lineOpacity: 1,
                 }}
               />
             </MapboxGL.ShapeSource>
-          ) : null}
+          )}
 
+          {/* Customer / User pin */}
           <MapboxGL.PointAnnotation id="user-marker" coordinate={[userPin.lng, userPin.lat]}>
             <View style={styles.userPinBoardWrap}>
               <Animated.View
@@ -297,6 +349,7 @@ export function OrderTrackingMap({
             </View>
           </MapboxGL.PointAnnotation>
 
+          {/* Pickup pin */}
           {shouldRenderPickupPin ? (
             <MapboxGL.PointAnnotation id="pickup-marker" coordinate={[pickup.lng, pickup.lat]}>
               <View style={styles.pickupPinWrap}>
@@ -307,32 +360,24 @@ export function OrderTrackingMap({
             </MapboxGL.PointAnnotation>
           ) : null}
 
+          {/* Chat-bubble vendor marker */}
           {activeVendorLocation ? (
             <MapboxGL.PointAnnotation
               id="active-vendor-marker"
               coordinate={[activeVendorLocation.lng, activeVendorLocation.lat]}
             >
-              <View style={[styles.partnerMarker, getActivePinStyle(activeVendorPin)]}>
-                <Truck size={18} color="#fff" />
-              </View>
+              <ChatBubbleMarker
+                name={activeVendorPin?.name || vendorName || 'Vendor'}
+                color="#1D4ED8"
+              />
             </MapboxGL.PointAnnotation>
           ) : null}
-
-          {passiveVendorPins.map((vendor) => (
-            <MapboxGL.PointAnnotation
-              key={`vendor-pin-${vendor.vendor_id}`}
-              id={`vendor-pin-${vendor.vendor_id}`}
-              coordinate={[vendor.lng, vendor.lat]}
-            >
-              <View style={[styles.partnerMarker, getPassivePinStyle(vendor), { borderColor: colors.border }]}>
-                <Truck size={16} color="#fff" />
-              </View>
-            </MapboxGL.PointAnnotation>
-          ))}
         </MapboxGL.MapView>
       </View>
     );
   }
+
+  // ── iOS – react-native-maps ──────────────────────────────────────────────────
 
   const mapRef = useRef<MapView | null>(null);
   const animatedVendor = useRef(
@@ -353,9 +398,7 @@ export function OrderTrackingMap({
       ...allPartnerPins.map((pin) => ({ lat: pin.lat, lng: pin.lng })),
       ...(activeVendorLocation ? [activeVendorLocation] : []),
     ];
-    if (!mapRef.current || !points.length) {
-      return;
-    }
+    if (!mapRef.current || !points.length) return;
 
     mapRef.current.fitToCoordinates(
       points.map((point) => ({ latitude: point.lat, longitude: point.lng })),
@@ -367,15 +410,11 @@ export function OrderTrackingMap({
   }, [activeVendorLocation, allPartnerPins, pickup, userPin]);
 
   useEffect(() => {
-    if (!activeVendorLocation) {
-      return;
-    }
-
+    if (!activeVendorLocation) return;
     const previous = previousVendorRef.current;
     if (previous) {
       rotationRef.current = calculateBearing(previous, activeVendorLocation);
     }
-
     animatedVendor
       .timing({
         toValue: {
@@ -388,11 +427,8 @@ export function OrderTrackingMap({
         useNativeDriver: false,
       } as any)
       .start();
-
     previousVendorRef.current = activeVendorLocation;
   }, [activeVendorLocation, animatedVendor]);
-
-  const visibleVendorPins = allPartnerPins;
 
   return (
     <View style={styles.container}>
@@ -444,29 +480,6 @@ export function OrderTrackingMap({
           </Marker>
         ) : null}
 
-        {visibleVendorPins.map((vendor) => {
-          const isActive =
-            !!activeVendorPin &&
-            vendor.vendor_id === activeVendorPin.vendor_id &&
-            vendor.pin_role === activeVendorPin.pin_role;
-
-          if (isActive && activeVendorLocation) {
-            return null;
-          }
-
-          return (
-            <Marker
-              key={`pin-${vendor.vendor_id}`}
-              coordinate={{ latitude: vendor.lat, longitude: vendor.lng }}
-              anchor={{ x: 0.5, y: 0.5 }}
-            >
-              <View style={[styles.partnerMarker, getPassivePinStyle(vendor), { borderColor: colors.border }]}>
-                <Truck size={16} color={isDark ? '#e2e8f0' : '#64748b'} />
-              </View>
-            </Marker>
-          );
-        })}
-
         {activeVendorLocation && (
           <>
             <Polyline
@@ -482,33 +495,62 @@ export function OrderTrackingMap({
                 },
                 { latitude: pickup.lat, longitude: pickup.lng },
               ]}
-              strokeColor={colors.primary}
-              strokeWidth={3}
-              lineDashPattern={[10, 6]}
+              strokeColor="#3B82F6"
+              strokeWidth={4}
             />
-            <MarkerAnimated coordinate={animatedVendor} anchor={{ x: 0.5, y: 0.5 }} flat>
-              <View
-                style={[
-                  styles.partnerMarker,
-                  getActivePinStyle(activeVendorPin),
-                  { transform: [{ rotate: `${rotationRef.current}deg` }] },
-                ]}
-              >
-                <Truck size={18} color="#fff" />
-              </View>
+            <MarkerAnimated coordinate={animatedVendor} anchor={{ x: 0.5, y: 1 }} flat>
+              <ChatBubbleMarker
+                name={activeVendorPin?.name || vendorName || 'Vendor'}
+                color="#1D4ED8"
+              />
             </MarkerAnimated>
           </>
         )}
       </MapView>
-
     </View>
   );
 }
+
+// ─── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  // ── Chat bubble marker ──────────────────────────────────────────────────────
+  chatBubbleWrap: {
+    alignItems: 'center',
+  },
+  chatBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+    maxWidth: 130,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  chatBubbleName: {
+    color: '#fff',
+    fontSize: 11,
+    fontFamily: 'Inter-SemiBold',
+    maxWidth: 88,
+  },
+  chatBubblePointer: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+  },
+  // ── User pin ────────────────────────────────────────────────────────────────
   userPinBoardWrap: {
     width: 72,
     height: 72,
@@ -531,6 +573,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2563EB',
     borderColor: 'rgba(255,255,255,0.96)',
   },
+  // ── Pickup pin ──────────────────────────────────────────────────────────────
   pickupPinWrap: {
     width: 36,
     height: 36,
@@ -546,6 +589,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#FFFFFF',
   },
+  // ── Legacy partner marker (iOS passive pins) ────────────────────────────────
   partnerMarker: {
     width: 34,
     height: 34,
@@ -561,29 +605,5 @@ const styles = StyleSheet.create({
   partnerMarkerAgent: {
     backgroundColor: 'rgba(30,64,175,0.9)',
     borderColor: 'rgba(255,255,255,0.92)',
-  },
-  partnerMarkerActiveVendor: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#16a34a',
-    borderColor: 'rgba(255,255,255,0.96)',
-    shadowColor: '#16a34a',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.28,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  partnerMarkerActiveAgent: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#2563EB',
-    borderColor: 'rgba(255,255,255,0.96)',
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.24,
-    shadowRadius: 16,
-    elevation: 8,
   },
 });

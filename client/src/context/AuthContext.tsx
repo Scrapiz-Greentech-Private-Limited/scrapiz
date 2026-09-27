@@ -91,6 +91,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, []);
 
+  useEffect(() => {
+    const syncPushTokenForAuthenticatedSession = async () => {
+      if (!isAuthenticated) {
+        return;
+      }
+
+      try {
+        const { hasShownNotificationPermission } = await import('../utils/notificationPermission');
+        const hasShown = await hasShownNotificationPermission();
+
+        if (!hasShown) {
+          return;
+        }
+
+        await registerForPushNotifications({ skipPermissionPrompt: true });
+      } catch (syncError) {
+        console.error('Failed to sync push token for authenticated session:', syncError);
+      }
+    };
+
+    syncPushTokenForAuthenticatedSession();
+  }, [isAuthenticated, registerForPushNotifications]);
+
   const checkAuthStatus = async () => {
     try {
       const authenticated = await AuthService.isAuthenticated();

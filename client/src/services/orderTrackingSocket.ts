@@ -3,6 +3,7 @@ import {
   BookingStatusEvent,
   LeadAcceptedEvent,
   LocationUpdateEvent,
+  OrderCancelledEvent,
   VendorDispatchedEvent,
 } from '../types/orderTracking';
 
@@ -11,6 +12,7 @@ interface OrderTrackingSocketHandlers {
   onLeadAccepted?: (event: LeadAcceptedEvent) => void;
   onLocationUpdate?: (event: LocationUpdateEvent) => void;
   onBookingStatus?: (event: BookingStatusEvent) => void;
+  onOrderCancelled?: (event: OrderCancelledEvent) => void;
   onConnectionChange?: (connected: boolean) => void;
   onPong?: () => void;
 }
@@ -70,6 +72,9 @@ export class OrderTrackingSocket {
             break;
           case 'booking_status':
             this.handlers.onBookingStatus?.(data as BookingStatusEvent);
+            break;
+          case 'order_cancelled':
+            this.handlers.onOrderCancelled?.(data as OrderCancelledEvent);
             break;
           case 'pong':
             this.handlers.onPong?.();

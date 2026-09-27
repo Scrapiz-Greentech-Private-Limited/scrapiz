@@ -425,6 +425,15 @@ export default function RatesScreen() {
         >
           <Image source={selectedTheme.heroImage} style={styles.heroImage} resizeMode="contain" />
 
+          {(selectedCategory === 'paper' || selectedCategory === 'plastic') && (
+            <View style={[styles.minimumBookingNote, isDark && styles.minimumBookingNoteDark]}>
+              <AlertCircle size={18} color={isDark ? '#BBF7D0' : '#166534'} />
+              <Text style={[styles.minimumBookingNoteText, isDark && styles.minimumBookingNoteTextDark]}>
+                Note: A minimum order value of ₹1,000 is required during booking. You may combine any number of {selectedCategory} products.
+              </Text>
+            </View>
+          )}
+
           <View style={styles.sectionHeading}>
             <Text style={[styles.sectionTitle, isDark && styles.sectionTitleDark]}>
               Available Rates
@@ -708,6 +717,20 @@ const styles = StyleSheet.create({
   sectionHeading: {
     marginBottom: 14,
   },
+  minimumBookingNote: {
+    marginBottom: 16,
+    padding: 14,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9,
+    backgroundColor: '#ECFDF3',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  minimumBookingNoteDark: { backgroundColor: '#123D24', borderColor: '#276749' },
+  minimumBookingNoteText: { flex: 1, color: '#166534', fontSize: 13, lineHeight: 19, fontWeight: '700' },
+  minimumBookingNoteTextDark: { color: '#BBF7D0' },
   sectionTitle: {
     fontSize: 22,
     color: '#0D3917',

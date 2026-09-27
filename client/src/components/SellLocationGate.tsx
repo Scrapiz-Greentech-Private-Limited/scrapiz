@@ -15,11 +15,11 @@ import {
   TouchableWithoutFeedback,
   StyleSheet,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { MapPin, ArrowRight, CheckCircle2, Navigation } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocation } from '../context/LocationContext';
 import { useTheme } from '../context/ThemeContext';
+import { ServiceabilityAPI } from '../api/apiService';
 import { setSellServiceability } from '../utils/sellServiceability';
 
 const { width } = Dimensions.get('window');
@@ -31,14 +31,11 @@ interface SellLocationGateProps {
 }
 
 export default function SellLocationGate({ onServiceable, onNotServiceable }: SellLocationGateProps) {
-  const router = useRouter();
   const { colors, isDark } = useTheme();
   const { 
     setLocationFromPincode, 
-    serviceAvailable, 
     getCurrentLocation, 
-    currentLocation, 
-    isLoading: locationLoading, 
+    isLoading: locationLoading,
     error: locationError 
   } = useLocation();
   
@@ -86,13 +83,6 @@ export default function SellLocationGate({ onServiceable, onNotServiceable }: Se
       ).start();
     });
   }, []);
-
-  useEffect(() => {
-    if (isUsingGPS && currentLocation && !locationLoading) {
-      handleServiceabilityResult(serviceAvailable);
-      setIsUsingGPS(false);
-    }
-  }, [currentLocation, serviceAvailable, locationLoading, isUsingGPS]);
 
   useEffect(() => {
     if (locationError && isUsingGPS) {
@@ -146,20 +136,16 @@ export default function SellLocationGate({ onServiceable, onNotServiceable }: Se
     Keyboard.dismiss();
 
     try {
-      await getCurrentLocation();
-      
-      setTimeout(() => {
-        if (locationError) {
-          setError(locationError);
-          setIsUsingGPS(false);
-          return;
-        }
-
-        if (currentLocation) {
-          handleServiceabilityResult(serviceAvailable);
-        }
-        setIsUsingGPS(false);
-      }, 1000);
+      const location = await getCurrentLocation();
+      if (!location) {
+        throw new Error(locationError || 'Unable to determine your current location.');
+      }
+      const result = await ServiceabilityAPI.checkCoordinates(
+        location.latitude,
+        location.longitude
+      );
+      await handleServiceabilityResult(result.serviceable);
+      setIsUsingGPS(false);
     } catch (err) {
       setError('Failed to get your location. Please try again or enter PIN code manually.');
       setIsUsingGPS(false);

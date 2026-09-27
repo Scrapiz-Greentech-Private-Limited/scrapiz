@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useEffect , useRef} from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { View, Text,StyleSheet,ScrollView,TouchableOpacity,Dimensions,Image,Platform,ActivityIndicator,RefreshControl,Share,Linking,Alert,} from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import * as Updates from 'expo-updates';
 import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Share2,
   User,
+  Truck,
 } from 'lucide-react-native';
 //Components
 import CustomCarousel from '../../components/Carousel';
@@ -29,6 +30,7 @@ import { useAppRating } from '../../hooks/useAppRating';
 import { useOrderRatingToast } from '../../hooks/useOrderRatingToast';
 import { wp, hp, fs } from '../../utils/responsive';
 import { getAvatarSource } from '../../utils/avatarUtils';
+import { getLiveOrderStatusLabel, isLiveOrderStatus } from '../../utils/orderStatus';
 //Tutorial
 import { homeTutorialConfig } from '@/src/config/tutorials/homeTutorial';
 import { useTutorialStore } from '@/src/store/tutorialStore';
@@ -44,13 +46,13 @@ function formatAMPM(date: Date) {
   return strTime;
 }
 
-
 export default function HomeScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
   const { 
     user, 
     products, 
+    orders,
     loading, 
     refetch,
     // Network retry state
@@ -138,6 +140,43 @@ export default function HomeScreen() {
       },
     ];
   }, [products]);
+
+  const liveOrder = useMemo(() => {
+    const availableOrders = orders?.length ? orders : (user?.orders || []);
+    return availableOrders.find((order: any) => isLiveOrderStatus(order.status)) || null;
+  }, [orders, user?.orders]);
+  const liveOrderId = liveOrder?.id;
+
+  const getLiveOrderWidgetLabel = (order: any) => {
+    const paymentStatus = String(order?.payment_status || '').toLowerCase();
+    if (['vendor_reference_submitted', 'customer_confirmation_pending'].includes(paymentStatus)) {
+      return 'Confirm payout received';
+    }
+    if (['paid', 'cash_paid'].includes(paymentStatus)) {
+      return 'Transaction received';
+    }
+    if (order?.quote_status === 'submitted') {
+      return 'Review payout quote';
+    }
+    return getLiveOrderStatusLabel(order?.status);
+  };
+
+  // Refresh orders whenever the Home tab becomes visible again, so a booking
+  // completed on another screen appears without requiring an app restart.
+  useFocusEffect(useCallback(() => {
+    void refetch();
+  }, [refetch]));
+
+  // Keep the home live-order card synchronized while a pickup/payment is in
+  // progress. The order list includes the server-authoritative payment
+  // transaction status, so this also surfaces UTR confirmation promptly.
+  useEffect(() => {
+    if (!liveOrderId) return undefined;
+    const timer = setInterval(() => {
+      void refetch();
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [liveOrderId, refetch]);
 
   const referralShareMessage = `Join me on Scrapiz and sell scrap smarter.${user?.referral_code ? ` Use my referral code: ${user.referral_code}` : ''}\n\nPlay Store: https://play.google.com/store/apps/details?id=com.scrapiz.app\nApp Store: https://apps.apple.com/in/app/scrapiz-sell-scrap-online/id6756441850`;
 
@@ -458,6 +497,68 @@ export default function HomeScreen() {
             <Image source={require('../../../assets/images/home/home_second_banner.webp')} style={styles.heroBannerImage} resizeMode="cover" />
           </TouchableOpacity>
 
+          {(liveOrder || orders.length > 0 || user) && (
+            <View style={[styles.liveOrderSection, { backgroundColor: colors.surface }]}> 
+              <View style={styles.liveOrderHeader}>
+                <View style={styles.liveOrderTitleRow}>
+                  <View style={[styles.liveOrderIcon, { backgroundColor: isDark ? '#14532d' : '#dcfce7' }]}>
+                    <Truck size={18} color={colors.primary} />
+                  </View>
+                  <View>
+                    <Text style={[styles.liveOrderTitle, { color: colors.text }]}>Your live order</Text>
+                    <Text style={[styles.liveOrderSubtitle, { color: colors.textSecondary }]}>Follow your pickup in real time</Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => handleNavigate('/profile/orders')} hitSlop={8}>
+                  <Text style={[styles.liveOrderViewAll, { color: colors.primary }]}>View all</Text>
+                </TouchableOpacity>
+              </View>
+
+              {liveOrder ? (
+                <TouchableOpacity
+                  style={[styles.liveOrderCard, { borderColor: isDark ? '#2f4f3b' : '#bbf7d0' }]}
+                  onPress={() => handleNavigate(`/tracking/${liveOrder.id}/search`)}
+                  activeOpacity={0.86}
+                >
+                  <View style={styles.liveOrderCardTop}>
+                    <View>
+                      <Text style={[styles.liveOrderLabel, { color: colors.textSecondary }]}>Order ID</Text>
+                      <Text style={[styles.liveOrderNumber, { color: colors.text }]} numberOfLines={1}>
+                        {liveOrder.order_number}
+                      </Text>
+                    </View>
+                    <View style={[styles.liveOrderStatus, { backgroundColor: isDark ? '#14532d' : '#ecfdf5' }]}>
+                      <Text style={[styles.liveOrderStatusText, { color: colors.primary }]}>
+                        {getLiveOrderWidgetLabel(liveOrder)}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={[styles.liveOrderAction, { backgroundColor: colors.primary }]}>
+                    <Text style={styles.liveOrderActionText}>
+                      {['vendor_reference_submitted', 'customer_confirmation_pending'].includes(String(liveOrder.payment_status || '').toLowerCase())
+                        ? 'Confirm payout'
+                        : 'View live order'}
+                    </Text>
+                    <ChevronRight size={18} color="#fff" />
+                  </View>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.liveOrderCard, { borderColor: isDark ? '#2f4f3b' : '#bbf7d0' }]}
+                  onPress={() => handleNavigate('/profile/orders')}
+                  activeOpacity={0.86}
+                >
+                  <Text style={[styles.liveOrderNumber, { color: colors.text }]}>Check your order status</Text>
+                  <Text style={[styles.liveOrderSubtitle, { color: colors.textSecondary }]}>Open My Orders to view the latest pickup progress.</Text>
+                  <View style={[styles.liveOrderAction, { backgroundColor: colors.primary, marginTop: hp(1.5) }]}>
+                    <Text style={styles.liveOrderActionText}>Open My Orders</Text>
+                    <ChevronRight size={18} color="#fff" />
+                  </View>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
           <View style={styles.marketSection} ref={ratesRef}>
             <View style={styles.marketHeader}>
               <Text style={[styles.marketHeaderText, { color: colors.text }]}>Market Rates Today</Text>
@@ -768,6 +869,103 @@ const styles = StyleSheet.create({
   heroBannerImage: {
     width: '100%',
     height: hp(18),
+  },
+  liveOrderSection: {
+    marginHorizontal: wp(4),
+    marginTop: hp(1.8),
+    padding: wp(4),
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  liveOrderHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: hp(1.4),
+  },
+  liveOrderTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  liveOrderIcon: {
+    width: wp(10),
+    height: wp(10),
+    borderRadius: wp(5),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: wp(2.8),
+  },
+  liveOrderTitle: {
+    fontSize: fs(16),
+    fontWeight: '800',
+    fontFamily: 'Inter-Bold',
+  },
+  liveOrderSubtitle: {
+    fontSize: fs(11.5),
+    marginTop: hp(0.25),
+    fontFamily: 'Inter-Medium',
+  },
+  liveOrderViewAll: {
+    fontSize: fs(12),
+    fontWeight: '700',
+    fontFamily: 'Inter-SemiBold',
+  },
+  liveOrderCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: wp(3.5),
+  },
+  liveOrderCardTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: hp(1.5),
+  },
+  liveOrderLabel: {
+    fontSize: fs(10.5),
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontFamily: 'Inter-SemiBold',
+  },
+  liveOrderNumber: {
+    fontSize: fs(14),
+    fontWeight: '800',
+    marginTop: hp(0.35),
+    maxWidth: wp(44),
+    fontFamily: 'Inter-Bold',
+  },
+  liveOrderStatus: {
+    borderRadius: 999,
+    paddingHorizontal: wp(2.6),
+    paddingVertical: hp(0.65),
+    maxWidth: wp(42),
+  },
+  liveOrderStatusText: {
+    fontSize: fs(10.5),
+    fontWeight: '700',
+    textAlign: 'center',
+    fontFamily: 'Inter-SemiBold',
+  },
+  liveOrderAction: {
+    minHeight: hp(5),
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: wp(1),
+  },
+  liveOrderActionText: {
+    color: '#fff',
+    fontSize: fs(13),
+    fontWeight: '800',
+    fontFamily: 'Inter-Bold',
   },
   marketSection: {
     paddingTop: hp(1.8),
