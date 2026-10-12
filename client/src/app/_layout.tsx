@@ -183,6 +183,14 @@ function AppContent() {
                     animation: 'slide_from_bottom'
                   }} 
                 />
+                <Stack.Screen 
+                  name="scrappy-assistant" 
+                  options={{ 
+                    headerShown: false,
+                    presentation: 'fullScreenModal',
+                    animation: 'fade',
+                  }} 
+                />
                 <Stack.Screen name="+not-found" />
               </Stack>
               <Toast />

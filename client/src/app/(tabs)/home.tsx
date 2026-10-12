@@ -19,6 +19,7 @@ import LocationSelector from '@/src/components/LocationSelector';
 import SearchBar from '@/src/components/SearchBar';
 import { RemoteImage } from '../../components/RemoteImage';
 import TutorialOverlay from '@/src/components/TutorialOverlay';
+import FloatingMascotWidget from '@/src/components/FloatingMascotWidget';
 import RateAppBottomSheet from '@/src/components/RateAppBottomSheet';
 import RatingToast from '@/src/components/RatingToast';
 import NetworkRetryOverlay from '../../components/NetworkRetryOverlay';
@@ -644,6 +645,9 @@ export default function HomeScreen() {
         errorMessage={errorMessage || undefined}
         onRetryNow={retryNow}
       />
+
+      {/* Floating Movable Mascot Widget */}
+      <FloatingMascotWidget />
     </View>
   );
 }

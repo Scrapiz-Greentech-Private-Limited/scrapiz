@@ -12,7 +12,7 @@ import {
   Linking,
 } from 'react-native';
 import { ArrowLeft, CircleAlert as AlertCircle, TrendingUp } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthService, CategorySummary, ProductSummary } from '../../api/apiService';
@@ -166,6 +166,7 @@ const matchesScrapCategory = (categoryName: string, categoryKey: ScrapCategoryKe
 
 export default function RatesScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ category?: ScrapCategoryKey }>();
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const { setStepTarget, currentScreen } = useTutorialStore();
@@ -176,6 +177,12 @@ export default function RatesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<ScrapCategoryKey | null>(null);
+
+  useEffect(() => {
+    if (params?.category && ['paper', 'plastic', 'metal', 'electronic'].includes(params.category)) {
+      setSelectedCategory(params.category as ScrapCategoryKey);
+    }
+  }, [params?.category]);
 
   const categoryGridRef = useRef<View>(null);
   const productsRef = useRef<View>(null);
