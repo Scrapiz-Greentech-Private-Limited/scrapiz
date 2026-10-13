@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -14,8 +15,23 @@ import { Audio } from "expo-av";
 import { GLView, ExpoWebGLRenderingContext } from "expo-gl";
 import { Mic, MicOff, X } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ScrappyNovaSocket, ScrappyService } from "../services/scrappyService";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+function pcmToWavUri(pcmBase64: string, sampleRate: number) {
+  try {
+    const pcm = atob(pcmBase64);
+    const buffer = new ArrayBuffer(44);
+    const view = new DataView(buffer);
+    const write = (offset: number, value: string) => [...value].forEach((char, index) => view.setUint8(offset + index, char.charCodeAt(0)));
+    write(0, "RIFF"); view.setUint32(4, 36 + pcm.length, true); write(8, "WAVE"); write(12, "fmt ");
+    view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true); write(36, "data"); view.setUint32(40, pcm.length, true);
+    let bytes = ""; for (let index = 0; index < buffer.byteLength; index += 1) bytes += String.fromCharCode(new Uint8Array(buffer)[index]);
+    return `data:audio/wav;base64,${btoa(bytes + pcm)}`;
+  } catch { return null; }
+}
 
 interface ScrappyVoiceOrbProps {
   onClose: () => void;
@@ -559,6 +575,12 @@ export default function ScrappyVoiceOrb({
   const recording =
     useRef<Audio.Recording | null>(null);
 
+  const voiceSocket =
+    useRef<ScrappyNovaSocket | null>(null);
+
+  const playback =
+    useRef<Audio.Sound | null>(null);
+
   const activityValue =
     useRef(0);
 
@@ -577,6 +599,8 @@ export default function ScrappyVoiceOrb({
           .stopAndUnloadAsync()
           .catch(() => undefined);
       }
+      voiceSocket.current?.stop();
+      playback.current?.unloadAsync().catch(() => undefined);
     };
   }, []);
 
@@ -616,10 +640,31 @@ export default function ScrappyVoiceOrb({
           playsInSilentModeIOS: true,
         });
 
+        setMessage("Connecting to Scrappy…");
+        const session = await ScrappyService.createSession("scrap");
+        const socket = new ScrappyNovaSocket(session.session_id, {
+          onAssistantText: (text) => setMessage(text),
+          onTranscript: (text) => setMessage(`You said: ${text}`),
+          onMode: (mode) => setMessage(mode === "nova" ? "Scrappy is listening…" : "Voice limit reached. Please use text mode."),
+          onConnectionState: (state) => { console.info('[Scrappy][Orb] connection state', state); setMessage(`Scrappy connection: ${state}`); },
+          onError: (error) => { console.error('[Scrappy][Orb] error', error); setMessage(error); },
+          onAudioChunk: async (data, sampleRate) => {
+            const uri = pcmToWavUri(data, sampleRate);
+            if (!uri) return;
+            await playback.current?.stopAsync().catch(() => undefined);
+            await playback.current?.unloadAsync().catch(() => undefined);
+            const result = await Audio.Sound.createAsync({ uri }, { shouldPlay: true });
+            playback.current = result.sound;
+          },
+        });
+        await socket.connect();
+        voiceSocket.current = socket;
+
         const result =
           await Audio.Recording.createAsync(
             {
               ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
+              ...(Platform.OS === "ios" ? { extension: ".wav", outputFormat: Audio.IOSOutputFormat.LINEARPCM, audioQuality: Audio.IOSAudioQuality.HIGH, sampleRate: 16000, numberOfChannels: 1, bitRate: 256000 } : {}),
               isMeteringEnabled: true,
             },
             (status) => {
@@ -677,9 +722,11 @@ export default function ScrappyVoiceOrb({
           "Listening… tell me what you need"
         );
 
-      } catch {
+      } catch (error) {
+        voiceSocket.current?.stop();
+        voiceSocket.current = null;
         setMessage(
-          "I couldn’t access the microphone. You can still write to me."
+          error instanceof Error ? error.message : "Scrappy could not start voice mode."
         );
       } finally {
         setIsStarting(false);
@@ -692,10 +739,15 @@ export default function ScrappyVoiceOrb({
 
   const stopListening =
     async () => {
-      if (recording.current) {
-        await recording.current
-          .stopAndUnloadAsync()
-          .catch(() => undefined);
+      const activeRecording = recording.current;
+      recording.current = null;
+      if (activeRecording) {
+        await activeRecording.stopAndUnloadAsync().catch(() => undefined);
+        const uri = activeRecording.getURI();
+        if (uri && voiceSocket.current) {
+          const response = await fetch(uri);
+          voiceSocket.current.sendAudio(await response.blob());
+        }
       }
 
       recording.current =
@@ -712,9 +764,7 @@ export default function ScrappyVoiceOrb({
 
       setIsListening(false);
 
-      setMessage(
-        "I’m ready for your next question"
-      );
+      setMessage("Thinking…");
     };
 
   /*

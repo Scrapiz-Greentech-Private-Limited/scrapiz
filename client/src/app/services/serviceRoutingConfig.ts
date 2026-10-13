@@ -4,6 +4,7 @@ export const SERVICE_BOOKING_ROUTES = {
   SOCIETY_TIEUP: '/services/society-tieup-book',
   JUNK_REMOVAL: '/services/debris-book',
   PAPER_SHREDDING: '/services/paper-shredding-book',
+  CORPORATE_TIEUP: '/services/paper-shredding-book',
 } as const;
 
 const SERVICE_BOOKING_ROUTE_MAP: Record<string, string> = {
@@ -12,6 +13,7 @@ const SERVICE_BOOKING_ROUTE_MAP: Record<string, string> = {
   'society-tieup': SERVICE_BOOKING_ROUTES.SOCIETY_TIEUP,
   'junk-removal': SERVICE_BOOKING_ROUTES.JUNK_REMOVAL,
   'paper-shredding': SERVICE_BOOKING_ROUTES.PAPER_SHREDDING,
+  'corporate-tieup': SERVICE_BOOKING_ROUTES.CORPORATE_TIEUP,
 };
 
 export const getServiceBookingRoute = (serviceId: string) =>
