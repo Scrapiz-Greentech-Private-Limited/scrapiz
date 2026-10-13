@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Scrapiz",  
+    "name": "Scrapiz",
     "slug": "scrapiz-client",
     "version": "1.2.2",
     "orientation": "portrait",
@@ -70,90 +70,77 @@
       "supportedPlatforms": []
     },
     "plugins": [
-  "expo-router",
-  "expo-apple-authentication",
-  [
-    "@livekit/react-native-expo-plugin", {
-      "android": {
-        "audioType": "communication"
-      }
-    }
-  ],
-  [
-    "@config-plugins/react-native-webrtc",{
-      "android": {
-        "cameraPermission": "Allow $(PRODUCT_NAME) to use camera",
-        "microphonePermission": "Allow $(PRODUCT_NAME) to use microphone"
-      }
-    }
-  ],
-  "expo-image-picker",
-
-  [
-    "expo-build-properties",
-    {
-      "android": {
-        "compileSdkVersion": 36,
-        "targetSdkVersion": 36,
-        "ndkVersion": "26.1.10909125"
-      }
-    }
-  ],
-
-  [
-    "expo-secure-store",
-    {
-      "configureAndroidBackup": true,
-      "faceIDPermission": "Allow $(PRODUCT_NAME) to access your Face ID biometric data."
-    }
-  ],
-
-  [
-    "expo-location",
-    {
-      "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location."
-    }
-  ],
-
-  [
-    "expo-splash-screen",
-    {
-      "image": "./assets/images/splashScreen.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff",
-      "dark": {
-        "image": "./assets/images/splashScreen.png",
-        "backgroundColor": "#121212"
-      }
-    }
-  ],
-
-  [
-    "expo-font",
-    {
-      "fonts": [
-        "./assets/fonts/Montserrat-Regular.ttf",
-        "./assets/fonts/YoungSerif-Regular.ttf"
-      ]
-    }
-  ],
-
-  "expo-localization",
-
-  [
-    "@rnmapbox/maps",
-    {
-      "RNMapboxMapsImpl": "mapbox"
-    }
-  ],
-
-  [
-    "./plugins/withMapboxAccessToken",
-    {
-      "accessToken": "pk.eyJ1IjoiYXlhYW5hbWphZCIsImEiOiJjbWhxbW1veHcwdnB2MmpzNDA2emo1aWp3In0.Mc5kN89_lqGeagn5jWvvzA"
-    }
-  ]
-],
+      "expo-router",
+      "expo-apple-authentication",
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "android": {
+            "cameraPermission": "Allow $(PRODUCT_NAME) to use camera",
+            "microphonePermission": "Allow $(PRODUCT_NAME) to use microphone"
+          }
+        }
+      ],
+      "expo-image-picker",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "ndkVersion": "26.1.10909125"
+          }
+        }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true,
+          "faceIDPermission": "Allow $(PRODUCT_NAME) to access your Face ID biometric data."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splashScreen.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "image": "./assets/images/splashScreen.png",
+            "backgroundColor": "#121212"
+          }
+        }
+      ],
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/Montserrat-Regular.ttf",
+            "./assets/fonts/YoungSerif-Regular.ttf"
+          ]
+        }
+      ],
+      "expo-localization",
+      [
+        "@rnmapbox/maps",
+        {
+          "RNMapboxMapsImpl": "mapbox"
+        }
+      ],
+      [
+        "./plugins/withMapboxAccessToken",
+        {
+          "accessToken": "pk.eyJ1IjoiYXlhYW5hbWphZCIsImEiOiJjbWhxbW1veHcwdnB2MmpzNDA2emo1aWp3In0.Mc5kN89_lqGeagn5jWvvzA"
+        }
+      ],
+      "expo-web-browser"
+    ],
     "experiments": {
       "typedRoutes": true
     },
@@ -174,7 +161,7 @@
       }
     },
     "runtimeVersion": {
-      "policy":"appVersion"
+      "policy": "appVersion"
     },
     "updates": {
       "url": "https://u.expo.dev/53993ab9-a554-4468-bbb9-e825c5646e77",
