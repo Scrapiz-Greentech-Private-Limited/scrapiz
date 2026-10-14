@@ -34,7 +34,7 @@ export default function ScrappyCategoryScreen() {
         <Text style={styles.kicker}>NICE CHOICE</Text>
         <Text style={styles.title}>{content.title}</Text>
         <Text style={styles.intro}>{content.intro}</Text>
-        <View style={styles.videoFrame}><Video source={require('../../assets/transparent.webm')} style={styles.video} resizeMode={ResizeMode.CONTAIN} shouldPlay isLooping isMuted useNativeControls={false} /></View>
+        <View style={styles.videoFrame}><Video source={{ uri: 'https://scrapiz-inventory.s3.ap-south-1.amazonaws.com/media/transparent-alpha.webm' }} style={styles.video} resizeMode={ResizeMode.CONTAIN} shouldPlay isLooping isMuted useNativeControls={false} /></View>
         <Text style={styles.prompt}>How would you like to add your {content.item}?</Text>
         <View style={styles.optionsCard}>
           <TouchableOpacity style={[styles.option, styles.voiceOption]} onPress={() => setShowVoice(true)} activeOpacity={0.88}>

@@ -70,6 +70,13 @@ export default function QuoteDecisionScreen() {
       const response = await AuthService.getOrderQuote(parsedOrderId);
       setQuote(response.quote);
 
+      const quoteStatus = (response.quote?.status || '').toLowerCase();
+      const quoteMethod = response.quote?.payment_method || response.quote?.preferred_payment_method;
+      if ((quoteStatus === 'paid' || quoteStatus === 'completed') && quoteMethod === 'cash') {
+        router.replace(`/tracking/${parsedOrderId}/complete` as any);
+        return;
+      }
+
       // Pre-fill UPI from quote (if customer already provided it)
       if (response.quote?.customer_upi_id) {
         setUpiId(response.quote.customer_upi_id);
@@ -145,14 +152,13 @@ export default function QuoteDecisionScreen() {
           'Your UPI ID has been shared with the vendor. They will scan your QR or transfer directly. ' +
           'Once they submit the payment reference, you can confirm receipt.'
         );
+        setShowSuccess(true);
+        await loadQuote();
       } else {
-        setSuccessMessage(
-          'Vendor will pay you in cash. You can confirm once they hand over the amount.'
-        );
+        // Immediate fulfillment for cash: no tracking or loading screen!
+        router.replace(`/tracking/${parsedOrderId}/complete` as any);
+        return;
       }
-
-      setShowSuccess(true);
-      await loadQuote();
     } catch (err: any) {
       Alert.alert('Unable to accept quote', err?.message || 'Please try again.');
     } finally {
@@ -229,12 +235,12 @@ export default function QuoteDecisionScreen() {
           </View>
         )}
 
-        {/* Navigate to payment confirmation screen */}
+        {/* Navigate to payment confirmation screen or complete screen */}
         <TouchableOpacity
           style={[styles.primaryButton, { backgroundColor: '#ff5b14', marginHorizontal: 16 }]}
-          onPress={() => router.replace(`/tracking/${parsedOrderId}/payment` as any)}
+          onPress={() => router.replace(requiresUpi ? `/tracking/${parsedOrderId}/payment` as any : `/tracking/${parsedOrderId}/complete` as any)}
         >
-          <Text style={styles.primaryButtonText}>Track Payment</Text>
+          <Text style={styles.primaryButtonText}>{requiresUpi ? 'Track Payment' : 'View Completed Order'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity

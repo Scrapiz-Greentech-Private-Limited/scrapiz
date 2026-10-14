@@ -66,15 +66,33 @@ export default function CustomerPaymentScreen() {
     if (isRefresh) setRefreshing(true);
     try {
       const data = await AuthService.getOrderPaymentState(parsedOrderId);
-      setTxData(data?.payment_transaction ?? null);
+      const tx = data?.payment_transaction ?? null;
+      setTxData(tx);
       setError(null);
+
+      const isCash =
+        tx?.preferred_payment_method === 'cash' ||
+        tx?.payment_method === 'cash' ||
+        tx?.cash_fallback_used ||
+        data?.preferred_payment_method === 'cash';
+      if (
+        isCash ||
+        tx?.status === 'paid' ||
+        tx?.status === 'cash_paid' ||
+        data?.quote_status === 'paid' ||
+        data?.booking_status === 'completed'
+      ) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        router.replace(`/tracking/${parsedOrderId}/complete` as any);
+        return;
+      }
     } catch (err: any) {
       if (!isRefresh) setError(err.message || 'Unable to load payment state');
     } finally {
       setLoading(false);
       if (isRefresh) setRefreshing(false);
     }
-  }, [parsedOrderId]);
+  }, [parsedOrderId, router]);
 
   useEffect(() => {
     void loadPaymentState();
@@ -82,17 +100,18 @@ export default function CustomerPaymentScreen() {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [loadPaymentState]);
 
-  // Auto-navigate on terminal success
+  // Auto-navigate on terminal success or cash
   useEffect(() => {
-    if (txData?.status === 'paid' || txData?.status === 'cash_paid') {
+    const isCash =
+      txData?.preferred_payment_method === 'cash' ||
+      txData?.payment_method === 'cash' ||
+      txData?.cash_fallback_used;
+
+    if (txData?.status === 'paid' || txData?.status === 'cash_paid' || isCash) {
       if (pollRef.current) clearInterval(pollRef.current);
-      // Short delay so user sees success
-      const t = setTimeout(() => {
-        router.replace(`/profile/orders/${parsedOrderId}` as any);
-      }, 2500);
-      return () => clearTimeout(t);
+      router.replace(`/tracking/${parsedOrderId}/complete` as any);
     }
-  }, [txData?.status, parsedOrderId, router]);
+  }, [txData, parsedOrderId, router]);
 
   const handleConfirm = async (confirmed: boolean) => {
     if (confirming) return;

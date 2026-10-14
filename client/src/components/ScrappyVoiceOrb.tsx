@@ -5,7 +5,6 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
-  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -22,7 +21,11 @@ import { GLView, ExpoWebGLRenderingContext } from "expo-gl";
 import { Mic, MicOff, X } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { ScrappyNovaSocket, ScrappyService } from "../services/scrappyService";
+import {
+  ScrappyConnectionState,
+  ScrappyNovaSocket,
+  ScrappyService,
+} from "../services/scrappyService";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const orbSize = Math.min(SCREEN_WIDTH * 0.72, 320);
@@ -468,6 +471,7 @@ function ScrappyOrbGL({ activity }: { activity: Animated.Value }) {
    ============================================================ */
 
 export default function ScrappyVoiceOrb({ onClose }: ScrappyVoiceOrbProps) {
+  const [connectionState, setConnectionState] = useState<ScrappyConnectionState>('DISCONNECTED');
   const [isListening, setIsListening] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [message, setMessage] = useState("Tap the orb to start talking");
@@ -499,17 +503,47 @@ export default function ScrappyVoiceOrb({ onClose }: ScrappyVoiceOrbProps) {
     activity.setValue(smoothed);
   }, [activity]);
 
-  const handleMicrophoneData = useCallback((event: { data: string }) => {
+  // @speechmatics/expo-two-way-audio delivers onMicrophoneData with
+  // event.data typed as string in its TS declarations, but the actual
+  // runtime value depends on the native bridge and React Native version:
+  //
+  //   Uint8Array  — Hermes / new arch (most common on Android & iOS RN 0.73+)
+  //   ArrayBuffer — some JSC / old-arch environments
+  //   string      — base64 on some older bridge versions
+  //
+  // We handle all three so this never throws regardless of environment.
+  const handleMicrophoneData = useCallback((event: { data: unknown }) => {
     if (!isListeningRef.current || !voiceSocket.current) return;
-    try {
-      const binary = atob(event.data);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-      updateActivityFromPcm(bytes);
-      voiceSocket.current.sendAudio(bytes);
-    } catch (error) {
-      console.error("[Scrappy][Audio] microphone PCM decode failed", error);
+
+    let bytes: Uint8Array | null = null;
+
+    const raw = event.data;
+
+    if (raw instanceof Uint8Array) {
+      // Most common path: Hermes delivers native bytes directly.
+      bytes = raw;
+    } else if (raw instanceof ArrayBuffer) {
+      bytes = new Uint8Array(raw);
+    } else if (typeof raw === "string" && raw.length > 0) {
+      // String path: try base64 first (some bridge versions encode it),
+      // fall back to treating each char code as a raw PCM byte.
+      try {
+        const decoded = atob(raw);
+        bytes = new Uint8Array(decoded.length);
+        for (let i = 0; i < decoded.length; i += 1) {
+          bytes[i] = decoded.charCodeAt(i) & 0xff;
+        }
+      } catch {
+        bytes = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i += 1) {
+          bytes[i] = (raw.charCodeAt(i)) & 0xff;
+        }
+      }
     }
+
+    if (!bytes || bytes.byteLength === 0) return;
+    updateActivityFromPcm(bytes);
+    voiceSocket.current.sendAudio(bytes);
   }, [updateActivityFromPcm]);
 
   useExpoTwoWayAudioEventListener("onMicrophoneData", handleMicrophoneData);
@@ -545,12 +579,33 @@ export default function ScrappyVoiceOrb({ onClose }: ScrappyVoiceOrbProps) {
         onAssistantText: (text) => { assistantHasSpokenRef.current = true; setMessage(text); },
         onTranscript: (text) => setMessage(`You said: ${text}`),
         onMode: (mode) => {
-          if (mode === "nova" && !assistantHasSpokenRef.current) setMessage("Scrappy is listening…");
-          else if (mode !== "nova") setMessage("Voice limit reached. Please use text mode.");
+          if (mode === "nova") {
+            // Nova stream is confirmed ready — NOW start the microphone.
+            // Starting recording before this point means audio bytes reach
+            // the server before the contentStart block is open, causing Nova
+            // to reject them with an empty-content-end error.
+            if (!isListeningRef.current) {
+              isListeningRef.current = true;
+              setIsListening(true);
+              setMessage("Listening… tell me what you need");
+              toggleRecording(true);
+            }
+          } else {
+            setMessage("Voice limit reached. Please use text mode.");
+          }
         },
         onConnectionState: (state) => {
           console.info("[Scrappy][Orb] connection state", state);
-          if (state === "FAILED" || state === "RECONNECTING") setMessage(`Scrappy connection: ${state}`);
+          setConnectionState(state);
+          if (state === "FAILED") {
+            // Hard failure — clean up mic and let user retry.
+            isListeningRef.current = false;
+            try { toggleRecording(false); } catch {}
+            setIsListening(false);
+            setMessage("Connection failed. Tap to retry.");
+          } else if (state === "RECONNECTING") {
+            setMessage("Reconnecting…");
+          }
         },
         onError: (error) => { console.error("[Scrappy][Orb] error", error); setMessage(error); },
         onAudioChunk: (data) => {
@@ -572,10 +627,11 @@ export default function ScrappyVoiceOrb({ onClose }: ScrappyVoiceOrbProps) {
       assistantHasSpokenRef.current = false;
       await socket.connect();
       voiceSocket.current = socket;
-      isListeningRef.current = true;
-      setIsListening(true);
-      toggleRecording(true);
-      setMessage("Listening… tell me what you need");
+      // NOTE: do NOT start toggleRecording(true) here.
+      // Recording starts only when the server sends {type:"mode",mode:"nova"}
+      // confirming the Nova audio content block is open.
+      // See the onMode handler above.
+      setMessage("Connecting to Nova…");
     } catch (error) {
       isListeningRef.current = false;
       try { toggleRecording(false); } catch {}

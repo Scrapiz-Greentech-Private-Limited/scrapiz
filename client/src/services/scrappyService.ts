@@ -76,9 +76,17 @@ export class ScrappyNovaSocket {
             'Voice limit khatam ho gayi. Text mode mein continue karein.'
           );
           break;
-        case 'error':
+                case 'error':
           console.error('[Scrappy][WS] server error', data);
-          this.setState('FAILED');
+          // If the WebSocket itself is still open, this is a recoverable
+          // server-side error (e.g. an empty audio-content-end, or a brief
+          // Nova hiccup). Don't kill the whole socket — stay CONNECTED so
+          // the user can tap the orb again without needing a full reconnect.
+          if (this.socket?.readyState === WebSocket.OPEN) {
+            this.setState('CONNECTED');
+          } else {
+            this.setState('FAILED');
+          }
           this.handlers.onError?.(
             `[${data.code || 'SCRAPPY_ERROR'}] ${
               data.message || 'Scrappy temporarily unavailable.'

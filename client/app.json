@@ -58,7 +58,8 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.INTERNET",
         "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.INTERNET"
       ],
       "package": "com.scrapiz.app",
       "googleServicesFile": "./google-services.json",

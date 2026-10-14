@@ -153,7 +153,7 @@ export default function ScrappyAssistantScreen() {
           <View style={styles.mascotVideoContainer}>
             <Video
               ref={videoRef}
-              source={require('../../assets/transparent-alpha.webm')}
+              source={{ uri: 'https://scrapiz-inventory.s3.ap-south-1.amazonaws.com/media/transparent-alpha.webm' }}
               style={styles.mascotVideo}
               resizeMode={ResizeMode.CONTAIN}
               shouldPlay={true}
