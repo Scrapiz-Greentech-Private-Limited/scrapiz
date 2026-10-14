@@ -1,17 +1,14 @@
 import axios from 'axios';
 import { API_CONFIG } from '../api/config';
 import { SecureStorageService } from './secureStorage';
-
 export interface ScrappySession { session_id: string; expires_at: string; mode: string; nova_seconds_remaining: number; }
 export interface ScrappyResponse { response_text?: string; intent?: string; ui_component?: string; form_fields?: { name: string; type?: string; required?: boolean; label?: string }[] | null; image_upload?: { enabled: boolean; required?: boolean; max_images?: number; accepted_types?: string[] }; requires_confirmation?: boolean; pending_action_id?: string | null; [key: string]: any; }
 export type ScrappyVoiceState = 'IDLE' | 'LISTENING' | 'PROCESSING' | 'THINKING' | 'SPEAKING' | 'INTERRUPTED' | 'ERROR' | 'RECONNECTING';
 export type ScrappyConnectionState = 'DISCONNECTED' | 'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'FAILED';
 export interface ScrappyAudioHandlers { onTranscript?: (text: string) => void; onAssistantText?: (text: string) => void; onAudioChunk?: (data: string, sampleRate: number, requestId: string) => void; onMode?: (mode: string) => void; onError?: (message: string) => void; onConnectionState?: (state: ScrappyConnectionState) => void; }
-
 const client = axios.create({ baseURL: API_CONFIG.BASE_URL, timeout: 20000 });
 client.interceptors.request.use(async (config) => { config.headers = config.headers || {}; config.headers['x-auth-app'] = API_CONFIG.HEADERS['x-auth-app']; const token = await SecureStorageService.getAuthToken(); if (token) config.headers.Authorization = token; return config; });
 const getError = (error: any) => { const serverMessage = error?.response?.data?.error || error?.response?.data?.message; if (serverMessage) return serverMessage; if (error?.response) return `Scrappy API error ${error.response.status}: ${error.response.statusText || 'request failed'}`; if (error?.request) return `Scrappy API unreachable at ${API_CONFIG.BASE_URL}`; return error?.message || 'Scrappy is temporarily unavailable. Please try again.'; };
-
 export class ScrappyService {
   static async createSession(selectedCategory?: string, selectedService = 'scrap_pickup') { try { return (await client.post<ScrappySession>('/voice/session/', { selected_category: selectedCategory || '', selected_service: selectedService })).data; } catch (error) { throw new Error(getError(error)); } }
   static async process(sessionId: string, transcript: string): Promise<ScrappyResponse> { try { return (await client.post<ScrappyResponse>('/voice/process/', { session_id: sessionId, transcript })).data; } catch (error) { throw new Error(getError(error)); } }
@@ -21,16 +18,119 @@ export class ScrappyService {
   static async listAddresses() { return (await client.get(API_CONFIG.ENDPOINTS.USER_ADDRESSES)).data; }
   static async scanImage(image: { uri: string; name: string; type: string }, sessionId?: string) { try { const form = new FormData(); form.append('image', image as any); if (sessionId) form.append('session_id', sessionId); return (await client.post('/scanner/identify/', form, { headers: { 'Content-Type': 'multipart/form-data' } })).data; } catch (error) { throw new Error(getError(error)); } }
 }
-
 export class ScrappyNovaSocket {
-  private socket: WebSocket | null = null; private retryTimer: ReturnType<typeof setTimeout> | null = null; private connectTimer: ReturnType<typeof setTimeout> | null = null; private closedByUser = false; private retryCount = 0; private requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  private socket: WebSocket | null = null;
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private connectTimer: ReturnType<typeof setTimeout> | null = null;
+  private closedByUser = false;
+  private retryCount = 0;
+  private requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  private pendingAudioByte: number | null = null;
+  private audioSendChain: Promise<void> = Promise.resolve();
   public state: ScrappyConnectionState = 'DISCONNECTED';
   constructor(private readonly sessionId: string, private readonly handlers: ScrappyAudioHandlers) {}
   private setState(state: ScrappyConnectionState) { this.state = state; this.handlers.onConnectionState?.(state); }
   private url(token: string) { const origin = API_CONFIG.BASE_URL.replace(/\/api\/?$/, '').replace(/^http/, 'ws'); return `${origin}/ws/scrappy/?token=${encodeURIComponent(token)}&session_id=${encodeURIComponent(this.sessionId)}`; }
   async connect() { if (this.socket && (this.state === 'CONNECTING' || this.state === 'CONNECTED')) return; const token = await SecureStorageService.getAuthToken(); if (!token) throw new Error('Login required: no auth token found'); this.closedByUser = false; this.setState(this.retryCount ? 'RECONNECTING' : 'CONNECTING'); const endpoint = this.url(token); console.info('[Scrappy][WS] connecting', endpoint.replace(/token=[^&]+/, 'token=<redacted>')); this.socket = new WebSocket(endpoint); this.socket.onmessage = (event) => this.handleMessage(event); this.socket.onclose = (event) => { console.warn('[Scrappy][WS] closed', { code: event.code, reason: event.reason, wasClean: event.wasClean }); this.handleClose(event.code); }; this.socket.onerror = (event) => { console.error('[Scrappy][WS] error', event); this.setState('FAILED'); this.handlers.onError?.('WebSocket error: unable to reach Scrappy backend. Check the endpoint and Nginx /ws/ proxy.'); }; await new Promise<void>((resolve, reject) => { let settled = false; const finish = (error?: Error) => { if (settled) return; settled = true; if (this.connectTimer) clearTimeout(this.connectTimer); error ? reject(error) : resolve(); }; this.socket!.onopen = () => { console.info('[Scrappy][WS] opened', endpoint.replace(/token=[^&]+/, 'token=<redacted>')); this.retryCount = 0; this.setState('CONNECTED'); finish(); }; this.socket!.onerror = () => { this.setState('FAILED'); finish(new Error(`WebSocket handshake failed: ${endpoint.replace(/token=[^&]+/, 'token=<redacted>')}`)); }; this.connectTimer = setTimeout(() => finish(new Error('WebSocket connection timed out after 12 seconds')), 12000); }); }
-  private handleMessage(event: MessageEvent) { if (typeof event.data !== 'string') return; try { const data = JSON.parse(event.data); console.info('[Scrappy][WS] message', { type: data.type, code: data.code, mode: data.mode }); if (data.type === 'mode') this.handlers.onMode?.(data.mode); else if (data.type === 'transcript') { const callback = data.speaker === 'user' ? this.handlers.onTranscript : this.handlers.onAssistantText; if (callback) callback(data.text); } else if (data.type === 'audio_chunk') { this.setState('SPEAKING'); this.handlers.onAudioChunk?.(data.data, data.sample_rate || 24000, this.requestId); } else if (data.type === 'error') { this.setState('FAILED'); console.error('[Scrappy][WS] server error', data); this.handlers.onError?.(`[${data.code || 'SCRAPPY_ERROR'}] ${data.message || 'Scrappy is temporarily unavailable.'}`); } } catch (error) { console.error('[Scrappy][WS] invalid message', error, event.data); this.handlers.onError?.('Voice response could not be read.'); } }
+  private handleMessage(event: MessageEvent) {
+    if (typeof event.data !== 'string') return;
+    try {
+      const data = JSON.parse(event.data);
+      console.info('[Scrappy][WS] message', {
+        type: data.type,
+        code: data.code,
+        mode: data.mode,
+      });
+      switch (data.type) {
+        case 'mode':
+          this.handlers.onMode?.(data.mode);
+          break;
+        case 'voice_ready':
+          this.setState('LISTENING');
+          this.handlers.onMode?.('nova');
+          break;
+        case 'transcript': {
+          const callback =
+            data.speaker === 'user'
+              ? this.handlers.onTranscript
+              : this.handlers.onAssistantText;
+          callback?.(data.text);
+          break;
+        }
+        case 'audio_chunk':
+          this.setState('SPEAKING');
+          this.handlers.onAudioChunk?.(
+            data.data,
+            data.sample_rate || 24000,
+            data.request_id || this.requestId
+          );
+          break;
+        case 'turn_complete':
+          this.setState('LISTENING');
+          break;
+        case 'mode_switch':
+          this.setState('CONNECTED');
+          this.handlers.onMode?.(data.mode);
+          this.handlers.onError?.(
+            data.message ||
+            'Voice limit khatam ho gayi. Text mode mein continue karein.'
+          );
+          break;
+        case 'error':
+          console.error('[Scrappy][WS] server error', data);
+          this.setState('FAILED');
+          this.handlers.onError?.(
+            `[${data.code || 'SCRAPPY_ERROR'}] ${
+              data.message || 'Scrappy temporarily unavailable.'
+            }`
+          );
+          break;
+        default:
+          console.info(
+            '[Scrappy][WS] unhandled message',
+            data.type
+          );
+      }
+    } catch (error) {
+      console.error(
+        '[Scrappy][WS] invalid message',
+        error,
+        event.data
+      );
+      this.handlers.onError?.(
+        'Voice response could not be read.'
+      );
+    }
+  }
   private handleClose(code: number) { this.socket = null; if (this.closedByUser || code === 4001) { this.setState(code === 4001 ? 'FAILED' : 'DISCONNECTED'); if (code === 4001) this.handlers.onError?.('WebSocket rejected (4001): missing or invalid JWT token. Please sign in again.'); return; } if (this.retryCount >= 3) { this.setState('FAILED'); this.handlers.onError?.(`Scrappy could not reconnect. WebSocket close code: ${code}`); return; } const delay = Math.min(15000, 1000 * (2 ** this.retryCount)) + Math.floor(Math.random() * 400); this.retryCount += 1; this.setState('RECONNECTING'); this.retryTimer = setTimeout(() => this.connect().catch((error) => { console.error('[Scrappy][WS] reconnect failed', error); }), delay); }
-  sendAudio(blob: Blob) { if (this.socket?.readyState === WebSocket.OPEN) { this.setState('CONNECTED'); this.socket.send(blob); } }
-  stop() { this.closedByUser = true; if (this.retryTimer) clearTimeout(this.retryTimer); if (this.connectTimer) clearTimeout(this.connectTimer); if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify({ type: 'end_session' })); this.socket?.close(); this.socket = null; this.setState('DISCONNECTED'); }
+  sendAudio(data: ArrayBuffer | Uint8Array) {
+    if (this.socket?.readyState !== WebSocket.OPEN) return;
+    const input = data instanceof Uint8Array ? data : new Uint8Array(data);
+    if (!input.byteLength) return;
+    let bytes = input;
+    if (this.pendingAudioByte !== null) {
+      const merged = new Uint8Array(bytes.byteLength + 1);
+      merged[0] = this.pendingAudioByte;
+      merged.set(bytes, 1);
+      bytes = merged;
+      this.pendingAudioByte = null;
+    }
+    if (bytes.byteLength % 2 !== 0) {
+      this.pendingAudioByte = bytes[bytes.byteLength - 1];
+      bytes = bytes.slice(0, -1);
+    }
+    if (!bytes.byteLength) return;
+    const frame = bytes.slice().buffer;
+    this.setState('LISTENING');
+    this.audioSendChain = this.audioSendChain
+      .then(() => {
+        if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(frame);
+      })
+      .catch((error) => {
+        console.error('[Scrappy][WS] audio send failed', error);
+        this.handlers.onError?.('Microphone audio could not be sent.');
+      });
+  }
+  endTurn() { this.pendingAudioByte = null; if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify({ type: 'end_turn' })); }
+  stop() { this.pendingAudioByte = null; this.audioSendChain = Promise.resolve(); this.closedByUser = true; if (this.retryTimer) clearTimeout(this.retryTimer); if (this.connectTimer) clearTimeout(this.connectTimer); if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify({ type: 'end_session' })); this.socket?.close(); this.socket = null; this.setState('DISCONNECTED'); }
 }

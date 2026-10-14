@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -11,27 +11,21 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Audio } from "expo-av";
+import {
+  initialize as initializeTwoWayAudio,
+  playPCMData,
+  toggleRecording,
+  useExpoTwoWayAudioEventListener,
+  useMicrophonePermissions,
+} from "@speechmatics/expo-two-way-audio";
 import { GLView, ExpoWebGLRenderingContext } from "expo-gl";
 import { Mic, MicOff, X } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import { ScrappyNovaSocket, ScrappyService } from "../services/scrappyService";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-
-function pcmToWavUri(pcmBase64: string, sampleRate: number) {
-  try {
-    const pcm = atob(pcmBase64);
-    const buffer = new ArrayBuffer(44);
-    const view = new DataView(buffer);
-    const write = (offset: number, value: string) => [...value].forEach((char, index) => view.setUint8(offset + index, char.charCodeAt(0)));
-    write(0, "RIFF"); view.setUint32(4, 36 + pcm.length, true); write(8, "WAVE"); write(12, "fmt ");
-    view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
-    view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true); write(36, "data"); view.setUint32(40, pcm.length, true);
-    let bytes = ""; for (let index = 0; index < buffer.byteLength; index += 1) bytes += String.fromCharCode(new Uint8Array(buffer)[index]);
-    return `data:audio/wav;base64,${btoa(bytes + pcm)}`;
-  } catch { return null; }
-}
+const orbSize = Math.min(SCREEN_WIDTH * 0.72, 320);
 
 interface ScrappyVoiceOrbProps {
   onClose: () => void;
@@ -355,11 +349,7 @@ function hexToRgb(hex: string): [number, number, number] {
    ORB
    ============================================================ */
 
-function ScrappyOrbGL({
-  activity,
-}: {
-  activity: Animated.Value;
-}) {
+function ScrappyOrbGL({ activity }: { activity: Animated.Value }) {
   const activityValue = useRef(0);
 
   useEffect(() => {
@@ -372,32 +362,25 @@ function ScrappyOrbGL({
     };
   }, [activity]);
 
-  const onContextCreate = async (
-    gl: ExpoWebGLRenderingContext
-  ) => {
+  const onContextCreate = async (gl: ExpoWebGLRenderingContext) => {
     const vertexShader = gl.createShader(gl.VERTEX_SHADER);
-
     gl.shaderSource(vertexShader, VERTEX_SHADER);
     gl.compileShader(vertexShader);
 
     const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-
     gl.shaderSource(fragmentShader, FRAGMENT_SHADER);
     gl.compileShader(fragmentShader);
 
     const program = gl.createProgram();
-
     gl.attachShader(program, vertexShader);
     gl.attachShader(program, fragmentShader);
     gl.linkProgram(program);
-
     gl.useProgram(program);
 
     /*
      * Full-screen quad.
      */
     const buffer = gl.createBuffer();
-
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
 
     gl.bufferData(
@@ -414,54 +397,19 @@ function ScrappyOrbGL({
       gl.STATIC_DRAW
     );
 
-    const position = gl.getAttribLocation(
-      program,
-      "a_position"
-    );
-
+    const position = gl.getAttribLocation(program, "a_position");
     gl.enableVertexAttribArray(position);
-
-    gl.vertexAttribPointer(
-      position,
-      2,
-      gl.FLOAT,
-      false,
-      0,
-      0
-    );
+    gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
 
     /*
      * Uniforms.
      */
-    const resolution = gl.getUniformLocation(
-      program,
-      "u_resolution"
-    );
-
-    const time = gl.getUniformLocation(
-      program,
-      "u_time"
-    );
-
-    const activityUniform = gl.getUniformLocation(
-      program,
-      "u_activity"
-    );
-
-    const base = gl.getUniformLocation(
-      program,
-      "u_base"
-    );
-
-    const light = gl.getUniformLocation(
-      program,
-      "u_light"
-    );
-
-    const dark = gl.getUniformLocation(
-      program,
-      "u_dark"
-    );
+    const resolution = gl.getUniformLocation(program, "u_resolution");
+    const time = gl.getUniformLocation(program, "u_time");
+    const activityUniform = gl.getUniformLocation(program, "u_activity");
+    const base = gl.getUniformLocation(program, "u_base");
+    const light = gl.getUniformLocation(program, "u_light");
+    const dark = gl.getUniformLocation(program, "u_dark");
 
     /*
      * IMPORTANT:
@@ -480,61 +428,25 @@ function ScrappyOrbGL({
     gl.uniform3fv(dark, darkColor);
 
     gl.enable(gl.BLEND);
-
-    gl.blendFunc(
-      gl.SRC_ALPHA,
-      gl.ONE_MINUS_SRC_ALPHA
-    );
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     const start = Date.now();
 
     const render = () => {
-      const elapsed =
-        (Date.now() - start) / 1000;
+      const elapsed = (Date.now() - start) / 1000;
 
       const width = gl.drawingBufferWidth;
       const height = gl.drawingBufferHeight;
 
-      gl.viewport(
-        0,
-        0,
-        width,
-        height
-      );
+      gl.viewport(0, 0, width, height);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
 
-      gl.clearColor(
-        0,
-        0,
-        0,
-        0
-      );
+      gl.uniform2f(resolution, width, height);
+      gl.uniform1f(time, elapsed);
+      gl.uniform1f(activityUniform, activityValue.current);
 
-      gl.clear(
-        gl.COLOR_BUFFER_BIT
-      );
-
-      gl.uniform2f(
-        resolution,
-        width,
-        height
-      );
-
-      gl.uniform1f(
-        time,
-        elapsed
-      );
-
-      gl.uniform1f(
-        activityUniform,
-        activityValue.current
-      );
-
-      gl.drawArrays(
-        gl.TRIANGLES,
-        0,
-        6
-      );
-
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
       gl.endFrameEXP();
 
       requestAnimationFrame(render);
@@ -555,232 +467,138 @@ function ScrappyOrbGL({
    MAIN COMPONENT
    ============================================================ */
 
-export default function ScrappyVoiceOrb({
-  onClose,
-}: ScrappyVoiceOrbProps) {
-  const [isListening, setIsListening] =
-    useState(false);
+export default function ScrappyVoiceOrb({ onClose }: ScrappyVoiceOrbProps) {
+  const [isListening, setIsListening] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
+  const [message, setMessage] = useState("Tap the orb to start talking");
+  const insets = useSafeAreaInsets();
+  const voiceSocket = useRef<ScrappyNovaSocket | null>(null);
+  const isListeningRef = useRef(false);
+  const assistantHasSpokenRef = useRef(false);
+  const audioInitialized = useRef(false);
+  const activityValue = useRef(0);
+  const activity = useRef(new Animated.Value(0)).current;
+  const [micPermission, requestMicPermission] = useMicrophonePermissions();
 
-  const [isStarting, setIsStarting] =
-    useState(false);
+  const updateActivityFromPcm = useCallback((pcm: Uint8Array) => {
+    const usableBytes = pcm.byteLength - (pcm.byteLength % 2);
+    if (usableBytes < 2) return;
+    const view = new DataView(pcm.buffer, pcm.byteOffset, usableBytes);
+    let sumSquares = 0;
+    const sampleCount = usableBytes / 2;
+    for (let i = 0; i < sampleCount; i += 1) {
+      const sample = view.getInt16(i * 2, true) / 32768;
+      sumSquares += sample * sample;
+    }
+    const rms = Math.sqrt(sumSquares / Math.max(1, sampleCount));
+    const normalized = Math.max(0, Math.min(1, Math.pow(rms * 7.5, 0.55)));
+    const previous = activityValue.current;
+    const smoothing = normalized > previous ? 0.30 : 0.10;
+    const smoothed = previous + (normalized - previous) * smoothing;
+    activityValue.current = smoothed;
+    activity.setValue(smoothed);
+  }, [activity]);
 
-  const [message, setMessage] =
-    useState(
-      "Tap the orb to start talking"
-    );
+  const handleMicrophoneData = useCallback((event: { data: string }) => {
+    if (!isListeningRef.current || !voiceSocket.current) return;
+    try {
+      const binary = atob(event.data);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+      updateActivityFromPcm(bytes);
+      voiceSocket.current.sendAudio(bytes);
+    } catch (error) {
+      console.error("[Scrappy][Audio] microphone PCM decode failed", error);
+    }
+  }, [updateActivityFromPcm]);
 
-  const insets =
-    useSafeAreaInsets();
-
-  const recording =
-    useRef<Audio.Recording | null>(null);
-
-  const voiceSocket =
-    useRef<ScrappyNovaSocket | null>(null);
-
-  const playback =
-    useRef<Audio.Sound | null>(null);
-
-  const activityValue =
-    useRef(0);
-
-  /*
-   * Holds real microphone activity for the shader.
-   */
-  const activity =
-    useRef(
-      new Animated.Value(0)
-    ).current;
+  useExpoTwoWayAudioEventListener("onMicrophoneData", handleMicrophoneData);
 
   useEffect(() => {
+    initializeTwoWayAudio()
+      .then(() => { audioInitialized.current = true; })
+      .catch((error) => console.error("[Scrappy][Audio] native audio init failed", error));
     return () => {
-      if (recording.current) {
-        recording.current
-          .stopAndUnloadAsync()
-          .catch(() => undefined);
-      }
+      isListeningRef.current = false;
+      try { toggleRecording(false); } catch {}
       voiceSocket.current?.stop();
-      playback.current?.unloadAsync().catch(() => undefined);
     };
   }, []);
 
-  /* ============================================================
-     START
-     ============================================================ */
-
-  const startListening =
-    async () => {
-      if (
-        isListening ||
-        isStarting
-      ) {
+  const startListening = async () => {
+    if (isListening || isStarting) return;
+    setIsStarting(true);
+    setMessage("Getting Scrappy ready…");
+    try {
+      const permission = micPermission?.granted ? micPermission : await requestMicPermission();
+      if (!permission.granted) {
+        setMessage("Microphone access is needed to talk to Scrappy");
         return;
       }
-
-      setIsStarting(true);
-
-      setMessage(
-        "Getting Scrappy ready…"
-      );
-
-      try {
-        const permission =
-          await Audio.requestPermissionsAsync();
-
-        if (!permission.granted) {
-          setMessage(
-            "Microphone access is needed to talk to Scrappy"
-          );
-
-          return;
-        }
-
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: true,
-          playsInSilentModeIOS: true,
-        });
-
-        setMessage("Connecting to Scrappy…");
-        const session = await ScrappyService.createSession("scrap");
-        const socket = new ScrappyNovaSocket(session.session_id, {
-          onAssistantText: (text) => setMessage(text),
-          onTranscript: (text) => setMessage(`You said: ${text}`),
-          onMode: (mode) => setMessage(mode === "nova" ? "Scrappy is listening…" : "Voice limit reached. Please use text mode."),
-          onConnectionState: (state) => { console.info('[Scrappy][Orb] connection state', state); setMessage(`Scrappy connection: ${state}`); },
-          onError: (error) => { console.error('[Scrappy][Orb] error', error); setMessage(error); },
-          onAudioChunk: async (data, sampleRate) => {
-            const uri = pcmToWavUri(data, sampleRate);
-            if (!uri) return;
-            await playback.current?.stopAsync().catch(() => undefined);
-            await playback.current?.unloadAsync().catch(() => undefined);
-            const result = await Audio.Sound.createAsync({ uri }, { shouldPlay: true });
-            playback.current = result.sound;
-          },
-        });
-        await socket.connect();
-        voiceSocket.current = socket;
-
-        const result =
-          await Audio.Recording.createAsync(
-            {
-              ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
-              ...(Platform.OS === "ios" ? { extension: ".wav", outputFormat: Audio.IOSOutputFormat.LINEARPCM, audioQuality: Audio.IOSAudioQuality.HIGH, sampleRate: 16000, numberOfChannels: 1, bitRate: 256000 } : {}),
-              isMeteringEnabled: true,
-            },
-            (status) => {
-              if (!status.isRecording) return;
-
-              const db = status.metering;
-              if (
-                typeof db !== "number" ||
-                !Number.isFinite(db)
-              ) {
-                return;
-              }
-
-              const MIN_DB = -55;
-              let normalized =
-                (db - MIN_DB) / (0 - MIN_DB);
-
-              normalized = Math.max(
-                0,
-                Math.min(1, normalized)
-              );
-
-              normalized = Math.pow(
-                normalized,
-                0.65
-              );
-
-              const previous =
-                activityValue.current;
-
-              const smoothing =
-                normalized > previous
-                  ? 0.32
-                  : 0.12;
-
-              const smoothed =
-                previous +
-                (normalized - previous) *
-                  smoothing;
-
-              activityValue.current =
-                smoothed;
-
-              activity.setValue(smoothed);
-            },
-            50
-          );
-
-        recording.current =
-          result.recording;
-
-        setIsListening(true);
-
-        setMessage(
-          "Listening… tell me what you need"
-        );
-
-      } catch (error) {
-        voiceSocket.current?.stop();
-        voiceSocket.current = null;
-        setMessage(
-          error instanceof Error ? error.message : "Scrappy could not start voice mode."
-        );
-      } finally {
-        setIsStarting(false);
+      if (!audioInitialized.current) {
+        await initializeTwoWayAudio();
+        audioInitialized.current = true;
       }
-    };
+      setMessage("Connecting to Scrappy…");
+      const session = await ScrappyService.createSession("scrap");
+      const socket = new ScrappyNovaSocket(session.session_id, {
+        onAssistantText: (text) => { assistantHasSpokenRef.current = true; setMessage(text); },
+        onTranscript: (text) => setMessage(`You said: ${text}`),
+        onMode: (mode) => {
+          if (mode === "nova" && !assistantHasSpokenRef.current) setMessage("Scrappy is listening…");
+          else if (mode !== "nova") setMessage("Voice limit reached. Please use text mode.");
+        },
+        onConnectionState: (state) => {
+          console.info("[Scrappy][Orb] connection state", state);
+          if (state === "FAILED" || state === "RECONNECTING") setMessage(`Scrappy connection: ${state}`);
+        },
+        onError: (error) => { console.error("[Scrappy][Orb] error", error); setMessage(error); },
+        onAudioChunk: (data) => {
+          try {
+            const binary = atob(data);
+            const pcm = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i += 1) pcm[i] = binary.charCodeAt(i);
+            if (pcm.byteLength % 2 !== 0) return;
+            playPCMData(pcm);
+            if (!assistantHasSpokenRef.current) {
+              assistantHasSpokenRef.current = true;
+              setMessage("Scrappy is speaking…");
+            }
+          } catch (error) {
+            console.error("[Scrappy][Audio] PCM playback failed", error);
+          }
+        },
+      });
+      assistantHasSpokenRef.current = false;
+      await socket.connect();
+      voiceSocket.current = socket;
+      isListeningRef.current = true;
+      setIsListening(true);
+      toggleRecording(true);
+      setMessage("Listening… tell me what you need");
+    } catch (error) {
+      isListeningRef.current = false;
+      try { toggleRecording(false); } catch {}
+      voiceSocket.current?.stop();
+      voiceSocket.current = null;
+      setMessage(error instanceof Error ? error.message : "Scrappy could not start voice mode.");
+    } finally {
+      setIsStarting(false);
+    }
+  };
 
-  /* ============================================================
-     STOP
-     ============================================================ */
-
-  const stopListening =
-    async () => {
-      const activeRecording = recording.current;
-      recording.current = null;
-      if (activeRecording) {
-        await activeRecording.stopAndUnloadAsync().catch(() => undefined);
-        const uri = activeRecording.getURI();
-        if (uri && voiceSocket.current) {
-          const response = await fetch(uri);
-          voiceSocket.current.sendAudio(await response.blob());
-        }
-      }
-
-      recording.current =
-        null;
-
-      activityValue.current =
-        0;
-
-      Animated.timing(activity, {
-        toValue: 0,
-        duration: 180,
-        useNativeDriver: false,
-      }).start();
-
-      setIsListening(false);
-
-      setMessage("Thinking…");
-    };
-
-  /*
-   * Keep the orb slightly smaller than
-   * the current implementation.
-   */
-  const orbSize =
-    Math.min(
-      SCREEN_WIDTH - 116,
-      340
-    );
+  const stopListening = async () => {
+    isListeningRef.current = false;
+    try { toggleRecording(false); } catch {}
+    voiceSocket.current?.endTurn();
+    activityValue.current = 0;
+    Animated.timing(activity, { toValue: 0, duration: 180, useNativeDriver: false }).start();
+    setIsListening(false);
+    setMessage("Thinking…");
+  };
 
   return (
-    <View
-      style={styles.overlay}
-    >
+    <View style={styles.overlay}>
       {/* ========================================================
           CLOSE BUTTON
          ======================================================== */}
@@ -788,65 +606,38 @@ export default function ScrappyVoiceOrb({
       <TouchableOpacity
         style={[
           styles.dismiss,
-          {
-            top:
-              Math.max(
-                insets.top + 52,
-                58
-              ),
-          },
+          { top: Math.max(insets.top + 52, 58) },
         ]}
         onPress={onClose}
         accessibilityLabel="Close voice assistant"
       >
-        <X
-          size={25}
-          color="#E8EDF7"
-          strokeWidth={2}
-        />
+        <X size={25} color="#E8EDF7" strokeWidth={2} />
       </TouchableOpacity>
 
       {/* ========================================================
           TITLE AREA
          ======================================================== */}
 
-      <Text style={styles.eyebrow}>
-        SCRAPPY VOICE
-      </Text>
+      <Text style={styles.eyebrow}>SCRAPPY VOICE</Text>
 
       <Text style={styles.title}>
-        {isListening
-          ? "I’m listening"
-          : "Talk to Scrappy"}
+        {isListening ? "I’m listening" : "Talk to Scrappy"}
       </Text>
 
-      <Text style={styles.subtitle}>
-        {message}
-      </Text>
+      <Text style={styles.subtitle}>{message}</Text>
 
       {/* ========================================================
           ORB
          ======================================================== */}
 
       <TouchableOpacity
-        onPress={
-          isListening
-            ? stopListening
-            : startListening
-        }
+        onPress={isListening ? stopListening : startListening}
         activeOpacity={0.96}
         accessibilityRole="button"
-        accessibilityLabel={
-          isListening
-            ? "Stop listening"
-            : "Start voice input"
-        }
+        accessibilityLabel={isListening ? "Stop listening" : "Start voice input"}
         style={[
           styles.orbTouchable,
-          {
-            width: orbSize,
-            height: orbSize,
-          },
+          { width: orbSize, height: orbSize },
         ]}
       >
         {/* soft ambient glow */}
@@ -855,12 +646,9 @@ export default function ScrappyVoiceOrb({
           style={[
             styles.orbGlow,
             {
-              width:
-                orbSize * 0.94,
-              height:
-                orbSize * 0.94,
-              borderRadius:
-                orbSize / 2,
+              width: orbSize * 0.94,
+              height: orbSize * 0.94,
+              borderRadius: orbSize / 2,
             },
           ]}
         />
@@ -872,37 +660,20 @@ export default function ScrappyVoiceOrb({
             {
               width: orbSize,
               height: orbSize,
-              borderRadius:
-                orbSize / 2,
+              borderRadius: orbSize / 2,
             },
           ]}
         >
-          <ScrappyOrbGL
-            activity={activity}
-          />
+          <ScrappyOrbGL activity={activity} />
 
           {/* microphone stays above shader */}
-          <View
-            pointerEvents="none"
-            style={styles.iconContainer}
-          >
+          <View pointerEvents="none" style={styles.iconContainer}>
             {isStarting ? (
-              <ActivityIndicator
-                size="small"
-                color="#20362D"
-              />
+              <ActivityIndicator size="small" color="#20362D" />
             ) : isListening ? (
-              <MicOff
-                size={35}
-                color="#20362D"
-                strokeWidth={2.3}
-              />
+              <MicOff size={35} color="#20362D" strokeWidth={2.3} />
             ) : (
-              <Mic
-                size={35}
-                color="#20362D"
-                strokeWidth={2.3}
-              />
+              <Mic size={35} color="#20362D" strokeWidth={2.3} />
             )}
           </View>
         </View>
@@ -913,9 +684,7 @@ export default function ScrappyVoiceOrb({
          ======================================================== */}
 
       <Text style={styles.hint}>
-        {isListening
-          ? "Tap to stop"
-          : "Tap the orb to speak"}
+        {isListening ? "Tap to stop" : "Tap the orb to speak"}
       </Text>
     </View>
   );
@@ -928,159 +697,94 @@ export default function ScrappyVoiceOrb({
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-
     zIndex: 50,
-
-    backgroundColor:
-      "#080F25",
-
+    backgroundColor: "#080F25",
     alignItems: "center",
-
     paddingTop: 224,
   },
 
   dismiss: {
     position: "absolute",
-
     right: 22,
-
     width: 56,
     height: 56,
-
     borderRadius: 28,
-
     alignItems: "center",
     justifyContent: "center",
-
-    backgroundColor:
-      "rgba(105,119,151,0.28)",
+    backgroundColor: "rgba(105,119,151,0.28)",
   },
 
   eyebrow: {
     color: "#B4C8FF",
-
     fontSize: 12,
-
     fontWeight: "800",
-
     letterSpacing: 2.4,
   },
 
   title: {
     color: "#FFFFFF",
-
     fontSize: 48,
-
     lineHeight: 56,
-
     fontWeight: "900",
-
     marginTop: 36,
-
     letterSpacing: -1.6,
   },
 
   subtitle: {
     color: "#D4DDFF",
-
     fontSize: 23,
-
     lineHeight: 29,
-
     textAlign: "center",
-
     marginTop: 28,
-
     paddingHorizontal: 34,
-
     minHeight: 58,
   },
 
   orbTouchable: {
     marginTop: 28,
-
     alignItems: "center",
     justifyContent: "center",
-
     position: "relative",
   },
 
   orbGlow: {
     position: "absolute",
-
-    backgroundColor:
-      "rgba(231,117,77,0.10)",
-
-    shadowColor:
-      "#E8754D",
-
-    shadowOpacity:
-      0.35,
-
-    shadowRadius:
-      42,
-
-    shadowOffset: {
-      width: 0,
-      height: 0,
-    },
-
+    backgroundColor: "rgba(231,117,77,0.10)",
+    shadowColor: "#E8754D",
+    shadowOpacity: 0.35,
+    shadowRadius: 42,
+    shadowOffset: { width: 0, height: 0 },
     elevation: 15,
   },
 
   orb: {
     overflow: "hidden",
-
-    backgroundColor:
-      "transparent",
-
+    backgroundColor: "transparent",
     borderWidth: 1,
-
-    borderColor:
-      "rgba(255,224,172,0.55)",
-
-    shadowColor:
-      "#000000",
-
-    shadowOpacity:
-      0.35,
-
-    shadowRadius:
-      24,
-
-    shadowOffset: {
-      width: 0,
-      height: 12,
-    },
-
+    borderColor: "rgba(255,224,172,0.55)",
+    shadowColor: "#000000",
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
     elevation: 15,
-
     alignItems: "center",
     justifyContent: "center",
   },
 
   iconContainer: {
     position: "absolute",
-
     width: 68,
     height: 68,
-
     alignItems: "center",
     justifyContent: "center",
-
     borderRadius: 34,
-
-    backgroundColor:
-      "rgba(255,224,172,0.10)",
+    backgroundColor: "rgba(255,224,172,0.10)",
   },
 
   hint: {
     color: "#C2CEFF",
-
     fontSize: 23,
-
     fontWeight: "800",
-
     marginTop: 38,
   },
 });

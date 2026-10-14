@@ -27,6 +27,7 @@
     "@react-navigation/native": "^7.1.8",
     "@rnmapbox/maps": "^10.2.6",
     "@shopify/react-native-skia": "2.2.12",
+    "@speechmatics/expo-two-way-audio": "^0.1.2",
     "axios": "^1.7.9",
     "babel-preset-expo": "~54.0.10",
     "clsx": "^2.1.1",
